@@ -1,0 +1,25 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "DED",
+    "DBD",
+    "DCD"
+  ],
+  "key": {
+    "B": {
+      "item": "create:windmill_bearing"
+    },
+    "C": {
+      "item": "create:mechanical_bearing"
+    },
+    "D": {
+      "item": "minecraft:diamond_block"
+    },
+    "E": {
+      "item": "minecraft:compass"
+    }
+  },
+  "result": {
+    "item": "twistermill:wind_roto_vertical_block"
+  }
+}

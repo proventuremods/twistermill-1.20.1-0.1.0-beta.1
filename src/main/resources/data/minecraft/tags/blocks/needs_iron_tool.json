@@ -1,0 +1,7 @@
+{
+  "values": [
+    "twistermill:servo_twister_block", "twistermill:inv_servo_twister_block",
+    "twistermill:twistermill_block", "twistermill:inv_twistermill_block",
+    "twistermill:torquey_converter_block"
+  ]
+}

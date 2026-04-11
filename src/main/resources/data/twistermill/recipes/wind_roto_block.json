@@ -1,0 +1,25 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "DED",
+    "DBD",
+    "DCD"
+  ],
+  "key": {
+    "B": {
+      "item": "create:windmill_bearing"
+    },
+    "C": {
+      "item": "create:flywheel"
+    },
+    "D": {
+      "item": "minecraft:gold_block"
+    },
+    "E": {
+      "item": "minecraft:heart_of_the_sea"
+    }
+  },
+  "result": {
+    "item": "twistermill:wind_roto_block"
+  }
+}

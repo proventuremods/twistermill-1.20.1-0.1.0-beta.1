@@ -1,0 +1,28 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "DEF",
+    "DBD",
+    "DCD"
+  ],
+  "key": {
+    "B": {
+      "item": "create:windmill_bearing"
+    },
+    "C": {
+      "item": "create:mechanical_arm"
+    },
+    "D": {
+      "item": "minecraft:redstone"
+    },
+    "E": {
+      "item": "create:redstone_link"
+    },
+    "F": {
+      "item": "minecraft:gold_ingot"
+    }
+  },
+  "result": {
+    "item": "twistermill:servo_twister_block"
+  }
+}
