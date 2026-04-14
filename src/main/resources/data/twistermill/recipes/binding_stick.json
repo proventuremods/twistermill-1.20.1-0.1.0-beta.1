@@ -1,0 +1,23 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    " C ",
+    " AB",
+    "A  "
+  ],
+  "key":
+  {
+    "A": {
+      "item": "minecraft:stick"
+    },
+    "B": {
+      "item": "create:redstone_link"
+    },
+    "C": {
+      "item": "minecraft:purple_dye"
+    }
+  },
+  "result": {
+    "item": "twistermill:binding_stick"
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "DBD",
+    "BCA",
+    "DBD"
+  ],
+  "key":
+  {
+    "A": {
+      "item": "create:mechanical_bearing"
+    },
+    "B": {
+      "item": "create:redstone_link"
+    },
+    "C": {
+      "item": "create:shaft"
+    },
+    "D": {
+      "item": "minecraft:orange_dye"
+    }
+  },
+  "result": {
+    "item": "twistermill:servo_twister_block"
+  }
+}

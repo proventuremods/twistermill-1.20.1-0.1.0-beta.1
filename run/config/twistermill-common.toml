@@ -1,0 +1,54 @@
+
+#TwisterMill settings
+[twistermill]
+
+	#WindRotoBlockEntity settings
+	[twistermill.Twistermill_bearing]
+		#SU multiplier for Twistermill bearing output. Range: 1.0 - 1000.0. Default: 8.0
+		#Range: 1.0 ~ 1000.0
+		suFactor = 1.0
+		#Static extra SU added per assembled contraption block. Range: 1 - 1024. Default: 64
+		#Range: 1 ~ 1024
+		suPerBlock = 64
+		#How often Wind Direction bearing ramps RPM toward target. Range: 10 - 1000 ticks in steps of 10. Default: 20
+		rpmRampTicks = 20
+		#How often Wind Direction bearing samples wind speed. Range: 10 - 1000 ticks in steps of 10. Default: 40
+		windUpdateTicks = 40
+		#Maximum RPM change per ramp update for Wind Direction bearing. Range: 1 - 64. Default: 4
+		#Range: 1 ~ 64
+		rpmRampStep = 4
+		#Maximum RPM for Wind Direction bearing. Range: 10 - 256. Default: 128
+		#Range: 10 ~ 256
+		maxRPM = 128
+		#Enables chunkloading/forceload for Twistermill block entities. Default: false
+		chunkLoadingEnabled = false
+		#Base SU generated per RPM. Range: 2.0 - 128.0. Default: 25.4
+		#Range: 2.0 ~ 128.0
+		suPerRpm = 12.8
+
+	#WindRotoVerticalBlockEntity settings
+	[twistermill."Wind Direction bearing"]
+		#How often WindRotoVerticalBlockEntity samples world wind angle. Range: 10 - 1000 ticks in steps of 10. Default: 20
+		verticalWindAngleUpdateTicks = 20
+		#Maximum yaw RPM for WindRotoVerticalBlockEntity. Range: 1 - 256. Default: 10
+		#Range: 1 ~ 256
+		verticalMaxYawRPM = 10
+		#Yaw degrees per tick at 1 RPM for WindRotoVerticalBlockEntity. Range: 0.001 - 10.0. Default: 0.1
+		#Range: 0.001 ~ 10.0
+		verticalDegreesPerTickAt1RPM = 0.1
+		#Maximum yaw acceleration in degrees per tick squared. Range: 0.0001 - 10.0. Default: 0.04
+		#Range: 1.0E-4 ~ 10.0
+		verticalMaxYawAccelDegPerTick2 = 0.04
+		#Yaw deadzone in degrees around the target. Range: 0.0 - 180.0. Default: 3.0
+		#Range: 0.0 ~ 180.0
+		verticalYawDeadzoneDeg = 3.0
+		#Yaw stop velocity threshold in degrees per tick. Range: 0.0001 - 10.0. Default: 0.025
+		#Range: 1.0E-4 ~ 10.0
+		verticalYawStopVelocityDegPerTick = 0.025
+		#Minimum yaw tracking speed in degrees per tick. Range: 0.0 - 10.0. Default: 0.06
+		#Range: 0.0 ~ 10.0
+		verticalYawMinTrackingSpeedDegPerTick = 0.06
+		#Yaw controller gain. Range: 0.0 - 10.0. Default: 0.3
+		#Range: 0.0 ~ 10.0
+		verticalYawControllerGain = 0.3
+

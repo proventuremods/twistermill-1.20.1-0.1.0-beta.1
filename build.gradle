@@ -1,0 +1,241 @@
+plugins {
+    id 'eclipse'
+    id 'idea'
+    id 'maven-publish'
+    id 'net.minecraftforge.gradle' version '[6.0,6.2)'
+    id 'org.parchmentmc.librarian.forgegradle' version '1.+'
+}
+
+import java.security.MessageDigest
+
+version = mod_version
+group = mod_group_id
+
+base {
+    archivesName = "createtwistermill"
+}
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(17)
+
+println "Java: ${System.getProperty 'java.version'}, JVM: ${System.getProperty 'java.vm.version'} (${System.getProperty 'java.vendor'}), Arch: ${System.getProperty 'os.arch'}"
+minecraft {
+    mappings channel: mapping_channel, version: mapping_version
+    copyIdeResources = true
+    runs {
+        configureEach {
+            workingDirectory project.file('run')
+            property 'forge.logging.markers', 'REGISTRIES'
+            property 'forge.logging.console.level', 'debug'
+
+            property 'mixin.env.remapRefMap', 'true'
+            property 'mixin.env.refMapRemappingFile', "${projectDir}/build/createSrgToMcp/output.srg"
+
+            mods {
+                "${mod_id}" {
+                    source sourceSets.main
+                }
+            }
+        }
+
+        client {
+            property 'forge.enabledGameTestNamespaces', mod_id
+        }
+
+        server {
+            property 'forge.enabledGameTestNamespaces', mod_id
+            args '--nogui'
+        }
+
+        gameTestServer {
+            property 'forge.enabledGameTestNamespaces', mod_id
+        }
+
+        data {
+            workingDirectory project.file('run-data')
+            args '--mod', mod_id, '--all', '--output', file('src/generated/resources/'), '--existing', file('src/main/resources/')
+        }
+    }
+}
+
+sourceSets.main.resources { srcDir 'src/generated/resources' }
+
+repositories {
+    maven { url = "https://repo.spongepowered.org/maven" }
+    maven { url = "https://maven.createmod.net" }
+    maven { url = "https://maven.tterrag.com/" }
+    maven { url = "https://maven.ithundxr.dev/mirror" }
+    maven {
+        name = "Valkyrien Skies"
+        url = "https://maven.valkyrienskies.org"
+    }
+    maven {
+        url = "https://cursemaven.com"
+        content {
+            includeGroup "curse.maven"
+        }
+    }
+    mavenCentral()
+}
+
+dependencies {
+
+    minecraft "net.minecraftforge:forge:1.20.1-47.4.10"
+
+    compileOnly(fg.deobf("com.simibubi.create:create-1.20.1:6.0.7-276:slim")) {
+        transitive = false
+    }
+    runtimeOnly(fg.deobf("com.simibubi.create:create-1.20.1:6.0.7-276"))
+
+
+    implementation fg.deobf("net.createmod.ponder:Ponder-Forge-1.20.1:1.0.91")
+
+    compileOnly fg.deobf("dev.engine-room.flywheel:flywheel-forge-api-1.20.1:1.0.5-beta-247")
+    runtimeOnly fg.deobf("dev.engine-room.flywheel:flywheel-forge-1.20.1:1.0.5-beta-247")
+
+    implementation fg.deobf("curse.maven:coroutil-237749:5096038")
+
+    implementation fg.deobf("curse.maven:weather-storms-tornadoes-237746:5244118")
+
+    implementation("org.valkyrienskies.core:api:1.1.0+3d898dfd55") {
+        exclude group: 'org.joml'
+    }
+    implementation("org.valkyrienskies.core:internal:1.1.0+3d898dfd55") {
+        exclude group: 'org.joml'
+    }
+    implementation("org.valkyrienskies.core:util:1.1.0+3d898dfd55") {
+        exclude group: 'org.joml'
+    }
+    implementation(fg.deobf("org.valkyrienskies:valkyrienskies-120-forge:2.4.5+76311e1a4d")) {
+        exclude group: 'com.simibubi'
+        exclude group: 'dev.engine-room'
+        exclude group: 'com.jozufozu'
+    }
+
+    implementation fg.deobf("curse.maven:kotlin-for-forge-351264:5402061")
+
+    implementation fg.deobf("curse.maven:architectury-api-419699:5137938")
+
+    implementation fg.deobf("com.tterrag.registrate:Registrate:MC1.20-1.3.3")
+
+    annotationProcessor "org.spongepowered:mixin:0.8.5:processor"
+}
+
+tasks.named('processResources', ProcessResources).configure {
+    var replaceProperties = [
+            minecraft_version: minecraft_version, minecraft_version_range: minecraft_version_range,
+            forge_version: forge_version, forge_version_range: forge_version_range,
+            loader_version_range: loader_version_range,
+            mod_id: mod_id, mod_name: mod_name, mod_license: mod_license, mod_version: mod_version,
+            mod_authors: mod_authors, mod_description: mod_description,
+    ]
+    inputs.properties replaceProperties
+
+    filesMatching(['META-INF/mods.toml', 'pack.mcmeta']) {
+        expand replaceProperties + [project: project]
+    }
+}
+
+tasks.named('jar', Jar).configure {
+    manifest {
+        attributes([
+                'Specification-Title'     : mod_id,
+                'Specification-Vendor'    : mod_authors,
+                'Specification-Version'   : '1',
+                'Implementation-Title'    : project.name,
+                'Implementation-Version'  : project.jar.archiveVersion,
+                'Implementation-Vendor'   : mod_authors
+        ])
+    }
+
+    finalizedBy 'reobfJar'
+}
+
+publishing {
+    publications {
+        register('mavenJava', MavenPublication) {
+            artifact jar
+        }
+    }
+    repositories {
+        maven {
+            url "file://${project.projectDir}/mcmodsrepo"
+        }
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
+
+tasks.withType(org.gradle.api.tasks.bundling.AbstractArchiveTask).configureEach {
+    preserveFileTimestamps = false
+    reproducibleFileOrder = true
+}
+
+def finalJarFile = tasks.named('jar', Jar).flatMap { it.archiveFile }
+
+def sha256ForFile = { File file ->
+    def digest = MessageDigest.getInstance('SHA-256')
+    file.withInputStream { input ->
+        byte[] buffer = new byte[8192]
+        int read
+        while ((read = input.read(buffer)) != -1) {
+            digest.update(buffer, 0, read)
+        }
+    }
+    digest.digest().collect { String.format('%02x', it) }.join()
+}
+
+def hashOutputFile = layout.buildDirectory.file('hash.txt')
+def expectedHashFile = layout.buildDirectory.file('expected_hash.txt')
+
+tasks.register('buildJarHash') {
+    group = 'verification'
+    description = 'Computes SHA-256 of the final built JAR and writes it to build/hash.txt.'
+    dependsOn tasks.named('reobfJar')
+    inputs.file(finalJarFile)
+    outputs.file(hashOutputFile)
+
+    doLast {
+        File jarFile = finalJarFile.get().asFile
+        if (!jarFile.exists()) {
+            throw new GradleException("Final JAR not found: ${jarFile}")
+        }
+
+        String hash = sha256ForFile(jarFile)
+        println "SHA-256 (${jarFile.name}): ${hash}"
+
+        File outFile = hashOutputFile.get().asFile
+        outFile.parentFile.mkdirs()
+        outFile.text = hash + System.lineSeparator()
+    }
+}
+
+tasks.named('build').configure {
+    finalizedBy tasks.named('buildJarHash')
+}
+
+tasks.register('verifyBuildHash') {
+    group = 'verification'
+    description = 'Verifies the built JAR SHA-256 against build/expected_hash.txt.'
+    dependsOn tasks.named('buildJarHash')
+
+    doLast {
+        File expectedFile = expectedHashFile.get().asFile
+        if (!expectedFile.exists()) {
+            throw new GradleException("Expected hash file not found: ${expectedFile}")
+        }
+
+        String expectedHash = expectedFile.text.trim()
+        if (expectedHash.isEmpty()) {
+            throw new GradleException("Expected hash file is empty: ${expectedFile}")
+        }
+
+        String actualHash = hashOutputFile.get().asFile.text.trim()
+        if (actualHash != expectedHash) {
+            throw new GradleException("Build hash mismatch. Expected: ${expectedHash}, actual: ${actualHash}")
+        }
+
+        println "Build hash verified: ${actualHash}"
+    }
+}

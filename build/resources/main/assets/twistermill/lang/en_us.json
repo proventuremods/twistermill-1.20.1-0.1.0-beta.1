@@ -1,0 +1,61 @@
+{
+  "block.twistermill.wind_roto_block": "Twistermill Bearing",
+  "block.twistermill.servo_twister_block": "Angle Servo",
+  "block.twistermill.inv_servo_twister_block": "Inverted Angle Servo",
+  "block.twistermill.wind_roto_vertical_block": "Wind-Directed Servo",
+  "creativetab.twistermill_tab": "Create: Twistermill",
+  "item.twistermill.binding_stick": "Binding Stick",
+
+  "create.tooltip.twistermill.key_ctrl": "[CTRL]",
+
+  "create.tooltip.twistermill.generated_speed": "Generated RPM",
+  "create.tooltip.twistermill.generated_su": "Kinetic Stress Capacity",
+  "create.tooltip.twistermill.wind_outside": "Outside Exposure",
+  "create.tooltip.twistermill.wind_raw": "Raw Wind Speed",
+  "create.tooltip.twistermill.wind_smoothed": "Smoothed Wind",
+  "create.tooltip.twistermill.servo.angle": "Angle",
+  "create.tooltip.twistermill.unit_rpm": "RPM",
+  "create.tooltip.twistermill.at_current_speed": "at current speed",
+
+  "create.tooltip.twistermill.servo.west_speed_input": "RS-Input (Speed)",
+  "create.tooltip.twistermill.servo.east_angle_input": "RS-Input (Angle)",
+  "create.tooltip.twistermill.servo.south_input": "RS-Input (Mode)",
+
+  "create.tooltip.twistermill.servo.contraption_blocks": "Contraption Blocks",
+  "create.tooltip.twistermill.servo.max_angle": "Set Angle",
+
+  "twistermill.max_angle": "Angle settings",
+  "twistermill.max_angle.option.30": "30 Degrees",
+  "twistermill.max_angle.option.60": "60 Degrees",
+  "twistermill.max_angle.option.90": "90 Degrees",
+
+  "create.tooltip.twistermill.connected_servo": "Connected Servo",
+  "create.tooltip.twistermill.average_servo_degrees": "Average Servo Degrees",
+  "create.tooltip.twistermill.bound_to_wind_roto": "Bound to Twistermill bearing",
+
+  "create.tooltip.twistermill.vertical.obsidian_north_marker": "Obsidian North Marker",
+  "create.tooltip.twistermill.vertical.yaw": "Yaw",
+  "create.tooltip.twistermill.vertical.rpm": "RPM",
+  "create.tooltip.twistermill.vertical.target_yaw": "Target Yaw",
+  "create.tooltip.twistermill.vertical.world_wind_angle": "World Wind Angle",
+  "create.tooltip.twistermill.vertical.local_target_yaw": "Local Target Yaw",
+  "create.tooltip.twistermill.vertical.yaw_velocity": "Yaw Velocity",
+  "create.tooltip.twistermill.vertical.yaw_moving": "Yaw Moving",
+  "create.tooltip.twistermill.vertical.park_mode": "Park Mode",
+  "create.tooltip.twistermill.vertical.redstone_pulse_cooldown": "Redstone Pulse Cooldown",
+  "create.tooltip.twistermill.vertical.present": "present",
+  "create.tooltip.twistermill.vertical.missing_placed_obsidian_block": "missing placed obsidian block",
+  "create.tooltip.twistermill.vertical.define_zero_degree_starting_point": "to define 0 degree starting point (north)",
+  "create.tooltip.twistermill.vertical.not_running": "not running",
+  "create.tooltip.twistermill.vertical.standby": "standby",
+  "create.tooltip.twistermill.vertical.targeting": "targeting",
+  "create.tooltip.twistermill.vertical.aligned": "aligned",
+  "create.tooltip.twistermill.vertical.active": "active",
+  "create.tooltip.twistermill.vertical.not_active": "not active",
+
+  "create.tooltip.twistermill.sail_like_blocks": "Sails-like Blocks",
+  "create.tooltip.twistermill.vertical.up_down_facing_check": "Block facing vertical?"
+}
+
+
+

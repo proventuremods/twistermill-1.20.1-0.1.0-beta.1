@@ -1,0 +1,19 @@
+{
+  "display": {
+    "icon": {
+      "item": "twistermill:wind_roto_block"
+    },
+    "title": "Twistermill dynamic SU",
+    "description": "Bind both a normal and an inverted servo to a Twistermill bearing.",
+    "background": "minecraft:textures/block/stone.png",
+    "frame": "task",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "binding_complete": {
+      "trigger": "minecraft:impossible"
+    }
+  }
+}

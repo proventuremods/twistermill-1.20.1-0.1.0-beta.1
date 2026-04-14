@@ -1,0 +1,23 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "CBC",
+    "BAB",
+    "CBC"
+  ],
+  "key":
+  {
+    "A": {
+      "item": "create:mechanical_bearing"
+    },
+    "B": {
+      "item": "minecraft:compass"
+    },
+    "C": {
+      "item": "minecraft:purple_dye"
+    }
+  },
+  "result": {
+    "item": "twistermill:wind_roto_vertical_block"
+  }
+}
