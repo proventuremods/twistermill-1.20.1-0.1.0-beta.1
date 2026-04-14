@@ -1,7 +1,7 @@
 
-<p align="center">
-  <img src="src/main/resources/icon.png" alt="Create: TwisterMill Icon" width="128" />
-</p>
+
+  <img src="src/main/resources/icon.png" alt="Create: TwisterMill Icon" width="256" />
+
 
 Source installation information for modders/players
 -----------------------------------------------------------------------------------------
@@ -9,15 +9,13 @@ Source installation information for modders/players
                             Minecraft Forge 1.20.1
                                  Dependencies:
 
-Weather2 2.8.3:
-        implementation fg.deobf("curse.maven:weather-storms-tornadoes-237746:5244118")
+Weather2 2.8.3 (weather-storms-tornados)
 
 CoroUtil 1.3.7:
-        implementation fg.deobf("curse.maven:coroutil-237749:5096038")
 
-Create 6.0.7:
-        implementation fg.deobf("curse.maven:create-328085:7149905")
+Create 6.0.7-6.0.8:
 
+available on www.curseforge.com or www.modrinth.com
 -----------------------------------------------------------------------------------------
 
                                 Create: TwisterMill
