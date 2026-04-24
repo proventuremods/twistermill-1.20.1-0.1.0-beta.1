@@ -27,6 +27,12 @@ public class ModCreativeModTabs {
                         pOutput.accept(ModBlocks.WIND_ROTO_VERTICAL_BLOCK.get());
                         pOutput.accept(ModBlocks.INV_SERVO_TWISTER_BLOCK.get());
                         pOutput.accept(ModBlocks.SERVO_TWISTER_BLOCK.get());
+
+                        // === NEU ===
+                        pOutput.accept(ModBlocks.TWISTER_SAIL_FRAME_BLOCK.get());
+                        pOutput.accept(ModBlocks.TWISTER_SAIL_BLOCK.get());
+                        // ===========
+
                         pOutput.accept(ModItems.BINDING_STICK.get());
                     })
                     .build());

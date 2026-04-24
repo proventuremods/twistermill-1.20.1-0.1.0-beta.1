@@ -2,6 +2,8 @@ package com.proventure.twistermill.blockentity;
 
 import com.proventure.twistermill.block.custom.WindRotoBlock;
 import com.proventure.twistermill.config.TwisterMillConfig;
+import com.proventure.twistermill.debug.WindRotoDebugDumpService;
+import com.proventure.twistermill.debug.WindRotoDebugTraceBuffer;
 import com.proventure.twistermill.util.ServoBindingResolver;
 import com.proventure.twistermill.util.WindRotoReflectionHelper;
 import com.simibubi.create.AllSoundEvents;
@@ -57,8 +59,10 @@ public class WindRotoBlockEntity extends MechanicalBearingBlockEntity {
     private static final float MAX_SERVO_BIND_ANGLE = 45.0F;
     private static final float SERVO_FACTOR_EPSILON = 0.0001F;
     private static final float SYNC_FLOAT_EPSILON = 0.01F;
-
     private static final int MIN_RPM = 1;
+    private static final float DEBUG_TRACE_FLOAT_EPSILON = 0.001F;
+    private static final int REDSTONE_RPM_LIMIT_AT_SIGNAL_1 = 220;
+    private static final int REDSTONE_RPM_LIMIT_AT_SIGNAL_14 = 20;
 
     private static final String NBT_BOUND_SERVOS = "BoundServos";
     private static final String NBT_SERVO_POS = "Pos";
@@ -72,8 +76,10 @@ public class WindRotoBlockEntity extends MechanicalBearingBlockEntity {
     private static final String SERVO_TYPE_NORMAL = "normal";
     private static final String SERVO_TYPE_INVERTED = "inverted";
 
-    private static final TagKey<Block> CREATE_WINDMILL_SAILS =
-            TagKey.create(Registries.BLOCK, ResourceLocation.fromNamespaceAndPath("create", "windmill_sails"));
+    private static final TagKey<Block> CREATE_WINDMILL_SAILS = TagKey.create(
+            Registries.BLOCK,
+            ResourceLocation.fromNamespaceAndPath("create", "windmill_sails")
+    );
 
     private record ForcedChunkKey(ResourceKey<Level> dimension, int chunkX, int chunkZ) {
     }
@@ -117,24 +123,27 @@ public class WindRotoBlockEntity extends MechanicalBearingBlockEntity {
         private static BoundServoData read(CompoundTag tag, BlockPos windRotoPos) {
             BlockPos pos = BlockPos.of(tag.getLong(NBT_SERVO_POS));
             boolean inverted = SERVO_TYPE_INVERTED.equals(tag.getString(NBT_SERVO_TYPE));
-
             BlockPos relativeOffset = tag.contains(NBT_REL_X) && tag.contains(NBT_REL_Y) && tag.contains(NBT_REL_Z)
                     ? new BlockPos(tag.getInt(NBT_REL_X), tag.getInt(NBT_REL_Y), tag.getInt(NBT_REL_Z))
                     : pos.subtract(windRotoPos);
 
             BoundServoData data = new BoundServoData(pos, relativeOffset, inverted);
-            if (tag.contains(NBT_SERVO_LAST_ANGLE))
+
+            if (tag.contains(NBT_SERVO_LAST_ANGLE)) {
                 data.lastKnownAngle = tag.getFloat(NBT_SERVO_LAST_ANGLE);
-            if (tag.contains(NBT_SERVO_VALID))
+            }
+            if (tag.contains(NBT_SERVO_VALID)) {
                 data.valid = tag.getBoolean(NBT_SERVO_VALID);
-            if (tag.contains(NBT_MISSING_SAMPLES))
+            }
+            if (tag.contains(NBT_MISSING_SAMPLES)) {
                 data.missingSamples = Math.max(0, tag.getInt(NBT_MISSING_SAMPLES));
+            }
+
             return data;
         }
     }
 
     private static class AllBlocksWindmillContraption extends BearingContraption {
-
         private final boolean windmill;
 
         public AllBlocksWindmillContraption(boolean isWindmill, Direction facing) {
@@ -145,15 +154,16 @@ public class WindRotoBlockEntity extends MechanicalBearingBlockEntity {
         @Override
         public boolean assemble(Level world, BlockPos pos) throws AssemblyException {
             BlockPos offset = pos.relative(facing);
-
-            if (!searchMovedStructure(world, offset, null))
+            if (!searchMovedStructure(world, offset, null)) {
                 return false;
+            }
 
             startMoving(world);
             expandBoundsAroundAxis(facing.getAxis());
 
-            if (windmill && sailBlocks < 1)
+            if (windmill && sailBlocks < 1) {
                 throw AssemblyException.notEnoughSails(sailBlocks);
+            }
 
             return !blocks.isEmpty();
         }
@@ -161,30 +171,25 @@ public class WindRotoBlockEntity extends MechanicalBearingBlockEntity {
         @Override
         public void addBlock(Level level, BlockPos pos, Pair<StructureBlockInfo, BlockEntity> capture) {
             BlockPos localPos = pos.subtract(anchor);
-
-            if (!getBlocks().containsKey(localPos))
+            if (!getBlocks().containsKey(localPos)) {
                 sailBlocks++;
-
+            }
             super.addBlock(level, pos, capture);
         }
     }
 
     private boolean needsInit = true;
     private boolean isOutsideCached = false;
-
     private float lastWindSpeed = 0.0F;
     private float windSmoothed = Float.NaN;
-
     private int targetRpmCached = 0;
     private int generatedRpm = 0;
     private float generatedSu = 0.0F;
-
     private long nextOutsideCheckAt = 0;
     private long nextWindSampleAt = 0;
     private long nextRampAt = 0;
     private long nextServoSampleAt = 0;
     private long nextStuckOverstressRebuildAt = 0;
-
     private int lastSentRpm = Integer.MIN_VALUE;
     private boolean lastSentOutside = false;
     private float lastSentWindSpeed = Float.NaN;
@@ -195,23 +200,34 @@ public class WindRotoBlockEntity extends MechanicalBearingBlockEntity {
     private float lastSentAverageBoundServoAngle = Float.NaN;
     private float lastSentServoSuMultiplier = Float.NaN;
     private int lastSentBoundServoContraptionBlocks = Integer.MIN_VALUE;
-
     private boolean lastVisualRunning = false;
-
     private int lastComparatorLevel = Integer.MIN_VALUE;
-
     protected ScrollOptionBehaviour<WindmillBearingBlockEntity.RotationDirection> movementDirection;
-
     private int lastExternalRedstone = 0;
     private boolean stoppedByRedstone = false;
-
     private boolean chunkForceRegistered = false;
     private ForcedChunkKey forcedChunkKey = null;
-
     private final List<BoundServoData> boundServos = new ArrayList<>();
     private float lastAverageBoundServoAngle = 0.0F;
     private float lastServoSuMultiplier = 1.0F;
     private int lastBoundServoContraptionBlocks = 0;
+    private long debugNextTraceSampleAt = 0L;
+    private int debugDimensionId = Integer.MIN_VALUE;
+    private int debugLastFlags = Integer.MIN_VALUE;
+    private int debugLastGeneratedRpm = Integer.MIN_VALUE;
+    private int debugLastTargetRpm = Integer.MIN_VALUE;
+    private int debugLastExternalRedstone = Integer.MIN_VALUE;
+    private int debugLastBoundServoCount = Integer.MIN_VALUE;
+    private int debugLastComparatorLevel = Integer.MIN_VALUE;
+    private int debugLastContraptionBlockCount = Integer.MIN_VALUE;
+    private int debugLastBoundServoContraptionBlocks = Integer.MIN_VALUE;
+    private int debugLastForcedChunkX = Integer.MIN_VALUE;
+    private int debugLastForcedChunkZ = Integer.MIN_VALUE;
+    private float debugLastGeneratedSu = Float.NaN;
+    private float debugLastRawWind = Float.NaN;
+    private float debugLastSmoothedWind = Float.NaN;
+    private float debugLastGeneratedSpeed = Float.NaN;
+    private float debugLastBearingAngle = Float.NaN;
 
     public WindRotoBlockEntity(BlockPos pos, BlockState state) {
         super(ModBlockEntities.WIND_ROTO_BE.get(), pos, state);
@@ -237,11 +253,19 @@ public class WindRotoBlockEntity extends MechanicalBearingBlockEntity {
     public boolean hasBothServoTypes() {
         boolean hasNormal = false;
         boolean hasInverted = false;
+
         for (BoundServoData data : boundServos) {
-            if (data.inverted) hasInverted = true;
-            else hasNormal = true;
-            if (hasNormal && hasInverted) return true;
+            if (data.inverted) {
+                hasInverted = true;
+            } else {
+                hasNormal = true;
+            }
+
+            if (hasNormal && hasInverted) {
+                return true;
+            }
         }
+
         return false;
     }
 
@@ -254,8 +278,9 @@ public class WindRotoBlockEntity extends MechanicalBearingBlockEntity {
     }
 
     public boolean addBoundServo(BlockPos servoPos, boolean inverted) {
-        if (servoPos == null || servoPos.equals(worldPosition))
+        if (servoPos == null || servoPos.equals(worldPosition)) {
             return false;
+        }
 
         BlockPos relativeOffset = servoPos.subtract(worldPosition);
 
@@ -286,8 +311,12 @@ public class WindRotoBlockEntity extends MechanicalBearingBlockEntity {
     }
 
     public void clearBoundServos() {
-        if (boundServos.isEmpty() && lastAverageBoundServoAngle == 0.0F && lastServoSuMultiplier == 1.0F && lastBoundServoContraptionBlocks == 0)
+        if (boundServos.isEmpty()
+                && lastAverageBoundServoAngle == 0.0F
+                && lastServoSuMultiplier == 1.0F
+                && lastBoundServoContraptionBlocks == 0) {
             return;
+        }
 
         for (BoundServoData data : boundServos) {
             setServoBoundFlag(data, false);
@@ -314,6 +343,7 @@ public class WindRotoBlockEntity extends MechanicalBearingBlockEntity {
         super.onLoad();
 
         if (level != null && !level.isClientSide) {
+            debugInitTraceSystem();
             ensureOwnChunkForced();
             nextServoSampleAt = level.getGameTime() + SERVO_SAMPLE_TICKS;
             nextStuckOverstressRebuildAt = level.getGameTime() + STUCK_OVERSTRESS_REBUILD_TICKS;
@@ -339,10 +369,8 @@ public class WindRotoBlockEntity extends MechanicalBearingBlockEntity {
         }
 
         ForcedChunkKey key = forcedChunkKey;
-
         synchronized (FORCED_CHUNK_REF_COUNTS) {
             int refs = FORCED_CHUNK_REF_COUNTS.getOrDefault(key, 0);
-
             if (refs <= 1) {
                 FORCED_CHUNK_REF_COUNTS.remove(key);
                 serverLevel.setChunkForced(key.chunkX(), key.chunkZ(), false);
@@ -383,11 +411,9 @@ public class WindRotoBlockEntity extends MechanicalBearingBlockEntity {
 
         synchronized (FORCED_CHUNK_REF_COUNTS) {
             int refs = FORCED_CHUNK_REF_COUNTS.getOrDefault(key, 0);
-
             if (refs <= 0) {
                 serverLevel.setChunkForced(key.chunkX(), key.chunkZ(), true);
             }
-
             FORCED_CHUNK_REF_COUNTS.put(key, refs + 1);
         }
 
@@ -399,11 +425,11 @@ public class WindRotoBlockEntity extends MechanicalBearingBlockEntity {
         assembleNextTick = true;
 
         if (level != null && !level.isClientSide) {
-
+            debugInitTraceSystem();
             ensureOwnChunkForced();
 
             int rs = getExternalRedstonePower();
-            if (rs > 0) {
+            if (isHardRedstoneStopSignal(rs)) {
                 stoppedByRedstone = true;
                 assembleNextTick = false;
                 updateVisualRunning(false);
@@ -425,9 +451,15 @@ public class WindRotoBlockEntity extends MechanicalBearingBlockEntity {
             }
 
             recomputeNow(level.getGameTime());
+            if (hasRedstoneRpmLimitSignal(rs)) {
+                int redstoneRpmLimit = getRedstoneRpmLimit(rs);
+                if (generatedRpm > redstoneRpmLimit) {
+                    generatedRpm = redstoneRpmLimit;
+                    generatedSu = computeSuFromRpm(generatedRpm);
+                }
+            }
             updateGeneratedRotation();
             zeroOutCreateWindmillContribution();
-
             setChanged();
             syncIfNeeded();
             updateComparatorIfNeeded();
@@ -439,19 +471,22 @@ public class WindRotoBlockEntity extends MechanicalBearingBlockEntity {
 
     @Override
     public void assemble() {
-        if (level == null)
+        if (level == null) {
             return;
+        }
 
         BlockState state = level.getBlockState(worldPosition);
-        if (!(state.getBlock() instanceof BearingBlock))
+        if (!(state.getBlock() instanceof BearingBlock)) {
             return;
+        }
 
         Direction direction = state.getValue(BearingBlock.FACING);
         BearingContraption contraption = new AllBlocksWindmillContraption(isWindmill(), direction);
 
         try {
-            if (!contraption.assemble(level, worldPosition))
+            if (!contraption.assemble(level, worldPosition)) {
                 return;
+            }
             lastException = null;
         } catch (AssemblyException e) {
             lastException = e;
@@ -459,10 +494,12 @@ public class WindRotoBlockEntity extends MechanicalBearingBlockEntity {
             return;
         }
 
-        if (isWindmill())
+        if (isWindmill()) {
             award(AllAdvancements.WINDMILL);
-        if (contraption.getSailBlocks() >= 16 * 8)
+        }
+        if (contraption.getSailBlocks() >= 16 * 8) {
             award(AllAdvancements.WINDMILL_MAXED);
+        }
 
         contraption.removeBlocksFromWorld(level, BlockPos.ZERO);
         movedContraption = ControlledContraptionEntity.create(level, this, contraption);
@@ -474,8 +511,9 @@ public class WindRotoBlockEntity extends MechanicalBearingBlockEntity {
 
         AllSoundEvents.CONTRAPTION_ASSEMBLE.playOnServer(level, worldPosition);
 
-        if (contraption.containsBlockBreakers())
+        if (contraption.containsBlockBreakers()) {
             award(AllAdvancements.CONTRAPTION_ACTORS);
+        }
 
         running = true;
         angle = 0;
@@ -498,6 +536,7 @@ public class WindRotoBlockEntity extends MechanicalBearingBlockEntity {
                 this,
                 getMovementModeSlot()
         );
+
         movementDirection.withCallback($ -> onDirectionChanged());
         behaviours.add(movementDirection);
     }
@@ -506,8 +545,9 @@ public class WindRotoBlockEntity extends MechanicalBearingBlockEntity {
     public void tick() {
         super.tick();
 
-        if (level == null || level.isClientSide)
+        if (level == null || level.isClientSide) {
             return;
+        }
 
         long time = level.getGameTime();
 
@@ -517,8 +557,8 @@ public class WindRotoBlockEntity extends MechanicalBearingBlockEntity {
 
         int rs = getExternalRedstonePower();
         if (rs != lastExternalRedstone) {
-            boolean nowPowered = rs > 0;
-            boolean wasPowered = lastExternalRedstone > 0;
+            boolean nowPowered = isHardRedstoneStopSignal(rs);
+            boolean wasPowered = isHardRedstoneStopSignal(lastExternalRedstone);
 
             if (nowPowered && !wasPowered) {
                 stoppedByRedstone = true;
@@ -568,13 +608,14 @@ public class WindRotoBlockEntity extends MechanicalBearingBlockEntity {
             if (generatedRpm != 0 || generatedSu != 0.0F) {
                 generatedRpm = 0;
                 generatedSu = 0.0F;
+
                 if (running || assembleNextTick) {
                     updateGeneratedRotation();
                     zeroOutCreateWindmillContribution();
                 }
+
                 setChanged();
             }
-
         } else if (time >= nextWindSampleAt) {
             nextWindSampleAt = time + windUpdateTicks;
 
@@ -588,21 +629,22 @@ public class WindRotoBlockEntity extends MechanicalBearingBlockEntity {
 
             lastWindSpeed = Mth.clamp(lastWindSpeed, 0.0F, MAX_WIND_SPEED);
 
-            if (Float.isNaN(windSmoothed))
+            if (Float.isNaN(windSmoothed)) {
                 windSmoothed = lastWindSpeed;
-            else
+            } else {
                 windSmoothed = windSmoothed + (lastWindSpeed - windSmoothed) * SMOOTH_ALPHA;
+            }
 
             windSmoothed = Mth.clamp(windSmoothed, 0.0F, MAX_WIND_SPEED);
-
             targetRpmCached = windToRpm1Step(windSmoothed, maxRpm);
         }
 
         if (time >= nextRampAt) {
             nextRampAt = time + rpmUpdateTicks;
-
             int targetRpm = (!isOutsideCached || stoppedByRedstone) ? 0 : targetRpmCached;
-
+            if (targetRpm > 0 && hasRedstoneRpmLimitSignal(rs)) {
+                targetRpm = Math.min(targetRpm, getRedstoneRpmLimit(rs));
+            }
             int newRpm = approachInt(generatedRpm, targetRpm, rpmStep);
             newRpm = Mth.clamp(newRpm, 0, maxRpm);
 
@@ -624,33 +666,32 @@ public class WindRotoBlockEntity extends MechanicalBearingBlockEntity {
             zeroOutCreateWindmillContribution();
             updateComparatorIfNeeded();
             syncIfNeeded();
+            debugTraceMaybeSample(time);
             return;
         }
 
         if (running && !isOutsideCached && generatedRpm != 0) {
             generatedRpm = 0;
             generatedSu = 0.0F;
-
             updateGeneratedRotation();
             zeroOutCreateWindmillContribution();
-
             setChanged();
         }
 
         boolean visualRunning = running && isOutsideCached && generatedRpm > 0;
         updateVisualRunning(visualRunning);
-
         maybeRecoverFromStuckOverstress(time);
-
         zeroOutCreateWindmillContribution();
         updateComparatorIfNeeded();
         syncIfNeeded();
+        debugTraceMaybeSample(time);
     }
 
     @Override
     public float getGeneratedSpeed() {
-        if (!running)
+        if (!running) {
             return 0;
+        }
         return generatedRpm * getAngleSpeedDirection();
     }
 
@@ -674,6 +715,7 @@ public class WindRotoBlockEntity extends MechanicalBearingBlockEntity {
     @Override
     public void write(CompoundTag tag, boolean clientPacket) {
         super.write(tag, clientPacket);
+
         tag.putBoolean("Outside", isOutsideCached);
         tag.putFloat("LastWind", lastWindSpeed);
         tag.putFloat("WindSmoothed", windSmoothed);
@@ -681,7 +723,6 @@ public class WindRotoBlockEntity extends MechanicalBearingBlockEntity {
         tag.putFloat("GenSu", generatedSu);
         tag.putInt("TargetRpm", targetRpmCached);
         tag.putBoolean("VisualRunning", lastVisualRunning);
-
         tag.putInt("ExtRS", lastExternalRedstone);
         tag.putBoolean("StoppedByRS", stoppedByRedstone);
 
@@ -695,19 +736,35 @@ public class WindRotoBlockEntity extends MechanicalBearingBlockEntity {
     @Override
     public void read(CompoundTag tag, boolean clientPacket) {
         super.read(tag, clientPacket);
-
         forceRotationModePlace();
 
-        if (tag.contains("Outside")) isOutsideCached = tag.getBoolean("Outside");
-        if (tag.contains("LastWind")) lastWindSpeed = tag.getFloat("LastWind");
-        if (tag.contains("WindSmoothed")) windSmoothed = tag.getFloat("WindSmoothed");
-        if (tag.contains("GenRpm")) generatedRpm = tag.getInt("GenRpm");
-        if (tag.contains("GenSu")) generatedSu = tag.getFloat("GenSu");
-        if (tag.contains("TargetRpm")) targetRpmCached = tag.getInt("TargetRpm");
-        if (tag.contains("VisualRunning")) lastVisualRunning = tag.getBoolean("VisualRunning");
-
-        if (tag.contains("ExtRS")) lastExternalRedstone = Mth.clamp(tag.getInt("ExtRS"), 0, 15);
-        if (tag.contains("StoppedByRS")) stoppedByRedstone = tag.getBoolean("StoppedByRS");
+        if (tag.contains("Outside")) {
+            isOutsideCached = tag.getBoolean("Outside");
+        }
+        if (tag.contains("LastWind")) {
+            lastWindSpeed = tag.getFloat("LastWind");
+        }
+        if (tag.contains("WindSmoothed")) {
+            windSmoothed = tag.getFloat("WindSmoothed");
+        }
+        if (tag.contains("GenRpm")) {
+            generatedRpm = tag.getInt("GenRpm");
+        }
+        if (tag.contains("GenSu")) {
+            generatedSu = tag.getFloat("GenSu");
+        }
+        if (tag.contains("TargetRpm")) {
+            targetRpmCached = tag.getInt("TargetRpm");
+        }
+        if (tag.contains("VisualRunning")) {
+            lastVisualRunning = tag.getBoolean("VisualRunning");
+        }
+        if (tag.contains("ExtRS")) {
+            lastExternalRedstone = Mth.clamp(tag.getInt("ExtRS"), 0, 15);
+        }
+        if (tag.contains("StoppedByRS")) {
+            stoppedByRedstone = tag.getBoolean("StoppedByRS");
+        }
 
         boundServos.clear();
         if (tag.contains(NBT_BOUND_SERVOS, Tag.TAG_LIST)) {
@@ -721,26 +778,22 @@ public class WindRotoBlockEntity extends MechanicalBearingBlockEntity {
         }
 
         int maxRpm = Mth.clamp(TwisterMillConfig.MAX_RPM.get(), 10, 256);
-
         lastWindSpeed = Mth.clamp(lastWindSpeed, 0.0F, MAX_WIND_SPEED);
-        if (!Float.isNaN(windSmoothed))
+        if (!Float.isNaN(windSmoothed)) {
             windSmoothed = Mth.clamp(windSmoothed, 0.0F, MAX_WIND_SPEED);
-
+        }
         targetRpmCached = Mth.clamp(targetRpmCached, 0, maxRpm);
         generatedRpm = Mth.clamp(generatedRpm, 0, maxRpm);
 
         recomputeBoundServoStats();
         generatedSu = computeSuFromRpm(generatedRpm);
-
         zeroOutCreateWindmillContribution();
         updateComparatorIfNeeded();
     }
 
     @Override
     public boolean addToGoggleTooltip(List<Component> tooltip, boolean isPlayerSneaking) {
-
         boolean details = com.simibubi.create.AllKeys.ctrlDown();
-
         int rpmDisplay = lastVisualRunning ? generatedRpm : 0;
         float suDisplay = lastVisualRunning ? generatedSu : 0.0F;
 
@@ -767,7 +820,6 @@ public class WindRotoBlockEntity extends MechanicalBearingBlockEntity {
                 .space()
                 .add(CreateLang.translateDirect("tooltip.twistermill.unit_rpm"))
                 .forGoggles(tooltip, 1);
-
 
         if (!details) {
             CreateLang.text("")
@@ -841,26 +893,43 @@ public class WindRotoBlockEntity extends MechanicalBearingBlockEntity {
     }
 
     private int computeComparatorLevel() {
-        if (!lastVisualRunning)
+        if (!lastVisualRunning) {
             return 0;
-        if (isOverStressed())
+        }
+        if (isOverStressed()) {
             return 0;
-        int lvl = generatedRpm / 16;
-        if (lvl < 0) lvl = 0;
-        if (lvl > 15) lvl = 15;
-        return lvl;
+        }
+
+        int rpm = Math.max(0, generatedRpm);
+        int lvl;
+
+        if (rpm <= 9) {
+            lvl = 1;
+        } else if (rpm >= 247) {
+            lvl = 15;
+        } else {
+            float normalized = (rpm - 9) / 238.0F;
+            lvl = 1 + Math.round(normalized * 14.0F);
+        }
+
+        if (TwisterMillConfig.COMPARATOR_OUTPUT_INVERTED.get()) {
+            lvl = 16 - lvl;
+        }
+
+        return Mth.clamp(lvl, 1, 15);
     }
 
     private void updateComparatorIfNeeded() {
-        if (level == null || level.isClientSide)
+        if (level == null || level.isClientSide) {
             return;
+        }
 
         int now = computeComparatorLevel();
-        if (now == lastComparatorLevel)
+        if (now == lastComparatorLevel) {
             return;
+        }
 
         lastComparatorLevel = now;
-
         BlockState state = getBlockState();
         level.updateNeighbourForOutputSignal(worldPosition, state.getBlock());
         level.updateNeighborsAt(worldPosition, state.getBlock());
@@ -871,43 +940,47 @@ public class WindRotoBlockEntity extends MechanicalBearingBlockEntity {
     }
 
     private void onDirectionChanged() {
-        if (!running || level == null)
+        if (!running || level == null) {
             return;
-
-        if (!level.isClientSide)
+        }
+        if (!level.isClientSide) {
             updateGeneratedRotation();
+        }
     }
 
     private float getAngleSpeedDirection() {
-        if (movementDirection == null)
+        if (movementDirection == null) {
             return 1;
+        }
+
         WindmillBearingBlockEntity.RotationDirection dir =
                 WindmillBearingBlockEntity.RotationDirection.values()[movementDirection.getValue()];
+
         return (dir == WindmillBearingBlockEntity.RotationDirection.CLOCKWISE ? 1 : -1);
     }
 
     private int getContraptionBlockCount() {
-        if (movedContraption == null || movedContraption.getContraption() == null)
+        if (movedContraption == null || movedContraption.getContraption() == null) {
             return 0;
-
+        }
         var blocks = movedContraption.getContraption().getBlocks();
-
-        if (blocks == null)
+        if (blocks == null) {
             return 0;
-
+        }
         return blocks.size();
     }
 
     private int getAssembledSailLikeBlockCount() {
-        if (movedContraption == null || movedContraption.getContraption() == null)
+        if (movedContraption == null || movedContraption.getContraption() == null) {
             return 0;
+        }
 
         var blocks = movedContraption.getContraption().getBlocks();
-        if (blocks == null || blocks.isEmpty())
+        if (blocks == null || blocks.isEmpty()) {
             return 0;
+        }
 
         int sailLikeCount = 0;
-
         for (StructureBlockInfo info : blocks.values()) {
             if (info != null && info.state().is(CREATE_WINDMILL_SAILS)) {
                 sailLikeCount++;
@@ -918,13 +991,34 @@ public class WindRotoBlockEntity extends MechanicalBearingBlockEntity {
     }
 
     private int getExternalRedstonePower() {
-        if (level == null) return 0;
+        if (level == null) {
+            return 0;
+        }
         return Mth.clamp(level.getBestNeighborSignal(worldPosition), 0, 15);
     }
 
+    private static boolean isHardRedstoneStopSignal(int redstoneLevel) {
+        return redstoneLevel == 15;
+    }
+
+    private static boolean hasRedstoneRpmLimitSignal(int redstoneLevel) {
+        return redstoneLevel >= 1 && redstoneLevel <= 14;
+    }
+
+    private static int getRedstoneRpmLimit(int redstoneLevel) {
+        if (!hasRedstoneRpmLimitSignal(redstoneLevel)) {
+            return Integer.MAX_VALUE;
+        }
+
+        float normalized = (redstoneLevel - 1) / 13.0F;
+        return Math.round(REDSTONE_RPM_LIMIT_AT_SIGNAL_1
+                + normalized * (REDSTONE_RPM_LIMIT_AT_SIGNAL_14 - REDSTONE_RPM_LIMIT_AT_SIGNAL_1));
+    }
+
     private void setServoBoundFlag(BoundServoData data, boolean bound) {
-        if (level == null || data == null)
+        if (level == null || data == null) {
             return;
+        }
 
         if (!bound) {
             if (data.lastResolvedPos != null && applyServoBoundFlagAtPos(data.lastResolvedPos, data.inverted, false)) {
@@ -974,16 +1068,17 @@ public class WindRotoBlockEntity extends MechanicalBearingBlockEntity {
                 data.inverted
         );
 
-        if (resolved.found() && resolved.resolvedPos() != null
+        if (resolved.found()
+                && resolved.resolvedPos() != null
                 && applyServoBoundFlagAtPos(resolved.resolvedPos(), data.inverted, true)) {
             data.lastResolvedPos = resolved.resolvedPos();
         }
     }
 
     private boolean applyServoBoundFlagAtPos(@Nullable BlockPos pos, boolean inverted, boolean bound) {
-        if (level == null || pos == null)
+        if (level == null || pos == null) {
             return false;
-
+        }
         BlockEntity be = level.getBlockEntity(pos);
         return applyServoBoundFlagToBlockEntity(be, inverted, bound);
     }
@@ -993,12 +1088,10 @@ public class WindRotoBlockEntity extends MechanicalBearingBlockEntity {
             servo.setBoundToWindRoto(bound);
             return true;
         }
-
         if (inverted && be instanceof InvServoTwisterBlockEntity invServo) {
             invServo.setBoundToWindRoto(bound);
             return true;
         }
-
         return false;
     }
 
@@ -1029,7 +1122,6 @@ public class WindRotoBlockEntity extends MechanicalBearingBlockEntity {
             updateGeneratedRotation();
             zeroOutCreateWindmillContribution();
         }
-
         setChanged();
         sendData();
     }
@@ -1056,7 +1148,9 @@ public class WindRotoBlockEntity extends MechanicalBearingBlockEntity {
 
     private float computeSuFromRpm(int rpm) {
         int r = Math.abs(rpm);
-        if (r <= 0) return 0.0F;
+        if (r <= 0) {
+            return 0.0F;
+        }
 
         float baseSu = (getSuPerRpm() * getSuFactor()) * r;
         float totalBaseSu = baseSu + computeStaticContraptionSu();
@@ -1064,8 +1158,9 @@ public class WindRotoBlockEntity extends MechanicalBearingBlockEntity {
     }
 
     private void updateBoundServoDataIfNeeded(long time) {
-        if (time < nextServoSampleAt)
+        if (time < nextServoSampleAt) {
             return;
+        }
 
         nextServoSampleAt = time + SERVO_SAMPLE_TICKS;
 
@@ -1104,8 +1199,8 @@ public class WindRotoBlockEntity extends MechanicalBearingBlockEntity {
         int validCount = 0;
         int totalServoContraptionBlocks = 0;
         BlockPos currentWorldWindRotoPos = getWorldBlockPosForExternalSystems();
-
         Iterator<BoundServoData> iterator = boundServos.iterator();
+
         while (iterator.hasNext()) {
             BoundServoData data = iterator.next();
 
@@ -1141,7 +1236,6 @@ public class WindRotoBlockEntity extends MechanicalBearingBlockEntity {
             data.lastKnownAngle = sample.normalizedAngle();
             data.valid = true;
             updateResolvedServoBinding(data, sample.resolvedPos());
-
             angleSum += data.lastKnownAngle;
             validCount++;
             totalServoContraptionBlocks += Math.max(0, sample.contraptionBlockCount());
@@ -1160,12 +1254,12 @@ public class WindRotoBlockEntity extends MechanicalBearingBlockEntity {
     }
 
     private float servoAngleToSuMultiplier(float angleDeg) {
-        if (angleDeg <= 0.0F)
+        if (angleDeg <= 0.0F) {
             return 1.0F;
-
-        if (angleDeg > MAX_SERVO_BIND_ANGLE)
+        }
+        if (angleDeg > MAX_SERVO_BIND_ANGLE) {
             return 1.0F;
-
+        }
         return 1.0F + (angleDeg / MAX_SERVO_BIND_ANGLE);
     }
 
@@ -1183,7 +1277,6 @@ public class WindRotoBlockEntity extends MechanicalBearingBlockEntity {
         BlockPos base = worldPosition;
         int maxY = level.getMaxBuildHeight() - 1;
         int solidBlocksAbove = 0;
-
         BlockPos.MutableBlockPos mp = new BlockPos.MutableBlockPos(base.getX(), base.getY() + 1, base.getZ());
 
         while (mp.getY() <= maxY) {
@@ -1195,7 +1288,6 @@ public class WindRotoBlockEntity extends MechanicalBearingBlockEntity {
             }
 
             boolean solid = !s.isAir() && !s.getCollisionShape(level, mp).isEmpty();
-
             if (solid) {
                 solidBlocksAbove++;
                 if (solidBlocksAbove > 5) {
@@ -1254,15 +1346,16 @@ public class WindRotoBlockEntity extends MechanicalBearingBlockEntity {
     }
 
     private void updateVisualRunning(boolean runningVisual) {
-        if (level == null || level.isClientSide)
+        if (level == null || level.isClientSide) {
             return;
-
-        if (runningVisual == lastVisualRunning)
+        }
+        if (runningVisual == lastVisualRunning) {
             return;
+        }
 
         lastVisualRunning = runningVisual;
-
         BlockState state = level.getBlockState(worldPosition);
+
         if (state.hasProperty(WindRotoBlock.RUNNING) && state.getValue(WindRotoBlock.RUNNING) != runningVisual) {
             level.setBlock(worldPosition, state.setValue(WindRotoBlock.RUNNING, runningVisual), 3);
         }
@@ -1295,17 +1388,15 @@ public class WindRotoBlockEntity extends MechanicalBearingBlockEntity {
 
         lastWindSpeed = Mth.clamp(lastWindSpeed, 0.0F, MAX_WIND_SPEED);
 
-        if (Float.isNaN(windSmoothed))
+        if (Float.isNaN(windSmoothed)) {
             windSmoothed = lastWindSpeed;
-        else
+        } else {
             windSmoothed = windSmoothed + (lastWindSpeed - windSmoothed) * SMOOTH_ALPHA;
+        }
 
         windSmoothed = Mth.clamp(windSmoothed, 0.0F, MAX_WIND_SPEED);
-
         targetRpmCached = windToRpm1Step(windSmoothed, maxRpm);
-
         generatedRpm = targetRpmCached;
-
         generatedSu = computeSuFromRpm(generatedRpm);
 
         nextWindSampleAt = time + step10(Mth.clamp(TwisterMillConfig.WIND_UPDATE_TICKS.get(), 10, 1000));
@@ -1315,73 +1406,246 @@ public class WindRotoBlockEntity extends MechanicalBearingBlockEntity {
     }
 
     private static int approachInt(int current, int target, int maxStep) {
-        if (current == target) return current;
-        if (current < target) return Math.min(target, current + maxStep);
+        if (current == target) {
+            return current;
+        }
+        if (current < target) {
+            return Math.min(target, current + maxStep);
+        }
         return Math.max(target, current - maxStep);
     }
 
     private static int windToRpm1Step(float wind, int maxRpm) {
-        if (wind <= 0.0001f) return 1;
+        if (wind <= 0.0001f) {
+            return 1;
+        }
 
         int minRpm = MIN_RPM;
-        if (maxRpm < minRpm) maxRpm = minRpm;
+        if (maxRpm < minRpm) {
+            maxRpm = minRpm;
+        }
 
         float w = Mth.clamp(wind, 0.0F, MAX_WIND_SPEED);
         float t = w / MAX_WIND_SPEED;
-
         float rpmFloat = minRpm + t * (maxRpm - minRpm);
         int rpm = Math.round(rpmFloat);
 
-        if (rpm < minRpm) rpm = minRpm;
-        if (rpm > maxRpm) rpm = maxRpm;
+        if (rpm < minRpm) {
+            rpm = minRpm;
+        }
+        if (rpm > maxRpm) {
+            rpm = maxRpm;
+        }
 
         return rpm;
     }
 
     private void maybeRecoverFromStuckOverstress(long time) {
-        if (time < nextStuckOverstressRebuildAt)
+        if (time < nextStuckOverstressRebuildAt) {
             return;
+        }
 
         nextStuckOverstressRebuildAt = time + STUCK_OVERSTRESS_REBUILD_TICKS;
 
-        if (level == null || level.isClientSide)
+        if (level == null || level.isClientSide) {
             return;
-        if (!running || assembleNextTick)
+        }
+        if (!running || assembleNextTick) {
             return;
-        if (!isOverStressed())
+        }
+        if (!isOverStressed()) {
             return;
-        if (lastExternalRedstone > 0)
+        }
+        if (isHardRedstoneStopSignal(lastExternalRedstone)) {
             return;
-        if (!isOutsideCached)
+        }
+        if (!isOutsideCached) {
             return;
+        }
 
         float generatedSpeed = getGeneratedSpeed();
-        if (Math.abs(generatedSpeed) <= SYNC_FLOAT_EPSILON)
+        if (Math.abs(generatedSpeed) <= SYNC_FLOAT_EPSILON) {
             return;
+        }
 
         rebuildKineticNetworkFromSource(generatedSpeed);
     }
 
     private void rebuildKineticNetworkFromSource(float generatedSpeed) {
-        if (level == null || level.isClientSide)
+        if (level == null || level.isClientSide) {
             return;
+        }
 
         if (hasNetwork()) {
             getOrCreateNetwork().remove(this);
         }
 
         detachKinetics();
-
         source = null;
         setSpeed(generatedSpeed);
         setNetwork(createNetworkId());
         attachKinetics();
-
         updateGeneratedRotation();
         zeroOutCreateWindmillContribution();
         setChanged();
         syncIfNeeded();
         updateComparatorIfNeeded();
+    }
+
+    private void debugInitTraceSystem() {
+        if (level == null || level.isClientSide) {
+            return;
+        }
+
+        WindRotoDebugDumpService.initialize(level.getServer());
+
+        if (debugDimensionId == Integer.MIN_VALUE) {
+            debugDimensionId = WindRotoDebugTraceBuffer.getOrCreateDimensionId(level.dimension().location());
+        }
+    }
+
+    private void debugTraceMaybeSample(long gameTime) {
+        if (level == null || level.isClientSide) {
+            return;
+        }
+
+        if (debugDimensionId == Integer.MIN_VALUE) {
+            debugDimensionId = WindRotoDebugTraceBuffer.getOrCreateDimensionId(level.dimension().location());
+        }
+
+        float smoothWind = Float.isNaN(windSmoothed) ? lastWindSpeed : windSmoothed;
+        float generatedSpeed = getGeneratedSpeed();
+        float bearingAngle = angle;
+
+        int flags = 0;
+        if (running) {
+            flags |= WindRotoDebugTraceBuffer.FLAG_RUNNING;
+        }
+        if (assembleNextTick) {
+            flags |= WindRotoDebugTraceBuffer.FLAG_ASSEMBLE_QUEUED;
+        }
+        if (movedContraption != null) {
+            flags |= WindRotoDebugTraceBuffer.FLAG_ASSEMBLED;
+        }
+        if (isOutsideCached) {
+            flags |= WindRotoDebugTraceBuffer.FLAG_OUTSIDE;
+        }
+        if (stoppedByRedstone) {
+            flags |= WindRotoDebugTraceBuffer.FLAG_STOPPED_BY_REDSTONE;
+        }
+        if (isOverStressed()) {
+            flags |= WindRotoDebugTraceBuffer.FLAG_OVERSTRESSED;
+        }
+        if (needsInit) {
+            flags |= WindRotoDebugTraceBuffer.FLAG_NEEDS_INIT;
+        }
+        if (chunkForceRegistered) {
+            flags |= WindRotoDebugTraceBuffer.FLAG_CHUNK_FORCED;
+        }
+        if (lastVisualRunning) {
+            flags |= WindRotoDebugTraceBuffer.FLAG_VISUAL_RUNNING;
+        }
+        if (hasNetwork()) {
+            flags |= WindRotoDebugTraceBuffer.FLAG_HAS_NETWORK;
+        }
+        if (source != null) {
+            flags |= WindRotoDebugTraceBuffer.FLAG_SOURCE_PRESENT;
+        }
+        if (lastSentOutside) {
+            flags |= WindRotoDebugTraceBuffer.FLAG_LAST_SENT_OUTSIDE;
+        }
+        if (lastSentVisualRunning) {
+            flags |= WindRotoDebugTraceBuffer.FLAG_LAST_SENT_VISUAL_RUNNING;
+        }
+
+        int servoCount = boundServos.size();
+        int contraptionBlockCount = getContraptionBlockCount();
+        int forcedChunkX = forcedChunkKey != null ? forcedChunkKey.chunkX() : Integer.MIN_VALUE;
+        int forcedChunkZ = forcedChunkKey != null ? forcedChunkKey.chunkZ() : Integer.MIN_VALUE;
+
+        boolean changed =
+                flags != debugLastFlags
+                        || generatedRpm != debugLastGeneratedRpm
+                        || targetRpmCached != debugLastTargetRpm
+                        || lastExternalRedstone != debugLastExternalRedstone
+                        || servoCount != debugLastBoundServoCount
+                        || lastComparatorLevel != debugLastComparatorLevel
+                        || contraptionBlockCount != debugLastContraptionBlockCount
+                        || lastBoundServoContraptionBlocks != debugLastBoundServoContraptionBlocks
+                        || forcedChunkX != debugLastForcedChunkX
+                        || forcedChunkZ != debugLastForcedChunkZ
+                        || debugFloatDiffers(generatedSu, debugLastGeneratedSu)
+                        || debugFloatDiffers(lastWindSpeed, debugLastRawWind)
+                        || debugFloatDiffers(smoothWind, debugLastSmoothedWind)
+                        || debugFloatDiffers(generatedSpeed, debugLastGeneratedSpeed)
+                        || debugFloatDiffers(bearingAngle, debugLastBearingAngle);
+
+        if (!changed && gameTime < debugNextTraceSampleAt) {
+            return;
+        }
+
+        debugNextTraceSampleAt = gameTime + WindRotoDebugTraceBuffer.TRACE_SAMPLE_INTERVAL_TICKS;
+        debugLastFlags = flags;
+        debugLastGeneratedRpm = generatedRpm;
+        debugLastTargetRpm = targetRpmCached;
+        debugLastExternalRedstone = lastExternalRedstone;
+        debugLastBoundServoCount = servoCount;
+        debugLastComparatorLevel = lastComparatorLevel;
+        debugLastContraptionBlockCount = contraptionBlockCount;
+        debugLastBoundServoContraptionBlocks = lastBoundServoContraptionBlocks;
+        debugLastForcedChunkX = forcedChunkX;
+        debugLastForcedChunkZ = forcedChunkZ;
+        debugLastGeneratedSu = generatedSu;
+        debugLastRawWind = lastWindSpeed;
+        debugLastSmoothedWind = smoothWind;
+        debugLastGeneratedSpeed = generatedSpeed;
+        debugLastBearingAngle = bearingAngle;
+
+        WindRotoDebugTraceBuffer.record(
+                gameTime,
+                worldPosition.asLong(),
+                debugDimensionId,
+                flags,
+                generatedRpm,
+                targetRpmCached,
+                lastExternalRedstone,
+                servoCount,
+                lastComparatorLevel,
+                contraptionBlockCount,
+                lastBoundServoContraptionBlocks,
+                forcedChunkX,
+                forcedChunkZ,
+                lastSentRpm,
+                lastSentBoundServoCount,
+                lastSentBoundServoContraptionBlocks,
+                generatedSu,
+                lastWindSpeed,
+                smoothWind,
+                lastAverageBoundServoAngle,
+                lastServoSuMultiplier,
+                generatedSpeed,
+                bearingAngle,
+                lastSentWindSpeed,
+                lastSentWindSmoothed,
+                lastSentGeneratedSu,
+                lastSentAverageBoundServoAngle,
+                lastSentServoSuMultiplier,
+                nextOutsideCheckAt,
+                nextWindSampleAt,
+                nextRampAt,
+                nextServoSampleAt,
+                nextStuckOverstressRebuildAt
+        );
+    }
+
+    private static boolean debugFloatDiffers(float a, float b) {
+        if (Float.isNaN(a) != Float.isNaN(b)) {
+            return true;
+        }
+        if (Float.isNaN(a)) {
+            return false;
+        }
+        return Math.abs(a - b) > DEBUG_TRACE_FLOAT_EPSILON;
     }
 
     private BlockPos getWorldBlockPosForExternalSystems() {

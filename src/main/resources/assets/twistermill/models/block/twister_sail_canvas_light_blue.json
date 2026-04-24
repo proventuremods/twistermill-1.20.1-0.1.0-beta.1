@@ -1,0 +1,6 @@
+{
+  "parent": "twistermill:block/twister_sail_canvas",
+  "textures": {
+    "3": "create:block/sail/canvas_light_blue"
+  }
+}

@@ -1,6 +1,9 @@
 package com.proventure.twistermill.blockentity;
 
 import com.proventure.twistermill.block.custom.InvServoTwisterBlock;
+import com.proventure.twistermill.debug.ServoTwisterDebugTraceBuffer;
+import com.proventure.twistermill.debug.WindRotoDebugDumpService;
+import com.proventure.twistermill.util.InvServoTwisterVentStateHelper;
 import com.simibubi.create.AllSoundEvents;
 import com.simibubi.create.content.contraptions.AssemblyException;
 import com.simibubi.create.content.contraptions.ControlledContraptionEntity;
@@ -27,6 +30,7 @@ import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate.StructureBlockInfo;
 import org.apache.commons.lang3.tuple.Pair;
 
+import javax.annotation.Nullable;
 import java.util.List;
 
 public class InvServoTwisterBlockEntity extends MechanicalBearingBlockEntity {
@@ -73,6 +77,43 @@ public class InvServoTwisterBlockEntity extends MechanicalBearingBlockEntity {
 
     private float targetAngle = 0.0F;
     private long lastRuntimeDirtyGameTime = Long.MIN_VALUE;
+
+    private static final float DEBUG_TRACE_FLOAT_EPSILON = 0.001F;
+
+    private long debugNextTraceSampleAt = 0L;
+    private int debugDimensionId = Integer.MIN_VALUE;
+    private int debugLastFlags = Integer.MIN_VALUE;
+    private int debugLastContraptionBlockCount = Integer.MIN_VALUE;
+    private int debugLastLastWestSignal = Integer.MIN_VALUE;
+    private int debugLastLastEastSignal = Integer.MIN_VALUE;
+    private int debugLastLastSouthSignal = Integer.MIN_VALUE;
+    private int debugLastPendingWestSignal = Integer.MIN_VALUE;
+    private int debugLastPendingEastSignal = Integer.MIN_VALUE;
+    private int debugLastPendingSouthSignal = Integer.MIN_VALUE;
+    private int debugLastPendingWestTicks = Integer.MIN_VALUE;
+    private int debugLastPendingEastTicks = Integer.MIN_VALUE;
+    private int debugLastPendingSouthTicks = Integer.MIN_VALUE;
+    private int debugLastDisplayWestSignal = Integer.MIN_VALUE;
+    private int debugLastDisplayEastSignal = Integer.MIN_VALUE;
+    private int debugLastDisplaySouthSignal = Integer.MIN_VALUE;
+    private int debugLastPendingDisplayWestSignal = Integer.MIN_VALUE;
+    private int debugLastPendingDisplayEastSignal = Integer.MIN_VALUE;
+    private int debugLastPendingDisplaySouthSignal = Integer.MIN_VALUE;
+    private int debugLastPendingDisplayWestTicks = Integer.MIN_VALUE;
+    private int debugLastPendingDisplayEastTicks = Integer.MIN_VALUE;
+    private int debugLastPendingDisplaySouthTicks = Integer.MIN_VALUE;
+    private int debugLastConfiguredMaxDegrees = Integer.MIN_VALUE;
+    private int debugLastEffectiveMaxDegrees = Integer.MIN_VALUE;
+    private int debugLastMovementModeValue = Integer.MIN_VALUE;
+    private int debugLastFacingOrdinal = Integer.MIN_VALUE;
+    private int debugLastWestInputOrdinal = Integer.MIN_VALUE;
+    private int debugLastEastInputOrdinal = Integer.MIN_VALUE;
+    private int debugLastSouthInputOrdinal = Integer.MIN_VALUE;
+    private long debugLastRuntimeDirtyGameTime = Long.MIN_VALUE;
+    private float debugLastAngle = Float.NaN;
+    private float debugLastTargetAngle = Float.NaN;
+    private float debugLastBindingAngle = Float.NaN;
+    private float debugLastGeneratedSpeed = Float.NaN;
 
     public enum MaxAngleOption implements INamedIconOptions {
         DEG_30(30, "twistermill.max_angle.option.30", AllIcons.I_ROTATE_NEVER_PLACE),
@@ -273,6 +314,17 @@ public class InvServoTwisterBlockEntity extends MechanicalBearingBlockEntity {
 
         updateDisplayedSignals();
 
+        if (serverSide) {
+            InvServoTwisterVentStateHelper.syncVentState(
+                    level,
+                    worldPosition,
+                    getBlockState(),
+                    displayWestSignal,
+                    displayEastSignal,
+                    displaySouthSignal
+            );
+        }
+
         if (level.isClientSide)
             return;
 
@@ -296,6 +348,7 @@ public class InvServoTwisterBlockEntity extends MechanicalBearingBlockEntity {
                 running && (manualEnabled || lastEastSignal > 0 || lastSouthSignal > 0 || Math.abs(angle) > ANGLE_EPSILON);
 
         updateVisualRunning(visualRunning);
+        debugTraceMaybeSample(time);
     }
 
     @Override
@@ -872,6 +925,184 @@ public class InvServoTwisterBlockEntity extends MechanicalBearingBlockEntity {
             lastRuntimeDirtyGameTime = gameTime;
             setChanged();
         }
+    }
+
+    private void debugInitTraceSystem() {
+        if (level == null || level.isClientSide) {
+            return;
+        }
+
+        WindRotoDebugDumpService.initialize(level.getServer());
+
+        if (debugDimensionId == Integer.MIN_VALUE) {
+            debugDimensionId = ServoTwisterDebugTraceBuffer.getOrCreateDimensionId(level.dimension().location());
+        }
+    }
+
+    private void debugTraceMaybeSample(long gameTime) {
+        if (level == null || level.isClientSide) {
+            return;
+        }
+
+        debugInitTraceSystem();
+
+        int movementModeValue = movementMode != null ? movementMode.getValue() : -1;
+        int configuredMaxDegrees = getConfiguredMaxDegrees();
+        int effectiveMaxDegrees = getEffectiveMaxDegrees();
+        int contraptionBlockCount = getContraptionBlockCount();
+
+        Direction facing = getBlockFacing();
+        Direction westInput = getRelativeWestInputSide();
+        Direction eastInput = getRelativeEastInputSide();
+        Direction southInput = getRelativeSouthInputSide();
+
+        int facingOrdinal = debugDirectionOrdinal(facing);
+        int westInputOrdinal = debugDirectionOrdinal(westInput);
+        int eastInputOrdinal = debugDirectionOrdinal(eastInput);
+        int southInputOrdinal = debugDirectionOrdinal(southInput);
+
+        float currentAngle = angle;
+        float currentTargetAngle = targetAngle;
+        float bindingAngle = getWindRotoBindingAngleDegrees();
+        float generatedSpeed = getGeneratedSpeed();
+
+        int flags = 0;
+        if (running) flags |= ServoTwisterDebugTraceBuffer.FLAG_RUNNING;
+        if (assembleNextTick) flags |= ServoTwisterDebugTraceBuffer.FLAG_ASSEMBLE_QUEUED;
+        if (movedContraption != null) flags |= ServoTwisterDebugTraceBuffer.FLAG_ASSEMBLED;
+        if (manualEnabled) flags |= ServoTwisterDebugTraceBuffer.FLAG_MANUAL_ENABLED;
+        if (needsStateRefresh) flags |= ServoTwisterDebugTraceBuffer.FLAG_NEEDS_STATE_REFRESH;
+        if (boundToWindRoto) flags |= ServoTwisterDebugTraceBuffer.FLAG_BOUND_TO_WIND_ROTO;
+        if (lastVisualRunning) flags |= ServoTwisterDebugTraceBuffer.FLAG_VISUAL_RUNNING;
+        if (hasNetwork()) flags |= ServoTwisterDebugTraceBuffer.FLAG_HAS_NETWORK;
+        if (source != null) flags |= ServoTwisterDebugTraceBuffer.FLAG_SOURCE_PRESENT;
+
+        boolean changed =
+                flags != debugLastFlags
+                        || contraptionBlockCount != debugLastContraptionBlockCount
+                        || lastWestSignal != debugLastLastWestSignal
+                        || lastEastSignal != debugLastLastEastSignal
+                        || lastSouthSignal != debugLastLastSouthSignal
+                        || pendingWestSignal != debugLastPendingWestSignal
+                        || pendingEastSignal != debugLastPendingEastSignal
+                        || pendingSouthSignal != debugLastPendingSouthSignal
+                        || pendingWestTicks != debugLastPendingWestTicks
+                        || pendingEastTicks != debugLastPendingEastTicks
+                        || pendingSouthTicks != debugLastPendingSouthTicks
+                        || displayWestSignal != debugLastDisplayWestSignal
+                        || displayEastSignal != debugLastDisplayEastSignal
+                        || displaySouthSignal != debugLastDisplaySouthSignal
+                        || pendingDisplayWestSignal != debugLastPendingDisplayWestSignal
+                        || pendingDisplayEastSignal != debugLastPendingDisplayEastSignal
+                        || pendingDisplaySouthSignal != debugLastPendingDisplaySouthSignal
+                        || pendingDisplayWestTicks != debugLastPendingDisplayWestTicks
+                        || pendingDisplayEastTicks != debugLastPendingDisplayEastTicks
+                        || pendingDisplaySouthTicks != debugLastPendingDisplaySouthTicks
+                        || configuredMaxDegrees != debugLastConfiguredMaxDegrees
+                        || effectiveMaxDegrees != debugLastEffectiveMaxDegrees
+                        || movementModeValue != debugLastMovementModeValue
+                        || facingOrdinal != debugLastFacingOrdinal
+                        || westInputOrdinal != debugLastWestInputOrdinal
+                        || eastInputOrdinal != debugLastEastInputOrdinal
+                        || southInputOrdinal != debugLastSouthInputOrdinal
+                        || lastRuntimeDirtyGameTime != debugLastRuntimeDirtyGameTime
+                        || debugFloatDiffers(currentAngle, debugLastAngle)
+                        || debugFloatDiffers(currentTargetAngle, debugLastTargetAngle)
+                        || debugFloatDiffers(bindingAngle, debugLastBindingAngle)
+                        || debugFloatDiffers(generatedSpeed, debugLastGeneratedSpeed);
+
+        if (!changed && gameTime < debugNextTraceSampleAt) {
+            return;
+        }
+
+        debugNextTraceSampleAt = gameTime + ServoTwisterDebugTraceBuffer.TRACE_SAMPLE_INTERVAL_TICKS;
+        debugLastFlags = flags;
+        debugLastContraptionBlockCount = contraptionBlockCount;
+        debugLastLastWestSignal = lastWestSignal;
+        debugLastLastEastSignal = lastEastSignal;
+        debugLastLastSouthSignal = lastSouthSignal;
+        debugLastPendingWestSignal = pendingWestSignal;
+        debugLastPendingEastSignal = pendingEastSignal;
+        debugLastPendingSouthSignal = pendingSouthSignal;
+        debugLastPendingWestTicks = pendingWestTicks;
+        debugLastPendingEastTicks = pendingEastTicks;
+        debugLastPendingSouthTicks = pendingSouthTicks;
+        debugLastDisplayWestSignal = displayWestSignal;
+        debugLastDisplayEastSignal = displayEastSignal;
+        debugLastDisplaySouthSignal = displaySouthSignal;
+        debugLastPendingDisplayWestSignal = pendingDisplayWestSignal;
+        debugLastPendingDisplayEastSignal = pendingDisplayEastSignal;
+        debugLastPendingDisplaySouthSignal = pendingDisplaySouthSignal;
+        debugLastPendingDisplayWestTicks = pendingDisplayWestTicks;
+        debugLastPendingDisplayEastTicks = pendingDisplayEastTicks;
+        debugLastPendingDisplaySouthTicks = pendingDisplaySouthTicks;
+        debugLastConfiguredMaxDegrees = configuredMaxDegrees;
+        debugLastEffectiveMaxDegrees = effectiveMaxDegrees;
+        debugLastMovementModeValue = movementModeValue;
+        debugLastFacingOrdinal = facingOrdinal;
+        debugLastWestInputOrdinal = westInputOrdinal;
+        debugLastEastInputOrdinal = eastInputOrdinal;
+        debugLastSouthInputOrdinal = southInputOrdinal;
+        debugLastRuntimeDirtyGameTime = lastRuntimeDirtyGameTime;
+        debugLastAngle = currentAngle;
+        debugLastTargetAngle = currentTargetAngle;
+        debugLastBindingAngle = bindingAngle;
+        debugLastGeneratedSpeed = generatedSpeed;
+
+        ServoTwisterDebugTraceBuffer.record(
+                gameTime,
+                worldPosition.asLong(),
+                debugDimensionId,
+                ServoTwisterDebugTraceBuffer.TYPE_INV_SERVO,
+                flags,
+                contraptionBlockCount,
+                lastWestSignal,
+                lastEastSignal,
+                lastSouthSignal,
+                pendingWestSignal,
+                pendingEastSignal,
+                pendingSouthSignal,
+                pendingWestTicks,
+                pendingEastTicks,
+                pendingSouthTicks,
+                displayWestSignal,
+                displayEastSignal,
+                displaySouthSignal,
+                pendingDisplayWestSignal,
+                pendingDisplayEastSignal,
+                pendingDisplaySouthSignal,
+                pendingDisplayWestTicks,
+                pendingDisplayEastTicks,
+                pendingDisplaySouthTicks,
+                configuredMaxDegrees,
+                effectiveMaxDegrees,
+                movementModeValue,
+                facingOrdinal,
+                westInputOrdinal,
+                eastInputOrdinal,
+                southInputOrdinal,
+                lastRuntimeDirtyGameTime,
+                currentAngle,
+                currentTargetAngle,
+                bindingAngle,
+                generatedSpeed
+        );
+    }
+
+    private static int debugDirectionOrdinal(@Nullable Direction direction) {
+        return direction == null ? -1 : direction.ordinal();
+    }
+
+    private static boolean debugFloatDiffers(float a, float b) {
+        if (Float.isNaN(a) != Float.isNaN(b)) {
+            return true;
+        }
+
+        if (Float.isNaN(a)) {
+            return false;
+        }
+
+        return Math.abs(a - b) > DEBUG_TRACE_FLOAT_EPSILON;
     }
 
     private void updateVisualRunning(boolean runningVisual) {

@@ -1,0 +1,15 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "A"
+  ],
+  "key": {
+    "A": {
+      "item": "twistermill:twister_sail_block"
+    }
+  },
+  "result": {
+    "item": "twistermill:twister_sail_frame_block",
+    "count": 1
+  }
+}

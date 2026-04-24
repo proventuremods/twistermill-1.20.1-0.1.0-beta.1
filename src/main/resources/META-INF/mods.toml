@@ -36,6 +36,13 @@ ordering="AFTER"
 side="BOTH"
 
 [[dependencies.twistermill]]
+modId="ponder"
+mandatory=true
+versionRange="[1.0.91,)"
+ordering="NONE"
+side="CLIENT"
+
+[[dependencies.twistermill]]
 modId="weather2"
 mandatory=true
 versionRange="[1.20.1-2.8.3,)"

@@ -2,6 +2,7 @@ package com.proventure.twistermill.block;
 
 import com.proventure.twistermill.block.custom.InvServoTwisterBlock;
 import com.proventure.twistermill.block.custom.ServoTwisterBlock;
+import com.proventure.twistermill.block.custom.TwisterSailBlock;
 import com.proventure.twistermill.block.custom.WindRotoBlock;
 import com.proventure.twistermill.block.custom.WindRotoVerticalBlock;
 import com.proventure.twistermill.item.ModItems;
@@ -15,6 +16,7 @@ import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.registries.DeferredRegister;
 import net.minecraftforge.registries.ForgeRegistries;
 import net.minecraftforge.registries.RegistryObject;
+import com.proventure.twistermill.block.custom.TwisterSailFrameBlock;
 
 import java.util.function.Supplier;
 
@@ -54,6 +56,24 @@ public class ModBlocks {
                     .sound(SoundType.METAL)
             ));
 
+    // === NEU ===
+
+    public static final RegistryObject<Block> TWISTER_SAIL_FRAME_BLOCK = registerBlock("twister_sail_frame_block",
+            () -> new TwisterSailFrameBlock(BlockBehaviour.Properties.copy(Blocks.OAK_PLANKS)
+                    .strength(2.0F, 3.0F)
+                    .noOcclusion()
+                    .sound(SoundType.WOOD)
+            ));
+
+    public static final RegistryObject<Block> TWISTER_SAIL_BLOCK = registerBlock("twister_sail_block",
+            () -> new TwisterSailBlock(BlockBehaviour.Properties.copy(Blocks.WHITE_WOOL)
+                    .strength(0.8F)
+                    .noOcclusion()
+                    .sound(SoundType.WOOL),
+                    false
+            ));
+
+    // =================
 
     private static <T extends Block> RegistryObject<T> registerBlock(String name, Supplier<T> block) {
         RegistryObject<T> toReturn = BLOCKS.register(name, block);

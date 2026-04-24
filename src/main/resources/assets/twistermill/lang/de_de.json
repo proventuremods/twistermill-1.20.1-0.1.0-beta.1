@@ -1,13 +1,13 @@
 {
   "block.twistermill.wind_roto_block": "Wirbelwindlager",
-  "block.twistermill.servo_twister_block": "Winkel-Servo",
-  "block.twistermill.inv_servo_twister_block": "Winkel-Servo invertiert",
-  "block.twistermill.wind_roto_vertical_block": "Windfahnenlager",
+  "block.twistermill.servo_twister_block": "Winkelservo",
+  "block.twistermill.inv_servo_twister_block": "Winkelservo invertiert",
+  "block.twistermill.wind_roto_vertical_block": "Windrichtungslager",
+  "block.twistermill.twister_sail_block": "Symmetrisches Segel",
+  "block.twistermill.twister_sail_frame_block": "Symmetrischer Segelrahmen",
   "creativetab.twistermill_tab": "Create: Twistermill",
-  "item.twistermill.binding_stick": "Bindungsstab",
 
   "create.tooltip.twistermill.key_ctrl": "[STRG]",
-
   "create.tooltip.twistermill.generated_speed": "Rotationsgeschwindigkeit",
   "create.tooltip.twistermill.generated_su": "Kinetische Belastungskapazität",
   "create.tooltip.twistermill.wind_outside": "draussen?",
@@ -16,23 +16,18 @@
   "create.tooltip.twistermill.servo.angle": "Winkel",
   "create.tooltip.twistermill.unit_rpm": "RPM",
   "create.tooltip.twistermill.at_current_speed": "bei derzeitiger Geschwindigkeit",
-
   "create.tooltip.twistermill.servo.west_speed_input": "RS-Eingang (Geschwindigkeit)",
   "create.tooltip.twistermill.servo.east_angle_input": "RS-Eingang (Winkel)",
   "create.tooltip.twistermill.servo.south_input": "RS-Eingang (Modus)",
-
   "create.tooltip.twistermill.servo.contraption_blocks": "Contraption-Blöcke",
   "create.tooltip.twistermill.servo.max_angle": "Winkeleinstellung",
-
   "twistermill.max_angle": "Winkeleinstellungen",
   "twistermill.max_angle.option.30": "30 Grad",
   "twistermill.max_angle.option.60": "60 Grad",
   "twistermill.max_angle.option.90": "90 Grad",
-
   "create.tooltip.twistermill.connected_servo": "Verbundene Servo",
   "create.tooltip.twistermill.average_servo_degrees": "Mittelwert Servo",
   "create.tooltip.twistermill.bound_to_wind_roto": "Mit Wirbelwindlager verbunden",
-
   "create.tooltip.twistermill.vertical.obsidian_north_marker": "Obsidian-Nordmarker",
   "create.tooltip.twistermill.vertical.yaw": "Yaw",
   "create.tooltip.twistermill.vertical.rpm": "RPM",
@@ -52,9 +47,80 @@
   "create.tooltip.twistermill.vertical.aligned": "ausgerichtet",
   "create.tooltip.twistermill.vertical.active": "aktiv",
   "create.tooltip.twistermill.vertical.not_active": "nicht aktiv",
+  "twistermill.display_source.wind_roto_stats": "Wirbelwindlager Werte",
+  "twistermill.display_source.wind_roto_stats.display": "Angezeigter Wert",
+  "twistermill.display_source.wind_roto_stats.option.rpm": "RPM",
+  "twistermill.display_source.wind_roto_stats.option.su_capacity": "SU-Kapazität",
+  "twistermill.display_source.wind_roto_stats.option.raw_wind_speed": "Roh-Windgeschwindigkeit",
+  "twistermill.display_source.wind_roto_stats.option.smoothed_wind_speed": "Geglättete Windgeschwindigkeit",
+  "twistermill.display_source.wind_roto_stats.option.outside": "draussen? (true/false)",
+  "twistermill.display_source.wind_roto_stats.option.connected_servos": "Verbundene Servos",
+  "twistermill.display_source.wind_roto_stats.option.average_servo": "Mittelwert Servo",
+  "twistermill.display_source.wind_roto_stats.option.sail_like_blocks": "Segelähnliche Blöcke",
+  "twistermill.display_source.wind_roto_stats.option.contraption_blocks": "Contraption Blöcke",
+  "twistermill.display_source.wind_roto_stats.option.redstone_input": "Redstone Input",
+  "twistermill.display_source.wind_roto_stats.option.redstone_output": "Redstone Output",
+  "twistermill.display_source.wind_roto_stats.option.hold_mode_state": "Hold Modus Status",
+  "twistermill.display_source.servo_twister_stats": "Winkelservo Werte",
+  "twistermill.display_source.wind_roto_vertical_stats": "Windrichtungslager Werte",
+  "create.tooltip.twistermill.sail_like_blocks": "Segelähnliche Blöcke",
+  "create.tooltip.twistermill.vertical.up_down_facing_check": "Blockausrichtung vertikal?",
 
-  "create.tooltip.twistermill.sail_like_blocks" : "Segelähnliche Blöcke",
-  "create.tooltip.twistermill.vertical.up_down_facing_check": "Blockausrichtung vertikal?"
 
+  "twistermill.ponder.windroto_ponder.title": "Wirbelwindlager",
+  "twistermill.ponder.windroto_ponder.header": "Rotationsenergie erzeugen mit Wirbelwindlager",
+
+  "twistermill.ponder.windroto_ponder.text_1": "Wirbelwindlager liefern dynamische RPM Kapazität dank Windkraft",
+  "twistermill.ponder.windroto_ponder.text_2": "Die Drehrichtung kann über den Bewegungsmodus eingestellt werden.",
+  "twistermill.ponder.windroto_ponder.text_3": "Je grösser Windräder gebaut werden, desto mehr Energie können sie umsetzen.",
+  "twistermill.ponder.windroto_ponder.text_4": "Wirbelwindlager verbinden sich mit den Blöcken, die auf dem Top platziert werden. \nBlöcke eines Windrades müssen verklebt werden. \nSegel benötigen keinen Kleber.",
+  "twistermill.ponder.windroto_ponder.text_5": "Bei Windstille kann es zu Überlastung kommen. Eine Kupplung kann bei niedriger Drehzahl abkoppeln und bei ausreichendem Wind wieder koppeln.\n",
+  "twistermill.ponder.windroto_ponder.text_6": "Redstone Comparator: \nDie Signalstärke ist Drehzahlabhängig. \nBei zu geringer Rotation des Windrades fällt das Signal auf Stärke 0",
+  "twistermill.ponder.windroto_ponder.text_7": "Redstone Inputsignale 1-14 aktivieren die Bremse, wobei Stärke 15 das Windrad zum Stillstand bringt.",
+  "twistermill.ponder.windroto_ponder.text_8": "Einzelne Werte oder Zusammenfassungen können an Create Anzeigen gesendet werden.",
+
+
+  "twistermill.ponder.windvane_ponder.title": "Windrichtungslager",
+  "twistermill.ponder.windvane_ponder.header": "Windrichtungslager als Windnachführungsgeber verwenden",
+
+  "twistermill.ponder.windvane_ponder.text_1": "Windfahnenlager richten sich entsprechend der Windrichtung aus.",
+  "twistermill.ponder.windvane_ponder.text_2": "Wirbelfahnenlager verbinden sich mit den Blöcken, die auf dem Top platziert werden. \nBlöcke eines Windrichtungsgeber müssen verklebt werden. \nSegel benötigen keinen Kleber.",
+  "twistermill.ponder.windvane_ponder.text_3": "Schau ein Windfahnenlager an, während du einen Kompass in der linken Hand und Obsidian in der rechten Hand hälst.",
+  "twistermill.ponder.windvane_ponder.text_4": "Obsidian muss auf der Nordseite des Windfahnenlagers platziert werden und dient als Nullpunkt Referenz.",
+  "twistermill.ponder.windvane_ponder.text_5": "Ein Redstone Impuls aktiviert den Park Modus wobei das Lager sich nach Norden / 0° ausrichtet. \nEin erneuter Impuls deaktiviert den Parkmodus. \n\n(Create Interactive Baumodus)",
+  "twistermill.ponder.windvane_ponder.text_6": "Einzelne Werte oder Zusammenfassungen können an Create Anzeigen gesendet werden.",
+
+
+  "twistermill.ponder.servo_ponder.title": "Winkel Servo",
+  "twistermill.ponder.servo_ponder.header": "Winkel Servo als Blade Pitch Controller verwenden.",
+
+  "twistermill.ponder.servo_ponder.text_1": "Winkel Servo können Rotorblätter von Windkraftanlagen drehen um die Effizienz zu erhöhen.\n\nNur wenn create interactive installiert ist.",
+  "twistermill.ponder.servo_ponder.text_2": "Winkel Servo Konfigurationen:\n\nRotationsgeschwindigkeit:\nSignalstärke 1-15\n\nModusauswahl:\nSignalstärke 1-9\n\nWinkel Schritte:\nSignal Stärke 1-15",
+  "twistermill.ponder.servo_ponder.text_3": "Einzelne Werte oder Zusammenfassungen können an Create Anzeigen gesendet werden.",
+  "twistermill.ponder.servo_ponder.text_4": "Winkel Servo Lager verbinden sich mit den Blöcken, die auf dem Top platziert werden. \nBlöcke eines Windrichtungsgeber müssen verklebt werden. \nSegel benötigen keinen Kleber.",
+  "twistermill.ponder.servo_ponder.text_5": "CREATE INTERACTIVE: \n\nFür maximale Effizienz, wende den Bindungsstab mit Rechtsklick zuerst am Wirbelwindlager danach am Servo an, um die Komponenten zu verbinden.",
+
+
+  "twistermill.ponder.invservo_ponder.title": "Winkel Servo invertiert",
+  "twistermill.ponder.invservo_ponder.header": "Invertierter Winkel Servo als Blade Pitch Controller verwenden",
+
+  "twistermill.ponder.invservo_ponder.text_1": "Invertierte Winkel Servo können Rotorblätter von Windkraftanlagen drehen um die Effizienz zu erhöhen.\n\nNur wenn create interactive installiert ist.",
+  "twistermill.ponder.invservo_ponder.text_2": "Inv. Winkel Servo Konfigurationen:\n\nRotationsgeschwindigkeit:\nSignalstärke 1-15\n\nModusauswahl:\nSignalstärke 1-9\n\nWinkel Schritte:\nSignal Stärke 1-15",
+  "twistermill.ponder.invservo_ponder.text_3": "Einzelne Werte oder Zusammenfassungen können an Create Anzeigen gesendet werden.",
+  "twistermill.ponder.invservo_ponder.text_4": "Inv. Winkel Servo verbinden sich mit den Blöcken, die auf dem Top platziert werden. \nBlöcke eines Windrichtungsgeber müssen verklebt werden. \nSegel benötigen keinen Kleber.",
+  "twistermill.ponder.invservo_ponder.text_5": "CREATE INTERACTIVE: \n\nFür maximale Effizienz, wende den Bindungsstab mit Rechtsklick zuerst am Wirbelwindlager danach am Inv. Servo an, um die Komponenten zu verbinden.",
+
+
+
+
+
+  "item.twistermill.binding_stick": "Bindungsstab",
+  "item.twistermill.binding_stick.tooltip.summary": "Verbindet Servos mit einem Twistermill-Lager.",
+  "item.twistermill.binding_stick.tooltip.condition1": "Benutzung",
+  "item.twistermill.binding_stick.tooltip.behaviour1": "Rechtsklick auf ein Wirbelwindlager aktiviert den Bindungsmodus. Danach Rechtsklick auf ein Servo, um es zu verknüpfen.",
+  "item.twistermill.binding_stick.tooltip.condition2": "Zurücksetzen",
+  "item.twistermill.binding_stick.tooltip.behaviour2": "Shift + Rechtsklick setzt den Bindungsmodus zurück und entfernt bestehende Lager-Servo-Verknüpfungen.",
+  "block.twistermill.twister_sail_frame_block.tooltip.summary": "Ein anpassbarer Segelrahmen. Rechtsklick mit Holzbrettern, um das Rahmenmaterial zu ändern.",
+  "block.twistermill.twister_sail_block.tooltip.summary": "Ein symmetrisches Segel mit anpassbarem Rahmen und färbbarem Canvas. Verwende Farbstoffe oder Holzbretter mit Rechtsklick, um das Segel zu färben oder den Rahmen zu ändern. Entferne das Segel vom Rahmen mit einer Schere."
 
 }

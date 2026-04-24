@@ -1,18 +1,26 @@
 package com.proventure.twistermill.client;
 
 import com.proventure.twistermill.blockentity.ModBlockEntities;
+import com.proventure.twistermill.client.ponder.TwisterMillPonderPlugin;
 import com.proventure.twistermill.client.render.InvServoTwisterRenderer;
 import com.proventure.twistermill.client.render.ServoTwisterRenderer;
 import com.proventure.twistermill.client.render.WindRotoRenderer;
 import com.proventure.twistermill.client.render.WindRotoVerticalRenderer;
+import net.createmod.ponder.foundation.PonderIndex;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.EntityRenderersEvent;
 import net.minecraftforge.client.event.ModelEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
+import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
 
 @Mod.EventBusSubscriber(modid = com.proventure.twistermill.TwisterMill.MOD_ID, bus = Mod.EventBusSubscriber.Bus.MOD, value = Dist.CLIENT)
 public class TwisterMillClient {
+
+    @SubscribeEvent
+    public static void onClientSetup(FMLClientSetupEvent event) {
+        PonderIndex.addPlugin(new TwisterMillPonderPlugin());
+    }
 
     @SubscribeEvent
     public static void registerRenderers(EntityRenderersEvent.RegisterRenderers event) {

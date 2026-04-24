@@ -1,0 +1,6 @@
+{
+  "parent": "twistermill:block/servo_twister_block",
+  "textures": {
+    "1": "twistermill:block/left_up_servo_vent_powered"
+  }
+}

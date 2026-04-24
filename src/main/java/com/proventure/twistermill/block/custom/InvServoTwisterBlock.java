@@ -6,6 +6,7 @@ import com.simibubi.create.content.contraptions.bearing.BearingBlock;
 import com.simibubi.create.foundation.block.IBE;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.util.StringRepresentable;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Player;
@@ -17,6 +18,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.StateDefinition;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.state.properties.BooleanProperty;
+import net.minecraft.world.level.block.state.properties.EnumProperty;
 import net.minecraft.world.phys.BlockHitResult;
 
 import javax.annotation.Nonnull;
@@ -27,16 +29,19 @@ import javax.annotation.ParametersAreNonnullByDefault;
 public class InvServoTwisterBlock extends BearingBlock implements IBE<InvServoTwisterBlockEntity> {
 
     public static final BooleanProperty RUNNING = BooleanProperty.create("running");
+    public static final EnumProperty<VentState> VENT_STATE = EnumProperty.create("vent_state", VentState.class);
 
     public InvServoTwisterBlock(Properties properties) {
         super(properties);
-        registerDefaultState(defaultBlockState().setValue(RUNNING, false));
+        registerDefaultState(defaultBlockState()
+                .setValue(RUNNING, false)
+                .setValue(VENT_STATE, VentState.NONE));
     }
 
     @Override
     protected void createBlockStateDefinition(StateDefinition.Builder<net.minecraft.world.level.block.Block, BlockState> builder) {
         super.createBlockStateDefinition(builder);
-        builder.add(RUNNING);
+        builder.add(RUNNING, VENT_STATE);
     }
 
     @Override
@@ -96,5 +101,27 @@ public class InvServoTwisterBlock extends BearingBlock implements IBE<InvServoTw
     @Override
     public BlockEntityType<? extends InvServoTwisterBlockEntity> getBlockEntityType() {
         return ModBlockEntities.INV_SERVO_TWISTER_BE.get();
+    }
+
+    public enum VentState implements StringRepresentable {
+        NONE("none"),
+        LEFT("left"),
+        UP("up"),
+        RIGHT("right"),
+        LEFT_UP("left_up"),
+        RIGHT_UP("right_up"),
+        RIGHT_LEFT("right_left"),
+        RIGHT_UP_LEFT("right_up_left");
+
+        private final String serializedName;
+
+        VentState(String serializedName) {
+            this.serializedName = serializedName;
+        }
+
+        @Override
+        public String getSerializedName() {
+            return serializedName;
+        }
     }
 }

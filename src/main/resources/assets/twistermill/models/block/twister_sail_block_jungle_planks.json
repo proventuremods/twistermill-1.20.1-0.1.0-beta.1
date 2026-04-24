@@ -1,0 +1,6 @@
+{
+  "parent": "twistermill:block/twister_sail_block",
+  "textures": {
+    "2": "minecraft:block/jungle_planks"
+  }
+}

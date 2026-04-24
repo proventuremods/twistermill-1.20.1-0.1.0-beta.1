@@ -14,6 +14,7 @@ public class TwisterMillConfig {
     public static final ForgeConfigSpec.IntValue RPM_RAMP_STEP;
     public static final ForgeConfigSpec.IntValue MAX_RPM;
     public static final ForgeConfigSpec.BooleanValue CHUNK_LOADING_ENABLED;
+    public static final ForgeConfigSpec.BooleanValue COMPARATOR_OUTPUT_INVERTED;
 
     public static final ForgeConfigSpec.ConfigValue<Integer> VERTICAL_WIND_ANGLE_UPDATE_TICKS;
     public static final ForgeConfigSpec.IntValue VERTICAL_MAX_YAW_RPM;
@@ -38,7 +39,7 @@ public class TwisterMillConfig {
 
         SU_FACTOR = b
                 .comment("SU multiplier for Twistermill bearing output. Range: 1.0 - 1000.0. Default: 8.0")
-                .defineInRange("suFactor", 8.0, 1.0, 1000.0);
+                .defineInRange("suFactor", 1.0, 1.0, 1000.0);
 
         SU_PER_RPM = b
                 .comment("Base SU generated per RPM. Range: 2.0 - 128.0. Default: 25.4")
@@ -67,6 +68,10 @@ public class TwisterMillConfig {
         CHUNK_LOADING_ENABLED = b
                 .comment("Enables chunkloading/forceload for Twistermill block entities. Default: false")
                 .define("chunkLoadingEnabled", false);
+
+        COMPARATOR_OUTPUT_INVERTED = b
+                .comment("Inverts WindRoto comparator output mapping (high RPM -> low signal, low RPM -> high signal). Default: false")
+                .define("comparatorOutputInverted", false);
 
         b.pop();
 

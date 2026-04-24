@@ -2,6 +2,8 @@ package com.proventure.twistermill.blockentity;
 
 import com.proventure.twistermill.block.custom.WindRotoBlock;
 import com.proventure.twistermill.config.TwisterMillConfig;
+import com.proventure.twistermill.debug.WindRotoDebugDumpService;
+import com.proventure.twistermill.debug.WindRotoVerticalDebugTraceBuffer;
 import com.proventure.twistermill.util.WindRotoReflectionHelper;
 import com.simibubi.create.AllSoundEvents;
 import com.simibubi.create.content.contraptions.AssemblyException;
@@ -47,6 +49,7 @@ public class WindRotoVerticalBlockEntity extends MechanicalBearingBlockEntity {
     private static final float SU_PER_RPM = 12.8F;
     private static final float YAW_TARGET_OFFSET_DEG = 0.0F;
     private static final float SYNC_FLOAT_EPSILON = 0.05F;
+    private static final float DEBUG_TRACE_FLOAT_EPSILON = 0.001F;
 
     private static final int REDSTONE_PULSE_MIN_TICKS = 2;
     private static final int REDSTONE_PULSE_MAX_TICKS = 40;
@@ -204,6 +207,27 @@ public class WindRotoVerticalBlockEntity extends MechanicalBearingBlockEntity {
     private float lastSentWorldWindAngleDeg = Float.NaN;
     private float lastSentLocalTargetYawDeg = Float.NaN;
 
+    private long debugNextTraceSampleAt = 0L;
+    private int debugDimensionId = Integer.MIN_VALUE;
+    private int debugLastFlags = Integer.MIN_VALUE;
+    private int debugLastExternalRedstone = Integer.MIN_VALUE;
+    private int debugLastPlacementNorthDirData = Integer.MIN_VALUE;
+    private int debugLastObsidianCheckTimer = Integer.MIN_VALUE;
+    private int debugLastAssemblyModeValue = Integer.MIN_VALUE;
+    private int debugLastGeneratedRpm = Integer.MIN_VALUE;
+    private int debugLastSentGeneratedRpm = Integer.MIN_VALUE;
+    private int debugLastSentPlacementNorthDirData = Integer.MIN_VALUE;
+    private int debugLastForcedChunkX = Integer.MIN_VALUE;
+    private int debugLastForcedChunkZ = Integer.MIN_VALUE;
+    private float debugLastGeneratedSpeedRpm = Float.NaN;
+    private float debugLastGeneratedSu = Float.NaN;
+    private float debugLastCurrentYawDeg = Float.NaN;
+    private float debugLastTargetYawDeg = Float.NaN;
+    private float debugLastYawVelocityDegPerTick = Float.NaN;
+    private float debugLastWorldWindAngleDeg = Float.NaN;
+    private float debugLastLocalTargetYawDeg = Float.NaN;
+    private float debugLastBearingAngle = Float.NaN;
+
     public WindRotoVerticalBlockEntity(BlockPos pos, BlockState state) {
         super(ModBlockEntities.WIND_ROTO_VERTICAL_BE.get(), pos, state);
     }
@@ -319,6 +343,7 @@ public class WindRotoVerticalBlockEntity extends MechanicalBearingBlockEntity {
         clearTransientRuntimeFlags();
 
         if (level != null && !level.isClientSide) {
+            debugInitTraceSystem();
             refreshPlacementNorthFromObsidian();
             ensureOwnChunkForced();
         }
@@ -389,6 +414,7 @@ public class WindRotoVerticalBlockEntity extends MechanicalBearingBlockEntity {
 
     public void queueAssemble() {
         if (level != null && !level.isClientSide) {
+            debugInitTraceSystem();
             if (!hasValidVerticalFacing()) {
                 assembleNextTick = false;
                 verticalManualEnabled = false;
@@ -456,6 +482,8 @@ public class WindRotoVerticalBlockEntity extends MechanicalBearingBlockEntity {
             return;
         }
 
+        long time = level.getGameTime();
+
         boolean verticalFacingValidNow = hasValidVerticalFacing();
 
         if (!verticalFacingValidNow) {
@@ -469,6 +497,7 @@ public class WindRotoVerticalBlockEntity extends MechanicalBearingBlockEntity {
             zeroOutCreateWindmillContribution();
             updateVisualRunning(false);
             syncIfNeeded();
+            debugTraceMaybeSample(time);
             return;
         }
 
@@ -485,10 +514,9 @@ public class WindRotoVerticalBlockEntity extends MechanicalBearingBlockEntity {
             zeroOutCreateWindmillContribution();
             updateVisualRunning(false);
             syncIfNeeded();
+            debugTraceMaybeSample(time);
             return;
         }
-
-        long time = level.getGameTime();
 
         if (!chunkForceRegistered || !TwisterMillConfig.CHUNK_LOADING_ENABLED.get() || time % 20L == 0L) {
             ensureOwnChunkForced();
@@ -507,6 +535,7 @@ public class WindRotoVerticalBlockEntity extends MechanicalBearingBlockEntity {
             zeroOutCreateWindmillContribution();
             updateVisualRunning(false);
             syncIfNeeded();
+            debugTraceMaybeSample(time);
             return;
         }
 
@@ -520,6 +549,7 @@ public class WindRotoVerticalBlockEntity extends MechanicalBearingBlockEntity {
         updateVisualRunning(visualRunning);
         zeroOutCreateWindmillContribution();
         syncIfNeeded();
+        debugTraceMaybeSample(time);
     }
 
     @Override
@@ -1550,6 +1580,150 @@ public class WindRotoVerticalBlockEntity extends MechanicalBearingBlockEntity {
         }
     }
 
+
+    private void debugInitTraceSystem() {
+        if (level == null || level.isClientSide) {
+            return;
+        }
+
+        WindRotoDebugDumpService.initialize(level.getServer());
+
+        if (debugDimensionId == Integer.MIN_VALUE) {
+            debugDimensionId = WindRotoVerticalDebugTraceBuffer.getOrCreateDimensionId(level.dimension().location());
+        }
+    }
+
+    private void debugTraceMaybeSample(long gameTime) {
+        if (level == null || level.isClientSide) {
+            return;
+        }
+
+        if (debugDimensionId == Integer.MIN_VALUE) {
+            debugDimensionId = WindRotoVerticalDebugTraceBuffer.getOrCreateDimensionId(level.dimension().location());
+        }
+
+        int redstone = getExternalRedstonePower();
+        int assemblyModeValue = assemblyMode != null ? assemblyMode.getValue() : -1;
+        int forcedChunkX = forcedChunkKey != null ? forcedChunkKey.chunkX() : Integer.MIN_VALUE;
+        int forcedChunkZ = forcedChunkKey != null ? forcedChunkKey.chunkZ() : Integer.MIN_VALUE;
+        long pulseCooldownRemaining = Math.max(0L, verticalPulseCooldownUntil - gameTime);
+        float bearingAngle = angle;
+
+        int flags = 0;
+
+        if (running) flags |= WindRotoVerticalDebugTraceBuffer.FLAG_RUNNING;
+        if (assembleNextTick) flags |= WindRotoVerticalDebugTraceBuffer.FLAG_ASSEMBLE_QUEUED;
+        if (movedContraption != null) flags |= WindRotoVerticalDebugTraceBuffer.FLAG_ASSEMBLED;
+        if (verticalManualEnabled) flags |= WindRotoVerticalDebugTraceBuffer.FLAG_VERTICAL_MANUAL_ENABLED;
+        if (restoreFreeModeAfterManualDisassembly)
+            flags |= WindRotoVerticalDebugTraceBuffer.FLAG_RESTORE_FREE_MODE_AFTER_MANUAL_DISASSEMBLY;
+        if (placementNorthValid) flags |= WindRotoVerticalDebugTraceBuffer.FLAG_PLACEMENT_NORTH_VALID;
+        if (verticalYawMoving) flags |= WindRotoVerticalDebugTraceBuffer.FLAG_VERTICAL_YAW_MOVING;
+        if (verticalParkedMode) flags |= WindRotoVerticalDebugTraceBuffer.FLAG_VERTICAL_PARKED_MODE;
+        if (verticalPulsePowered) flags |= WindRotoVerticalDebugTraceBuffer.FLAG_VERTICAL_PULSE_POWERED;
+        if (chunkForceRegistered) flags |= WindRotoVerticalDebugTraceBuffer.FLAG_CHUNK_FORCED;
+        if (lastVisualRunning) flags |= WindRotoVerticalDebugTraceBuffer.FLAG_VISUAL_RUNNING;
+        if (isMoveNeverPlaceModeSelected()) flags |= WindRotoVerticalDebugTraceBuffer.FLAG_MOVE_NEVER_PLACE_MODE_SELECTED;
+        if (isVerticalControlEnabled()) flags |= WindRotoVerticalDebugTraceBuffer.FLAG_VERTICAL_CONTROL_ENABLED;
+        if (hasValidVerticalFacing()) flags |= WindRotoVerticalDebugTraceBuffer.FLAG_VERTICAL_FACING_VALID;
+        if (isOverStressed()) flags |= WindRotoVerticalDebugTraceBuffer.FLAG_OVERSTRESSED;
+        if (lastSentVisualRunning) flags |= WindRotoVerticalDebugTraceBuffer.FLAG_LAST_SENT_VISUAL_RUNNING;
+        if (lastSentPlacementNorthValid) flags |= WindRotoVerticalDebugTraceBuffer.FLAG_LAST_SENT_PLACEMENT_NORTH_VALID;
+        if (lastSentVerticalYawMoving) flags |= WindRotoVerticalDebugTraceBuffer.FLAG_LAST_SENT_VERTICAL_YAW_MOVING;
+        if (lastSentVerticalParkedMode) flags |= WindRotoVerticalDebugTraceBuffer.FLAG_LAST_SENT_VERTICAL_PARKED_MODE;
+
+        boolean changed =
+                flags != debugLastFlags
+                        || redstone != debugLastExternalRedstone
+                        || placementNorthDirData != debugLastPlacementNorthDirData
+                        || obsidianCheckTimer != debugLastObsidianCheckTimer
+                        || assemblyModeValue != debugLastAssemblyModeValue
+                        || generatedRpm != debugLastGeneratedRpm
+                        || lastSentGeneratedRpm != debugLastSentGeneratedRpm
+                        || lastSentPlacementNorthDirData != debugLastSentPlacementNorthDirData
+                        || forcedChunkX != debugLastForcedChunkX
+                        || forcedChunkZ != debugLastForcedChunkZ
+                        || debugFloatDiffers(generatedSpeedRpm, debugLastGeneratedSpeedRpm)
+                        || debugFloatDiffers(generatedSu, debugLastGeneratedSu)
+                        || debugFloatDiffers(verticalCurrentYawDeg, debugLastCurrentYawDeg)
+                        || debugFloatDiffers(verticalTargetYawDeg, debugLastTargetYawDeg)
+                        || debugFloatDiffers(verticalYawVelocityDegPerTick, debugLastYawVelocityDegPerTick)
+                        || debugFloatDiffers(lastWorldWindAngleDeg, debugLastWorldWindAngleDeg)
+                        || debugFloatDiffers(lastLocalTargetYawDeg, debugLastLocalTargetYawDeg)
+                        || debugFloatDiffers(bearingAngle, debugLastBearingAngle);
+
+        if (!changed && gameTime < debugNextTraceSampleAt) {
+            return;
+        }
+
+        debugNextTraceSampleAt = gameTime + WindRotoVerticalDebugTraceBuffer.TRACE_SAMPLE_INTERVAL_TICKS;
+        debugLastFlags = flags;
+        debugLastExternalRedstone = redstone;
+        debugLastPlacementNorthDirData = placementNorthDirData;
+        debugLastObsidianCheckTimer = obsidianCheckTimer;
+        debugLastAssemblyModeValue = assemblyModeValue;
+        debugLastGeneratedRpm = generatedRpm;
+        debugLastSentGeneratedRpm = lastSentGeneratedRpm;
+        debugLastSentPlacementNorthDirData = lastSentPlacementNorthDirData;
+        debugLastForcedChunkX = forcedChunkX;
+        debugLastForcedChunkZ = forcedChunkZ;
+        debugLastGeneratedSpeedRpm = generatedSpeedRpm;
+        debugLastGeneratedSu = generatedSu;
+        debugLastCurrentYawDeg = verticalCurrentYawDeg;
+        debugLastTargetYawDeg = verticalTargetYawDeg;
+        debugLastYawVelocityDegPerTick = verticalYawVelocityDegPerTick;
+        debugLastWorldWindAngleDeg = lastWorldWindAngleDeg;
+        debugLastLocalTargetYawDeg = lastLocalTargetYawDeg;
+        debugLastBearingAngle = bearingAngle;
+
+        WindRotoVerticalDebugTraceBuffer.record(
+                gameTime,
+                worldPosition.asLong(),
+                debugDimensionId,
+                flags,
+                redstone,
+                placementNorthDirData,
+                obsidianCheckTimer,
+                assemblyModeValue,
+                generatedRpm,
+                lastSentGeneratedRpm,
+                lastSentPlacementNorthDirData,
+                forcedChunkX,
+                forcedChunkZ,
+                generatedSpeedRpm,
+                generatedSu,
+                verticalCurrentYawDeg,
+                verticalTargetYawDeg,
+                verticalYawVelocityDegPerTick,
+                lastWorldWindAngleDeg,
+                lastLocalTargetYawDeg,
+                lastSentGeneratedSpeedRpm,
+                lastSentGeneratedSu,
+                lastSentVerticalCurrentYawDeg,
+                lastSentVerticalTargetYawDeg,
+                lastSentVerticalYawVelocityDegPerTick,
+                lastSentWorldWindAngleDeg,
+                lastSentLocalTargetYawDeg,
+                bearingAngle,
+                nextWindAngleSampleAt,
+                verticalPulseStartTick,
+                verticalPulseCooldownUntil,
+                pulseCooldownRemaining,
+                lastRuntimeDirtyGameTime
+        );
+    }
+
+    private static boolean debugFloatDiffers(float a, float b) {
+        if (Float.isNaN(a) != Float.isNaN(b)) {
+            return true;
+        }
+
+        if (Float.isNaN(a)) {
+            return false;
+        }
+
+        return Math.abs(a - b) > DEBUG_TRACE_FLOAT_EPSILON;
+    }
     private static float approachValue(float current, float target, float maxDelta) {
         if (current < target) {
             return Math.min(current + maxDelta, target);
@@ -1587,3 +1761,5 @@ public class WindRotoVerticalBlockEntity extends MechanicalBearingBlockEntity {
         return Math.abs(a - b) > SYNC_FLOAT_EPSILON;
     }
 }
+
+

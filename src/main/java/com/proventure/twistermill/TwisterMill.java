@@ -4,6 +4,7 @@ import com.mojang.logging.LogUtils;
 import com.proventure.twistermill.block.ModBlocks;
 import com.proventure.twistermill.blockentity.ModBlockEntities;
 import com.proventure.twistermill.config.TwisterMillConfig;
+import com.proventure.twistermill.display.ModDisplaySources;
 import com.proventure.twistermill.item.ModCreativeModTabs;
 import com.proventure.twistermill.item.ModItems;
 import net.minecraftforge.eventbus.api.IEventBus;
@@ -27,6 +28,7 @@ public class TwisterMill {
         ModItems.register(modEventBus);
         ModBlocks.register(modEventBus);
         ModBlockEntities.register(modEventBus);
+        ModDisplaySources.register(modEventBus);
 
         LOGGER.info("{} loaded", MOD_ID);
     }
