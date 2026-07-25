@@ -1,0 +1,15 @@
+{
+  "variants": {
+    "facing=north": { "model": "twistermill:block/digital_signal_tx_block" },
+
+    "facing=south": { "model": "twistermill:block/digital_signal_tx_block", "y": 180 },
+
+    "facing=west":  { "model": "twistermill:block/digital_signal_tx_block", "y": 270 },
+
+    "facing=east":  { "model": "twistermill:block/digital_signal_tx_block", "y": 90 },
+
+    "facing=up":    { "model": "twistermill:block/digital_signal_tx_block", "x": 270 },
+
+    "facing=down":  { "model": "twistermill:block/digital_signal_tx_block", "x": 90 }
+  }
+}

@@ -1,0 +1,16 @@
+{
+
+  "type": "create:cutting",
+  "ingredients": [
+    {
+      "item": "twistermill:signal_steel_sheet"
+    }
+  ],
+  "processing_time": 250,
+  "results": [
+    {
+      "count": 2,
+      "id": "twistermill:signal_steel_rod"
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "variants": {
+    "facing=north,powered=false": { "model": "twistermill:block/redstone_in_bit_out_block" },
+    "facing=north,powered=true": { "model": "twistermill:block/redstone_in_bit_out_block_powered" },
+
+    "facing=south,powered=false": { "model": "twistermill:block/redstone_in_bit_out_block", "y": 180 },
+    "facing=south,powered=true": { "model": "twistermill:block/redstone_in_bit_out_block_powered", "y": 180 },
+
+    "facing=west,powered=false": { "model": "twistermill:block/redstone_in_bit_out_block", "y": 270 },
+    "facing=west,powered=true": { "model": "twistermill:block/redstone_in_bit_out_block_powered", "y": 270 },
+
+    "facing=east,powered=false": { "model": "twistermill:block/redstone_in_bit_out_block", "y": 90 },
+    "facing=east,powered=true": { "model": "twistermill:block/redstone_in_bit_out_block_powered", "y": 90 }
+  }
+}

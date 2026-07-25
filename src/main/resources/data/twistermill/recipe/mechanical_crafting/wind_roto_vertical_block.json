@@ -1,0 +1,32 @@
+{
+  "type": "create:mechanical_crafting",
+  "accept_mirrored": false,
+  "key": {
+    "A": {
+      "item": "create:mechanical_bearing"
+    },
+    "B": {
+      "item": "minecraft:compass"
+    },
+    "C": {
+      "item": "minecraft:purple_dye"
+    },
+    "E": {
+      "item": "twistermill:polished_signal_quartz"
+    },
+    "F": {
+      "item": "twistermill:signal_steel_sheet"
+      }
+    },
+  "pattern": [
+    "FCBCF",
+    "FBABF",
+    "FCBCF",
+    "FEEEF"
+  ],
+  "result": {
+    "count": 1,
+    "id": "twistermill:wind_roto_vertical_block"
+  },
+  "show_notification": false
+}

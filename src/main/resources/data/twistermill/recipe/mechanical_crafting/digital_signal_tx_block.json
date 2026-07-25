@@ -1,0 +1,32 @@
+{
+  "type": "create:mechanical_crafting",
+  "accept_mirrored": false,
+  "key": {
+    "A": {
+      "item": "create:metal_girder"
+    },
+    "B": {
+      "item": "twistermill:signal_steel_ingot"
+    },
+    "C": {
+      "item": "create:redstone_link"
+    },
+    "E": {
+      "item": "twistermill:signal_steel_sheet"
+    },
+    "F": {
+      "item": "twistermill:signal_steel_rod"
+    }
+  },
+  "pattern": [
+    "FACAF",
+    "FABAF",
+    "FBBBF",
+    "FEEEF"
+  ],
+  "result": {
+    "count": 1,
+    "id": "twistermill:digital_signal_tx_block"
+  },
+  "show_notification": false
+}

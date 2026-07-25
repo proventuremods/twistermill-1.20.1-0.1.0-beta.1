@@ -1,0 +1,25 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "com.proventure.twistermill.mixin",
+  "plugin": "com.proventure.twistermill.mixin.TwisterMillMixinPlugin",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [
+    "create.ClickToLinkBlockItemMixin",
+    "create.RedstoneLinkNetworkHandlerMixin",
+    "create.LinkBehaviourSyncMixin",
+    "weather2.PacketNBTFromServerMixin",
+    "weather2.WeatherNetworkingv2Mixin"
+  ],
+  "client": [
+    "create.LinkRendererMixin",
+    "create.PlacementClientMixin",
+    "create.IPlacementHelperMixin",
+    "creative_tab.CreativeModeInventoryScreenMixin",
+    "creative_tab.ItemPickerMenuMixin",
+    "creative_tab.CreativeModeTabMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

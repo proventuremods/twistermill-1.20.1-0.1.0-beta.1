@@ -1,0 +1,22 @@
+{
+  "neoforge:conditions": [
+    {
+      "type": "twistermill:config_enabled",
+      "key": "showNostalgicGrassBlock"
+    }
+  ],
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "NN",
+    "NN"
+  ],
+  "key": {
+    "N": {
+      "item": "twistermill:nostalgic_grass_block"
+    }
+  },
+  "result": {
+    "id": "minecraft:grass_block",
+    "count": 4
+  }
+}

@@ -1,0 +1,1252 @@
+{
+    "variants":  {
+                     "facing=north,frame_material=twister_pale_planks":  {
+                                                                             "model":  "twistermill:block/twister_sail_frame_block",
+                                                                             "x":  90
+                                                                         },
+                     "facing=south,frame_material=twister_pale_planks":  {
+                                                                             "model":  "twistermill:block/twister_sail_frame_block",
+                                                                             "x":  90,
+                                                                             "y":  180
+                                                                         },
+                     "facing=east,frame_material=twister_pale_planks":  {
+                                                                            "model":  "twistermill:block/twister_sail_frame_block",
+                                                                            "x":  90,
+                                                                            "y":  90
+                                                                        },
+                     "facing=west,frame_material=twister_pale_planks":  {
+                                                                            "model":  "twistermill:block/twister_sail_frame_block",
+                                                                            "x":  90,
+                                                                            "y":  270
+                                                                        },
+                     "facing=up,frame_material=twister_pale_planks":  {
+                                                                          "model":  "twistermill:block/twister_sail_frame_block"
+                                                                      },
+                     "facing=down,frame_material=twister_pale_planks":  {
+                                                                            "model":  "twistermill:block/twister_sail_frame_block",
+                                                                            "x":  180
+                                                                        },
+                     "facing=north,frame_material=acacia_planks":  {
+                                                                       "model":  "twistermill:block/twister_sail_frame_block_acacia_planks",
+                                                                       "x":  90
+                                                                   },
+                     "facing=south,frame_material=acacia_planks":  {
+                                                                       "model":  "twistermill:block/twister_sail_frame_block_acacia_planks",
+                                                                       "x":  90,
+                                                                       "y":  180
+                                                                   },
+                     "facing=east,frame_material=acacia_planks":  {
+                                                                      "model":  "twistermill:block/twister_sail_frame_block_acacia_planks",
+                                                                      "x":  90,
+                                                                      "y":  90
+                                                                  },
+                     "facing=west,frame_material=acacia_planks":  {
+                                                                      "model":  "twistermill:block/twister_sail_frame_block_acacia_planks",
+                                                                      "x":  90,
+                                                                      "y":  270
+                                                                  },
+                     "facing=up,frame_material=acacia_planks":  {
+                                                                    "model":  "twistermill:block/twister_sail_frame_block_acacia_planks"
+                                                                },
+                     "facing=down,frame_material=acacia_planks":  {
+                                                                      "model":  "twistermill:block/twister_sail_frame_block_acacia_planks",
+                                                                      "x":  180
+                                                                  },
+                     "facing=north,frame_material=bamboo_planks":  {
+                                                                       "model":  "twistermill:block/twister_sail_frame_block_bamboo_planks",
+                                                                       "x":  90
+                                                                   },
+                     "facing=south,frame_material=bamboo_planks":  {
+                                                                       "model":  "twistermill:block/twister_sail_frame_block_bamboo_planks",
+                                                                       "x":  90,
+                                                                       "y":  180
+                                                                   },
+                     "facing=east,frame_material=bamboo_planks":  {
+                                                                      "model":  "twistermill:block/twister_sail_frame_block_bamboo_planks",
+                                                                      "x":  90,
+                                                                      "y":  90
+                                                                  },
+                     "facing=west,frame_material=bamboo_planks":  {
+                                                                      "model":  "twistermill:block/twister_sail_frame_block_bamboo_planks",
+                                                                      "x":  90,
+                                                                      "y":  270
+                                                                  },
+                     "facing=up,frame_material=bamboo_planks":  {
+                                                                    "model":  "twistermill:block/twister_sail_frame_block_bamboo_planks"
+                                                                },
+                     "facing=down,frame_material=bamboo_planks":  {
+                                                                      "model":  "twistermill:block/twister_sail_frame_block_bamboo_planks",
+                                                                      "x":  180
+                                                                  },
+                     "facing=north,frame_material=birch_planks":  {
+                                                                      "model":  "twistermill:block/twister_sail_frame_block_birch_planks",
+                                                                      "x":  90
+                                                                  },
+                     "facing=south,frame_material=birch_planks":  {
+                                                                      "model":  "twistermill:block/twister_sail_frame_block_birch_planks",
+                                                                      "x":  90,
+                                                                      "y":  180
+                                                                  },
+                     "facing=east,frame_material=birch_planks":  {
+                                                                     "model":  "twistermill:block/twister_sail_frame_block_birch_planks",
+                                                                     "x":  90,
+                                                                     "y":  90
+                                                                 },
+                     "facing=west,frame_material=birch_planks":  {
+                                                                     "model":  "twistermill:block/twister_sail_frame_block_birch_planks",
+                                                                     "x":  90,
+                                                                     "y":  270
+                                                                 },
+                     "facing=up,frame_material=birch_planks":  {
+                                                                   "model":  "twistermill:block/twister_sail_frame_block_birch_planks"
+                                                               },
+                     "facing=down,frame_material=birch_planks":  {
+                                                                     "model":  "twistermill:block/twister_sail_frame_block_birch_planks",
+                                                                     "x":  180
+                                                                 },
+                     "facing=north,frame_material=cherry_planks":  {
+                                                                       "model":  "twistermill:block/twister_sail_frame_block_cherry_planks",
+                                                                       "x":  90
+                                                                   },
+                     "facing=south,frame_material=cherry_planks":  {
+                                                                       "model":  "twistermill:block/twister_sail_frame_block_cherry_planks",
+                                                                       "x":  90,
+                                                                       "y":  180
+                                                                   },
+                     "facing=east,frame_material=cherry_planks":  {
+                                                                      "model":  "twistermill:block/twister_sail_frame_block_cherry_planks",
+                                                                      "x":  90,
+                                                                      "y":  90
+                                                                  },
+                     "facing=west,frame_material=cherry_planks":  {
+                                                                      "model":  "twistermill:block/twister_sail_frame_block_cherry_planks",
+                                                                      "x":  90,
+                                                                      "y":  270
+                                                                  },
+                     "facing=up,frame_material=cherry_planks":  {
+                                                                    "model":  "twistermill:block/twister_sail_frame_block_cherry_planks"
+                                                                },
+                     "facing=down,frame_material=cherry_planks":  {
+                                                                      "model":  "twistermill:block/twister_sail_frame_block_cherry_planks",
+                                                                      "x":  180
+                                                                  },
+                     "facing=north,frame_material=crimson_planks":  {
+                                                                        "model":  "twistermill:block/twister_sail_frame_block_crimson_planks",
+                                                                        "x":  90
+                                                                    },
+                     "facing=south,frame_material=crimson_planks":  {
+                                                                        "model":  "twistermill:block/twister_sail_frame_block_crimson_planks",
+                                                                        "x":  90,
+                                                                        "y":  180
+                                                                    },
+                     "facing=east,frame_material=crimson_planks":  {
+                                                                       "model":  "twistermill:block/twister_sail_frame_block_crimson_planks",
+                                                                       "x":  90,
+                                                                       "y":  90
+                                                                   },
+                     "facing=west,frame_material=crimson_planks":  {
+                                                                       "model":  "twistermill:block/twister_sail_frame_block_crimson_planks",
+                                                                       "x":  90,
+                                                                       "y":  270
+                                                                   },
+                     "facing=up,frame_material=crimson_planks":  {
+                                                                     "model":  "twistermill:block/twister_sail_frame_block_crimson_planks"
+                                                                 },
+                     "facing=down,frame_material=crimson_planks":  {
+                                                                       "model":  "twistermill:block/twister_sail_frame_block_crimson_planks",
+                                                                       "x":  180
+                                                                   },
+                     "facing=north,frame_material=dark_oak_planks":  {
+                                                                         "model":  "twistermill:block/twister_sail_frame_block_dark_oak_planks",
+                                                                         "x":  90
+                                                                     },
+                     "facing=south,frame_material=dark_oak_planks":  {
+                                                                         "model":  "twistermill:block/twister_sail_frame_block_dark_oak_planks",
+                                                                         "x":  90,
+                                                                         "y":  180
+                                                                     },
+                     "facing=east,frame_material=dark_oak_planks":  {
+                                                                        "model":  "twistermill:block/twister_sail_frame_block_dark_oak_planks",
+                                                                        "x":  90,
+                                                                        "y":  90
+                                                                    },
+                     "facing=west,frame_material=dark_oak_planks":  {
+                                                                        "model":  "twistermill:block/twister_sail_frame_block_dark_oak_planks",
+                                                                        "x":  90,
+                                                                        "y":  270
+                                                                    },
+                     "facing=up,frame_material=dark_oak_planks":  {
+                                                                      "model":  "twistermill:block/twister_sail_frame_block_dark_oak_planks"
+                                                                  },
+                     "facing=down,frame_material=dark_oak_planks":  {
+                                                                        "model":  "twistermill:block/twister_sail_frame_block_dark_oak_planks",
+                                                                        "x":  180
+                                                                    },
+                     "facing=north,frame_material=jungle_planks":  {
+                                                                       "model":  "twistermill:block/twister_sail_frame_block_jungle_planks",
+                                                                       "x":  90
+                                                                   },
+                     "facing=south,frame_material=jungle_planks":  {
+                                                                       "model":  "twistermill:block/twister_sail_frame_block_jungle_planks",
+                                                                       "x":  90,
+                                                                       "y":  180
+                                                                   },
+                     "facing=east,frame_material=jungle_planks":  {
+                                                                      "model":  "twistermill:block/twister_sail_frame_block_jungle_planks",
+                                                                      "x":  90,
+                                                                      "y":  90
+                                                                  },
+                     "facing=west,frame_material=jungle_planks":  {
+                                                                      "model":  "twistermill:block/twister_sail_frame_block_jungle_planks",
+                                                                      "x":  90,
+                                                                      "y":  270
+                                                                  },
+                     "facing=up,frame_material=jungle_planks":  {
+                                                                    "model":  "twistermill:block/twister_sail_frame_block_jungle_planks"
+                                                                },
+                     "facing=down,frame_material=jungle_planks":  {
+                                                                      "model":  "twistermill:block/twister_sail_frame_block_jungle_planks",
+                                                                      "x":  180
+                                                                  },
+                     "facing=north,frame_material=mangrove_planks":  {
+                                                                         "model":  "twistermill:block/twister_sail_frame_block_mangrove_planks",
+                                                                         "x":  90
+                                                                     },
+                     "facing=south,frame_material=mangrove_planks":  {
+                                                                         "model":  "twistermill:block/twister_sail_frame_block_mangrove_planks",
+                                                                         "x":  90,
+                                                                         "y":  180
+                                                                     },
+                     "facing=east,frame_material=mangrove_planks":  {
+                                                                        "model":  "twistermill:block/twister_sail_frame_block_mangrove_planks",
+                                                                        "x":  90,
+                                                                        "y":  90
+                                                                    },
+                     "facing=west,frame_material=mangrove_planks":  {
+                                                                        "model":  "twistermill:block/twister_sail_frame_block_mangrove_planks",
+                                                                        "x":  90,
+                                                                        "y":  270
+                                                                    },
+                     "facing=up,frame_material=mangrove_planks":  {
+                                                                      "model":  "twistermill:block/twister_sail_frame_block_mangrove_planks"
+                                                                  },
+                     "facing=down,frame_material=mangrove_planks":  {
+                                                                        "model":  "twistermill:block/twister_sail_frame_block_mangrove_planks",
+                                                                        "x":  180
+                                                                    },
+                     "facing=north,frame_material=oak_planks":  {
+                                                                    "model":  "twistermill:block/twister_sail_frame_block_oak_planks",
+                                                                    "x":  90
+                                                                },
+                     "facing=south,frame_material=oak_planks":  {
+                                                                    "model":  "twistermill:block/twister_sail_frame_block_oak_planks",
+                                                                    "x":  90,
+                                                                    "y":  180
+                                                                },
+                     "facing=east,frame_material=oak_planks":  {
+                                                                   "model":  "twistermill:block/twister_sail_frame_block_oak_planks",
+                                                                   "x":  90,
+                                                                   "y":  90
+                                                               },
+                     "facing=west,frame_material=oak_planks":  {
+                                                                   "model":  "twistermill:block/twister_sail_frame_block_oak_planks",
+                                                                   "x":  90,
+                                                                   "y":  270
+                                                               },
+                     "facing=up,frame_material=oak_planks":  {
+                                                                 "model":  "twistermill:block/twister_sail_frame_block_oak_planks"
+                                                             },
+                     "facing=down,frame_material=oak_planks":  {
+                                                                   "model":  "twistermill:block/twister_sail_frame_block_oak_planks",
+                                                                   "x":  180
+                                                               },
+                     "facing=north,frame_material=spruce_planks":  {
+                                                                       "model":  "twistermill:block/twister_sail_frame_block_spruce_planks",
+                                                                       "x":  90
+                                                                   },
+                     "facing=south,frame_material=spruce_planks":  {
+                                                                       "model":  "twistermill:block/twister_sail_frame_block_spruce_planks",
+                                                                       "x":  90,
+                                                                       "y":  180
+                                                                   },
+                     "facing=east,frame_material=spruce_planks":  {
+                                                                      "model":  "twistermill:block/twister_sail_frame_block_spruce_planks",
+                                                                      "x":  90,
+                                                                      "y":  90
+                                                                  },
+                     "facing=west,frame_material=spruce_planks":  {
+                                                                      "model":  "twistermill:block/twister_sail_frame_block_spruce_planks",
+                                                                      "x":  90,
+                                                                      "y":  270
+                                                                  },
+                     "facing=up,frame_material=spruce_planks":  {
+                                                                    "model":  "twistermill:block/twister_sail_frame_block_spruce_planks"
+                                                                },
+                     "facing=down,frame_material=spruce_planks":  {
+                                                                      "model":  "twistermill:block/twister_sail_frame_block_spruce_planks",
+                                                                      "x":  180
+                                                                  },
+                     "facing=north,frame_material=warped_planks":  {
+                                                                       "model":  "twistermill:block/twister_sail_frame_block_warped_planks",
+                                                                       "x":  90
+                                                                   },
+                     "facing=south,frame_material=warped_planks":  {
+                                                                       "model":  "twistermill:block/twister_sail_frame_block_warped_planks",
+                                                                       "x":  90,
+                                                                       "y":  180
+                                                                   },
+                     "facing=east,frame_material=warped_planks":  {
+                                                                      "model":  "twistermill:block/twister_sail_frame_block_warped_planks",
+                                                                      "x":  90,
+                                                                      "y":  90
+                                                                  },
+                     "facing=west,frame_material=warped_planks":  {
+                                                                      "model":  "twistermill:block/twister_sail_frame_block_warped_planks",
+                                                                      "x":  90,
+                                                                      "y":  270
+                                                                  },
+                     "facing=up,frame_material=warped_planks":  {
+                                                                    "model":  "twistermill:block/twister_sail_frame_block_warped_planks"
+                                                                },
+                     "facing=down,frame_material=warped_planks":  {
+                                                                      "model":  "twistermill:block/twister_sail_frame_block_warped_planks",
+                                                                      "x":  180
+                                                                  },
+                     "facing=north,frame_material=black_wool":  {
+                                                                    "model":  "twistermill:block/twister_sail_frame_block_black_wool",
+                                                                    "x":  90
+                                                                },
+                     "facing=south,frame_material=black_wool":  {
+                                                                    "model":  "twistermill:block/twister_sail_frame_block_black_wool",
+                                                                    "y":  180,
+                                                                    "x":  90
+                                                                },
+                     "facing=east,frame_material=black_wool":  {
+                                                                   "model":  "twistermill:block/twister_sail_frame_block_black_wool",
+                                                                   "y":  90,
+                                                                   "x":  90
+                                                               },
+                     "facing=west,frame_material=black_wool":  {
+                                                                   "model":  "twistermill:block/twister_sail_frame_block_black_wool",
+                                                                   "y":  270,
+                                                                   "x":  90
+                                                               },
+                     "facing=up,frame_material=black_wool":  {
+                                                                 "model":  "twistermill:block/twister_sail_frame_block_black_wool"
+                                                             },
+                     "facing=down,frame_material=black_wool":  {
+                                                                   "model":  "twistermill:block/twister_sail_frame_block_black_wool",
+                                                                   "x":  180
+                                                               },
+                     "facing=north,frame_material=blue_wool":  {
+                                                                   "model":  "twistermill:block/twister_sail_frame_block_blue_wool",
+                                                                   "x":  90
+                                                               },
+                     "facing=south,frame_material=blue_wool":  {
+                                                                   "model":  "twistermill:block/twister_sail_frame_block_blue_wool",
+                                                                   "y":  180,
+                                                                   "x":  90
+                                                               },
+                     "facing=east,frame_material=blue_wool":  {
+                                                                  "model":  "twistermill:block/twister_sail_frame_block_blue_wool",
+                                                                  "y":  90,
+                                                                  "x":  90
+                                                              },
+                     "facing=west,frame_material=blue_wool":  {
+                                                                  "model":  "twistermill:block/twister_sail_frame_block_blue_wool",
+                                                                  "y":  270,
+                                                                  "x":  90
+                                                              },
+                     "facing=up,frame_material=blue_wool":  {
+                                                                "model":  "twistermill:block/twister_sail_frame_block_blue_wool"
+                                                            },
+                     "facing=down,frame_material=blue_wool":  {
+                                                                  "model":  "twistermill:block/twister_sail_frame_block_blue_wool",
+                                                                  "x":  180
+                                                              },
+                     "facing=north,frame_material=brown_wool":  {
+                                                                    "model":  "twistermill:block/twister_sail_frame_block_brown_wool",
+                                                                    "x":  90
+                                                                },
+                     "facing=south,frame_material=brown_wool":  {
+                                                                    "model":  "twistermill:block/twister_sail_frame_block_brown_wool",
+                                                                    "y":  180,
+                                                                    "x":  90
+                                                                },
+                     "facing=east,frame_material=brown_wool":  {
+                                                                   "model":  "twistermill:block/twister_sail_frame_block_brown_wool",
+                                                                   "y":  90,
+                                                                   "x":  90
+                                                               },
+                     "facing=west,frame_material=brown_wool":  {
+                                                                   "model":  "twistermill:block/twister_sail_frame_block_brown_wool",
+                                                                   "y":  270,
+                                                                   "x":  90
+                                                               },
+                     "facing=up,frame_material=brown_wool":  {
+                                                                 "model":  "twistermill:block/twister_sail_frame_block_brown_wool"
+                                                             },
+                     "facing=down,frame_material=brown_wool":  {
+                                                                   "model":  "twistermill:block/twister_sail_frame_block_brown_wool",
+                                                                   "x":  180
+                                                               },
+                     "facing=north,frame_material=cyan_wool":  {
+                                                                   "model":  "twistermill:block/twister_sail_frame_block_cyan_wool",
+                                                                   "x":  90
+                                                               },
+                     "facing=south,frame_material=cyan_wool":  {
+                                                                   "model":  "twistermill:block/twister_sail_frame_block_cyan_wool",
+                                                                   "y":  180,
+                                                                   "x":  90
+                                                               },
+                     "facing=east,frame_material=cyan_wool":  {
+                                                                  "model":  "twistermill:block/twister_sail_frame_block_cyan_wool",
+                                                                  "y":  90,
+                                                                  "x":  90
+                                                              },
+                     "facing=west,frame_material=cyan_wool":  {
+                                                                  "model":  "twistermill:block/twister_sail_frame_block_cyan_wool",
+                                                                  "y":  270,
+                                                                  "x":  90
+                                                              },
+                     "facing=up,frame_material=cyan_wool":  {
+                                                                "model":  "twistermill:block/twister_sail_frame_block_cyan_wool"
+                                                            },
+                     "facing=down,frame_material=cyan_wool":  {
+                                                                  "model":  "twistermill:block/twister_sail_frame_block_cyan_wool",
+                                                                  "x":  180
+                                                              },
+                     "facing=north,frame_material=gray_wool":  {
+                                                                   "model":  "twistermill:block/twister_sail_frame_block_gray_wool",
+                                                                   "x":  90
+                                                               },
+                     "facing=south,frame_material=gray_wool":  {
+                                                                   "model":  "twistermill:block/twister_sail_frame_block_gray_wool",
+                                                                   "y":  180,
+                                                                   "x":  90
+                                                               },
+                     "facing=east,frame_material=gray_wool":  {
+                                                                  "model":  "twistermill:block/twister_sail_frame_block_gray_wool",
+                                                                  "y":  90,
+                                                                  "x":  90
+                                                              },
+                     "facing=west,frame_material=gray_wool":  {
+                                                                  "model":  "twistermill:block/twister_sail_frame_block_gray_wool",
+                                                                  "y":  270,
+                                                                  "x":  90
+                                                              },
+                     "facing=up,frame_material=gray_wool":  {
+                                                                "model":  "twistermill:block/twister_sail_frame_block_gray_wool"
+                                                            },
+                     "facing=down,frame_material=gray_wool":  {
+                                                                  "model":  "twistermill:block/twister_sail_frame_block_gray_wool",
+                                                                  "x":  180
+                                                              },
+                     "facing=north,frame_material=green_wool":  {
+                                                                    "model":  "twistermill:block/twister_sail_frame_block_green_wool",
+                                                                    "x":  90
+                                                                },
+                     "facing=south,frame_material=green_wool":  {
+                                                                    "model":  "twistermill:block/twister_sail_frame_block_green_wool",
+                                                                    "y":  180,
+                                                                    "x":  90
+                                                                },
+                     "facing=east,frame_material=green_wool":  {
+                                                                   "model":  "twistermill:block/twister_sail_frame_block_green_wool",
+                                                                   "y":  90,
+                                                                   "x":  90
+                                                               },
+                     "facing=west,frame_material=green_wool":  {
+                                                                   "model":  "twistermill:block/twister_sail_frame_block_green_wool",
+                                                                   "y":  270,
+                                                                   "x":  90
+                                                               },
+                     "facing=up,frame_material=green_wool":  {
+                                                                 "model":  "twistermill:block/twister_sail_frame_block_green_wool"
+                                                             },
+                     "facing=down,frame_material=green_wool":  {
+                                                                   "model":  "twistermill:block/twister_sail_frame_block_green_wool",
+                                                                   "x":  180
+                                                               },
+                     "facing=north,frame_material=light_blue_wool":  {
+                                                                         "model":  "twistermill:block/twister_sail_frame_block_light_blue_wool",
+                                                                         "x":  90
+                                                                     },
+                     "facing=south,frame_material=light_blue_wool":  {
+                                                                         "model":  "twistermill:block/twister_sail_frame_block_light_blue_wool",
+                                                                         "y":  180,
+                                                                         "x":  90
+                                                                     },
+                     "facing=east,frame_material=light_blue_wool":  {
+                                                                        "model":  "twistermill:block/twister_sail_frame_block_light_blue_wool",
+                                                                        "y":  90,
+                                                                        "x":  90
+                                                                    },
+                     "facing=west,frame_material=light_blue_wool":  {
+                                                                        "model":  "twistermill:block/twister_sail_frame_block_light_blue_wool",
+                                                                        "y":  270,
+                                                                        "x":  90
+                                                                    },
+                     "facing=up,frame_material=light_blue_wool":  {
+                                                                      "model":  "twistermill:block/twister_sail_frame_block_light_blue_wool"
+                                                                  },
+                     "facing=down,frame_material=light_blue_wool":  {
+                                                                        "model":  "twistermill:block/twister_sail_frame_block_light_blue_wool",
+                                                                        "x":  180
+                                                                    },
+                     "facing=north,frame_material=light_gray_wool":  {
+                                                                         "model":  "twistermill:block/twister_sail_frame_block_light_gray_wool",
+                                                                         "x":  90
+                                                                     },
+                     "facing=south,frame_material=light_gray_wool":  {
+                                                                         "model":  "twistermill:block/twister_sail_frame_block_light_gray_wool",
+                                                                         "y":  180,
+                                                                         "x":  90
+                                                                     },
+                     "facing=east,frame_material=light_gray_wool":  {
+                                                                        "model":  "twistermill:block/twister_sail_frame_block_light_gray_wool",
+                                                                        "y":  90,
+                                                                        "x":  90
+                                                                    },
+                     "facing=west,frame_material=light_gray_wool":  {
+                                                                        "model":  "twistermill:block/twister_sail_frame_block_light_gray_wool",
+                                                                        "y":  270,
+                                                                        "x":  90
+                                                                    },
+                     "facing=up,frame_material=light_gray_wool":  {
+                                                                      "model":  "twistermill:block/twister_sail_frame_block_light_gray_wool"
+                                                                  },
+                     "facing=down,frame_material=light_gray_wool":  {
+                                                                        "model":  "twistermill:block/twister_sail_frame_block_light_gray_wool",
+                                                                        "x":  180
+                                                                    },
+                     "facing=north,frame_material=lime_wool":  {
+                                                                   "model":  "twistermill:block/twister_sail_frame_block_lime_wool",
+                                                                   "x":  90
+                                                               },
+                     "facing=south,frame_material=lime_wool":  {
+                                                                   "model":  "twistermill:block/twister_sail_frame_block_lime_wool",
+                                                                   "y":  180,
+                                                                   "x":  90
+                                                               },
+                     "facing=east,frame_material=lime_wool":  {
+                                                                  "model":  "twistermill:block/twister_sail_frame_block_lime_wool",
+                                                                  "y":  90,
+                                                                  "x":  90
+                                                              },
+                     "facing=west,frame_material=lime_wool":  {
+                                                                  "model":  "twistermill:block/twister_sail_frame_block_lime_wool",
+                                                                  "y":  270,
+                                                                  "x":  90
+                                                              },
+                     "facing=up,frame_material=lime_wool":  {
+                                                                "model":  "twistermill:block/twister_sail_frame_block_lime_wool"
+                                                            },
+                     "facing=down,frame_material=lime_wool":  {
+                                                                  "model":  "twistermill:block/twister_sail_frame_block_lime_wool",
+                                                                  "x":  180
+                                                              },
+                     "facing=north,frame_material=magenta_wool":  {
+                                                                      "model":  "twistermill:block/twister_sail_frame_block_magenta_wool",
+                                                                      "x":  90
+                                                                  },
+                     "facing=south,frame_material=magenta_wool":  {
+                                                                      "model":  "twistermill:block/twister_sail_frame_block_magenta_wool",
+                                                                      "y":  180,
+                                                                      "x":  90
+                                                                  },
+                     "facing=east,frame_material=magenta_wool":  {
+                                                                     "model":  "twistermill:block/twister_sail_frame_block_magenta_wool",
+                                                                     "y":  90,
+                                                                     "x":  90
+                                                                 },
+                     "facing=west,frame_material=magenta_wool":  {
+                                                                     "model":  "twistermill:block/twister_sail_frame_block_magenta_wool",
+                                                                     "y":  270,
+                                                                     "x":  90
+                                                                 },
+                     "facing=up,frame_material=magenta_wool":  {
+                                                                   "model":  "twistermill:block/twister_sail_frame_block_magenta_wool"
+                                                               },
+                     "facing=down,frame_material=magenta_wool":  {
+                                                                     "model":  "twistermill:block/twister_sail_frame_block_magenta_wool",
+                                                                     "x":  180
+                                                                 },
+                     "facing=north,frame_material=orange_wool":  {
+                                                                     "model":  "twistermill:block/twister_sail_frame_block_orange_wool",
+                                                                     "x":  90
+                                                                 },
+                     "facing=south,frame_material=orange_wool":  {
+                                                                     "model":  "twistermill:block/twister_sail_frame_block_orange_wool",
+                                                                     "y":  180,
+                                                                     "x":  90
+                                                                 },
+                     "facing=east,frame_material=orange_wool":  {
+                                                                    "model":  "twistermill:block/twister_sail_frame_block_orange_wool",
+                                                                    "y":  90,
+                                                                    "x":  90
+                                                                },
+                     "facing=west,frame_material=orange_wool":  {
+                                                                    "model":  "twistermill:block/twister_sail_frame_block_orange_wool",
+                                                                    "y":  270,
+                                                                    "x":  90
+                                                                },
+                     "facing=up,frame_material=orange_wool":  {
+                                                                  "model":  "twistermill:block/twister_sail_frame_block_orange_wool"
+                                                              },
+                     "facing=down,frame_material=orange_wool":  {
+                                                                    "model":  "twistermill:block/twister_sail_frame_block_orange_wool",
+                                                                    "x":  180
+                                                                },
+                     "facing=north,frame_material=pink_wool":  {
+                                                                   "model":  "twistermill:block/twister_sail_frame_block_pink_wool",
+                                                                   "x":  90
+                                                               },
+                     "facing=south,frame_material=pink_wool":  {
+                                                                   "model":  "twistermill:block/twister_sail_frame_block_pink_wool",
+                                                                   "y":  180,
+                                                                   "x":  90
+                                                               },
+                     "facing=east,frame_material=pink_wool":  {
+                                                                  "model":  "twistermill:block/twister_sail_frame_block_pink_wool",
+                                                                  "y":  90,
+                                                                  "x":  90
+                                                              },
+                     "facing=west,frame_material=pink_wool":  {
+                                                                  "model":  "twistermill:block/twister_sail_frame_block_pink_wool",
+                                                                  "y":  270,
+                                                                  "x":  90
+                                                              },
+                     "facing=up,frame_material=pink_wool":  {
+                                                                "model":  "twistermill:block/twister_sail_frame_block_pink_wool"
+                                                            },
+                     "facing=down,frame_material=pink_wool":  {
+                                                                  "model":  "twistermill:block/twister_sail_frame_block_pink_wool",
+                                                                  "x":  180
+                                                              },
+                     "facing=north,frame_material=purple_wool":  {
+                                                                     "model":  "twistermill:block/twister_sail_frame_block_purple_wool",
+                                                                     "x":  90
+                                                                 },
+                     "facing=south,frame_material=purple_wool":  {
+                                                                     "model":  "twistermill:block/twister_sail_frame_block_purple_wool",
+                                                                     "y":  180,
+                                                                     "x":  90
+                                                                 },
+                     "facing=east,frame_material=purple_wool":  {
+                                                                    "model":  "twistermill:block/twister_sail_frame_block_purple_wool",
+                                                                    "y":  90,
+                                                                    "x":  90
+                                                                },
+                     "facing=west,frame_material=purple_wool":  {
+                                                                    "model":  "twistermill:block/twister_sail_frame_block_purple_wool",
+                                                                    "y":  270,
+                                                                    "x":  90
+                                                                },
+                     "facing=up,frame_material=purple_wool":  {
+                                                                  "model":  "twistermill:block/twister_sail_frame_block_purple_wool"
+                                                              },
+                     "facing=down,frame_material=purple_wool":  {
+                                                                    "model":  "twistermill:block/twister_sail_frame_block_purple_wool",
+                                                                    "x":  180
+                                                                },
+                     "facing=north,frame_material=red_wool":  {
+                                                                  "model":  "twistermill:block/twister_sail_frame_block_red_wool",
+                                                                  "x":  90
+                                                              },
+                     "facing=south,frame_material=red_wool":  {
+                                                                  "model":  "twistermill:block/twister_sail_frame_block_red_wool",
+                                                                  "y":  180,
+                                                                  "x":  90
+                                                              },
+                     "facing=east,frame_material=red_wool":  {
+                                                                 "model":  "twistermill:block/twister_sail_frame_block_red_wool",
+                                                                 "y":  90,
+                                                                 "x":  90
+                                                             },
+                     "facing=west,frame_material=red_wool":  {
+                                                                 "model":  "twistermill:block/twister_sail_frame_block_red_wool",
+                                                                 "y":  270,
+                                                                 "x":  90
+                                                             },
+                     "facing=up,frame_material=red_wool":  {
+                                                               "model":  "twistermill:block/twister_sail_frame_block_red_wool"
+                                                           },
+                     "facing=down,frame_material=red_wool":  {
+                                                                 "model":  "twistermill:block/twister_sail_frame_block_red_wool",
+                                                                 "x":  180
+                                                             },
+                     "facing=north,frame_material=white_wool":  {
+                                                                    "model":  "twistermill:block/twister_sail_frame_block_white_wool",
+                                                                    "x":  90
+                                                                },
+                     "facing=south,frame_material=white_wool":  {
+                                                                    "model":  "twistermill:block/twister_sail_frame_block_white_wool",
+                                                                    "y":  180,
+                                                                    "x":  90
+                                                                },
+                     "facing=east,frame_material=white_wool":  {
+                                                                   "model":  "twistermill:block/twister_sail_frame_block_white_wool",
+                                                                   "y":  90,
+                                                                   "x":  90
+                                                               },
+                     "facing=west,frame_material=white_wool":  {
+                                                                   "model":  "twistermill:block/twister_sail_frame_block_white_wool",
+                                                                   "y":  270,
+                                                                   "x":  90
+                                                               },
+                     "facing=up,frame_material=white_wool":  {
+                                                                 "model":  "twistermill:block/twister_sail_frame_block_white_wool"
+                                                             },
+                     "facing=down,frame_material=white_wool":  {
+                                                                   "model":  "twistermill:block/twister_sail_frame_block_white_wool",
+                                                                   "x":  180
+                                                               },
+                     "facing=north,frame_material=yellow_wool":  {
+                                                                     "model":  "twistermill:block/twister_sail_frame_block_yellow_wool",
+                                                                     "x":  90
+                                                                 },
+                     "facing=south,frame_material=yellow_wool":  {
+                                                                     "model":  "twistermill:block/twister_sail_frame_block_yellow_wool",
+                                                                     "y":  180,
+                                                                     "x":  90
+                                                                 },
+                     "facing=east,frame_material=yellow_wool":  {
+                                                                    "model":  "twistermill:block/twister_sail_frame_block_yellow_wool",
+                                                                    "y":  90,
+                                                                    "x":  90
+                                                                },
+                     "facing=west,frame_material=yellow_wool":  {
+                                                                    "model":  "twistermill:block/twister_sail_frame_block_yellow_wool",
+                                                                    "y":  270,
+                                                                    "x":  90
+                                                                },
+                     "facing=up,frame_material=yellow_wool":  {
+                                                                  "model":  "twistermill:block/twister_sail_frame_block_yellow_wool"
+                                                              },
+                     "facing=down,frame_material=yellow_wool":  {
+                                                                    "model":  "twistermill:block/twister_sail_frame_block_yellow_wool",
+                                                                    "x":  180
+                                                                },
+                     "facing=north,frame_material=acacia_log":  {
+                                                                    "model":  "twistermill:block/twister_sail_frame_block_acacia_log",
+                                                                    "x":  90
+                                                                },
+                     "facing=south,frame_material=acacia_log":  {
+                                                                    "model":  "twistermill:block/twister_sail_frame_block_acacia_log",
+                                                                    "y":  180,
+                                                                    "x":  90
+                                                                },
+                     "facing=east,frame_material=acacia_log":  {
+                                                                   "model":  "twistermill:block/twister_sail_frame_block_acacia_log",
+                                                                   "y":  90,
+                                                                   "x":  90
+                                                               },
+                     "facing=west,frame_material=acacia_log":  {
+                                                                   "model":  "twistermill:block/twister_sail_frame_block_acacia_log",
+                                                                   "y":  270,
+                                                                   "x":  90
+                                                               },
+                     "facing=up,frame_material=acacia_log":  {
+                                                                 "model":  "twistermill:block/twister_sail_frame_block_acacia_log"
+                                                             },
+                     "facing=down,frame_material=acacia_log":  {
+                                                                   "model":  "twistermill:block/twister_sail_frame_block_acacia_log",
+                                                                   "x":  180
+                                                               },
+                     "facing=north,frame_material=birch_log":  {
+                                                                   "model":  "twistermill:block/twister_sail_frame_block_birch_log",
+                                                                   "x":  90
+                                                               },
+                     "facing=south,frame_material=birch_log":  {
+                                                                   "model":  "twistermill:block/twister_sail_frame_block_birch_log",
+                                                                   "y":  180,
+                                                                   "x":  90
+                                                               },
+                     "facing=east,frame_material=birch_log":  {
+                                                                  "model":  "twistermill:block/twister_sail_frame_block_birch_log",
+                                                                  "y":  90,
+                                                                  "x":  90
+                                                              },
+                     "facing=west,frame_material=birch_log":  {
+                                                                  "model":  "twistermill:block/twister_sail_frame_block_birch_log",
+                                                                  "y":  270,
+                                                                  "x":  90
+                                                              },
+                     "facing=up,frame_material=birch_log":  {
+                                                                "model":  "twistermill:block/twister_sail_frame_block_birch_log"
+                                                            },
+                     "facing=down,frame_material=birch_log":  {
+                                                                  "model":  "twistermill:block/twister_sail_frame_block_birch_log",
+                                                                  "x":  180
+                                                              },
+                     "facing=north,frame_material=cherry_log":  {
+                                                                    "model":  "twistermill:block/twister_sail_frame_block_cherry_log",
+                                                                    "x":  90
+                                                                },
+                     "facing=south,frame_material=cherry_log":  {
+                                                                    "model":  "twistermill:block/twister_sail_frame_block_cherry_log",
+                                                                    "y":  180,
+                                                                    "x":  90
+                                                                },
+                     "facing=east,frame_material=cherry_log":  {
+                                                                   "model":  "twistermill:block/twister_sail_frame_block_cherry_log",
+                                                                   "y":  90,
+                                                                   "x":  90
+                                                               },
+                     "facing=west,frame_material=cherry_log":  {
+                                                                   "model":  "twistermill:block/twister_sail_frame_block_cherry_log",
+                                                                   "y":  270,
+                                                                   "x":  90
+                                                               },
+                     "facing=up,frame_material=cherry_log":  {
+                                                                 "model":  "twistermill:block/twister_sail_frame_block_cherry_log"
+                                                             },
+                     "facing=down,frame_material=cherry_log":  {
+                                                                   "model":  "twistermill:block/twister_sail_frame_block_cherry_log",
+                                                                   "x":  180
+                                                               },
+                     "facing=north,frame_material=dark_oak_log":  {
+                                                                      "model":  "twistermill:block/twister_sail_frame_block_dark_oak_log",
+                                                                      "x":  90
+                                                                  },
+                     "facing=south,frame_material=dark_oak_log":  {
+                                                                      "model":  "twistermill:block/twister_sail_frame_block_dark_oak_log",
+                                                                      "y":  180,
+                                                                      "x":  90
+                                                                  },
+                     "facing=east,frame_material=dark_oak_log":  {
+                                                                     "model":  "twistermill:block/twister_sail_frame_block_dark_oak_log",
+                                                                     "y":  90,
+                                                                     "x":  90
+                                                                 },
+                     "facing=west,frame_material=dark_oak_log":  {
+                                                                     "model":  "twistermill:block/twister_sail_frame_block_dark_oak_log",
+                                                                     "y":  270,
+                                                                     "x":  90
+                                                                 },
+                     "facing=up,frame_material=dark_oak_log":  {
+                                                                   "model":  "twistermill:block/twister_sail_frame_block_dark_oak_log"
+                                                               },
+                     "facing=down,frame_material=dark_oak_log":  {
+                                                                     "model":  "twistermill:block/twister_sail_frame_block_dark_oak_log",
+                                                                     "x":  180
+                                                                 },
+                     "facing=north,frame_material=jungle_log":  {
+                                                                    "model":  "twistermill:block/twister_sail_frame_block_jungle_log",
+                                                                    "x":  90
+                                                                },
+                     "facing=south,frame_material=jungle_log":  {
+                                                                    "model":  "twistermill:block/twister_sail_frame_block_jungle_log",
+                                                                    "y":  180,
+                                                                    "x":  90
+                                                                },
+                     "facing=east,frame_material=jungle_log":  {
+                                                                   "model":  "twistermill:block/twister_sail_frame_block_jungle_log",
+                                                                   "y":  90,
+                                                                   "x":  90
+                                                               },
+                     "facing=west,frame_material=jungle_log":  {
+                                                                   "model":  "twistermill:block/twister_sail_frame_block_jungle_log",
+                                                                   "y":  270,
+                                                                   "x":  90
+                                                               },
+                     "facing=up,frame_material=jungle_log":  {
+                                                                 "model":  "twistermill:block/twister_sail_frame_block_jungle_log"
+                                                             },
+                     "facing=down,frame_material=jungle_log":  {
+                                                                   "model":  "twistermill:block/twister_sail_frame_block_jungle_log",
+                                                                   "x":  180
+                                                               },
+                     "facing=north,frame_material=mangrove_log":  {
+                                                                      "model":  "twistermill:block/twister_sail_frame_block_mangrove_log",
+                                                                      "x":  90
+                                                                  },
+                     "facing=south,frame_material=mangrove_log":  {
+                                                                      "model":  "twistermill:block/twister_sail_frame_block_mangrove_log",
+                                                                      "y":  180,
+                                                                      "x":  90
+                                                                  },
+                     "facing=east,frame_material=mangrove_log":  {
+                                                                     "model":  "twistermill:block/twister_sail_frame_block_mangrove_log",
+                                                                     "y":  90,
+                                                                     "x":  90
+                                                                 },
+                     "facing=west,frame_material=mangrove_log":  {
+                                                                     "model":  "twistermill:block/twister_sail_frame_block_mangrove_log",
+                                                                     "y":  270,
+                                                                     "x":  90
+                                                                 },
+                     "facing=up,frame_material=mangrove_log":  {
+                                                                   "model":  "twistermill:block/twister_sail_frame_block_mangrove_log"
+                                                               },
+                     "facing=down,frame_material=mangrove_log":  {
+                                                                     "model":  "twistermill:block/twister_sail_frame_block_mangrove_log",
+                                                                     "x":  180
+                                                                 },
+                     "facing=north,frame_material=oak_log":  {
+                                                                 "model":  "twistermill:block/twister_sail_frame_block_oak_log",
+                                                                 "x":  90
+                                                             },
+                     "facing=south,frame_material=oak_log":  {
+                                                                 "model":  "twistermill:block/twister_sail_frame_block_oak_log",
+                                                                 "y":  180,
+                                                                 "x":  90
+                                                             },
+                     "facing=east,frame_material=oak_log":  {
+                                                                "model":  "twistermill:block/twister_sail_frame_block_oak_log",
+                                                                "y":  90,
+                                                                "x":  90
+                                                            },
+                     "facing=west,frame_material=oak_log":  {
+                                                                "model":  "twistermill:block/twister_sail_frame_block_oak_log",
+                                                                "y":  270,
+                                                                "x":  90
+                                                            },
+                     "facing=up,frame_material=oak_log":  {
+                                                              "model":  "twistermill:block/twister_sail_frame_block_oak_log"
+                                                          },
+                     "facing=down,frame_material=oak_log":  {
+                                                                "model":  "twistermill:block/twister_sail_frame_block_oak_log",
+                                                                "x":  180
+                                                            },
+                     "facing=north,frame_material=spruce_log":  {
+                                                                    "model":  "twistermill:block/twister_sail_frame_block_spruce_log",
+                                                                    "x":  90
+                                                                },
+                     "facing=south,frame_material=spruce_log":  {
+                                                                    "model":  "twistermill:block/twister_sail_frame_block_spruce_log",
+                                                                    "y":  180,
+                                                                    "x":  90
+                                                                },
+                     "facing=east,frame_material=spruce_log":  {
+                                                                   "model":  "twistermill:block/twister_sail_frame_block_spruce_log",
+                                                                   "y":  90,
+                                                                   "x":  90
+                                                               },
+                     "facing=west,frame_material=spruce_log":  {
+                                                                   "model":  "twistermill:block/twister_sail_frame_block_spruce_log",
+                                                                   "y":  270,
+                                                                   "x":  90
+                                                               },
+                     "facing=up,frame_material=spruce_log":  {
+                                                                 "model":  "twistermill:block/twister_sail_frame_block_spruce_log"
+                                                             },
+                     "facing=down,frame_material=spruce_log":  {
+                                                                   "model":  "twistermill:block/twister_sail_frame_block_spruce_log",
+                                                                   "x":  180
+                                                               },
+                     "facing=north,frame_material=stripped_acacia_log":  {
+                                                                             "model":  "twistermill:block/twister_sail_frame_block_stripped_acacia_log",
+                                                                             "x":  90
+                                                                         },
+                     "facing=south,frame_material=stripped_acacia_log":  {
+                                                                             "model":  "twistermill:block/twister_sail_frame_block_stripped_acacia_log",
+                                                                             "y":  180,
+                                                                             "x":  90
+                                                                         },
+                     "facing=east,frame_material=stripped_acacia_log":  {
+                                                                            "model":  "twistermill:block/twister_sail_frame_block_stripped_acacia_log",
+                                                                            "y":  90,
+                                                                            "x":  90
+                                                                        },
+                     "facing=west,frame_material=stripped_acacia_log":  {
+                                                                            "model":  "twistermill:block/twister_sail_frame_block_stripped_acacia_log",
+                                                                            "y":  270,
+                                                                            "x":  90
+                                                                        },
+                     "facing=up,frame_material=stripped_acacia_log":  {
+                                                                          "model":  "twistermill:block/twister_sail_frame_block_stripped_acacia_log"
+                                                                      },
+                     "facing=down,frame_material=stripped_acacia_log":  {
+                                                                            "model":  "twistermill:block/twister_sail_frame_block_stripped_acacia_log",
+                                                                            "x":  180
+                                                                        },
+                     "facing=north,frame_material=stripped_birch_log":  {
+                                                                            "model":  "twistermill:block/twister_sail_frame_block_stripped_birch_log",
+                                                                            "x":  90
+                                                                        },
+                     "facing=south,frame_material=stripped_birch_log":  {
+                                                                            "model":  "twistermill:block/twister_sail_frame_block_stripped_birch_log",
+                                                                            "y":  180,
+                                                                            "x":  90
+                                                                        },
+                     "facing=east,frame_material=stripped_birch_log":  {
+                                                                           "model":  "twistermill:block/twister_sail_frame_block_stripped_birch_log",
+                                                                           "y":  90,
+                                                                           "x":  90
+                                                                       },
+                     "facing=west,frame_material=stripped_birch_log":  {
+                                                                           "model":  "twistermill:block/twister_sail_frame_block_stripped_birch_log",
+                                                                           "y":  270,
+                                                                           "x":  90
+                                                                       },
+                     "facing=up,frame_material=stripped_birch_log":  {
+                                                                         "model":  "twistermill:block/twister_sail_frame_block_stripped_birch_log"
+                                                                     },
+                     "facing=down,frame_material=stripped_birch_log":  {
+                                                                           "model":  "twistermill:block/twister_sail_frame_block_stripped_birch_log",
+                                                                           "x":  180
+                                                                       },
+                     "facing=north,frame_material=stripped_cherry_log":  {
+                                                                             "model":  "twistermill:block/twister_sail_frame_block_stripped_cherry_log",
+                                                                             "x":  90
+                                                                         },
+                     "facing=south,frame_material=stripped_cherry_log":  {
+                                                                             "model":  "twistermill:block/twister_sail_frame_block_stripped_cherry_log",
+                                                                             "y":  180,
+                                                                             "x":  90
+                                                                         },
+                     "facing=east,frame_material=stripped_cherry_log":  {
+                                                                            "model":  "twistermill:block/twister_sail_frame_block_stripped_cherry_log",
+                                                                            "y":  90,
+                                                                            "x":  90
+                                                                        },
+                     "facing=west,frame_material=stripped_cherry_log":  {
+                                                                            "model":  "twistermill:block/twister_sail_frame_block_stripped_cherry_log",
+                                                                            "y":  270,
+                                                                            "x":  90
+                                                                        },
+                     "facing=up,frame_material=stripped_cherry_log":  {
+                                                                          "model":  "twistermill:block/twister_sail_frame_block_stripped_cherry_log"
+                                                                      },
+                     "facing=down,frame_material=stripped_cherry_log":  {
+                                                                            "model":  "twistermill:block/twister_sail_frame_block_stripped_cherry_log",
+                                                                            "x":  180
+                                                                        },
+                     "facing=north,frame_material=stripped_dark_oak_log":  {
+                                                                               "model":  "twistermill:block/twister_sail_frame_block_stripped_dark_oak_log",
+                                                                               "x":  90
+                                                                           },
+                     "facing=south,frame_material=stripped_dark_oak_log":  {
+                                                                               "model":  "twistermill:block/twister_sail_frame_block_stripped_dark_oak_log",
+                                                                               "y":  180,
+                                                                               "x":  90
+                                                                           },
+                     "facing=east,frame_material=stripped_dark_oak_log":  {
+                                                                              "model":  "twistermill:block/twister_sail_frame_block_stripped_dark_oak_log",
+                                                                              "y":  90,
+                                                                              "x":  90
+                                                                          },
+                     "facing=west,frame_material=stripped_dark_oak_log":  {
+                                                                              "model":  "twistermill:block/twister_sail_frame_block_stripped_dark_oak_log",
+                                                                              "y":  270,
+                                                                              "x":  90
+                                                                          },
+                     "facing=up,frame_material=stripped_dark_oak_log":  {
+                                                                            "model":  "twistermill:block/twister_sail_frame_block_stripped_dark_oak_log"
+                                                                        },
+                     "facing=down,frame_material=stripped_dark_oak_log":  {
+                                                                              "model":  "twistermill:block/twister_sail_frame_block_stripped_dark_oak_log",
+                                                                              "x":  180
+                                                                          },
+                     "facing=north,frame_material=stripped_jungle_log":  {
+                                                                             "model":  "twistermill:block/twister_sail_frame_block_stripped_jungle_log",
+                                                                             "x":  90
+                                                                         },
+                     "facing=south,frame_material=stripped_jungle_log":  {
+                                                                             "model":  "twistermill:block/twister_sail_frame_block_stripped_jungle_log",
+                                                                             "y":  180,
+                                                                             "x":  90
+                                                                         },
+                     "facing=east,frame_material=stripped_jungle_log":  {
+                                                                            "model":  "twistermill:block/twister_sail_frame_block_stripped_jungle_log",
+                                                                            "y":  90,
+                                                                            "x":  90
+                                                                        },
+                     "facing=west,frame_material=stripped_jungle_log":  {
+                                                                            "model":  "twistermill:block/twister_sail_frame_block_stripped_jungle_log",
+                                                                            "y":  270,
+                                                                            "x":  90
+                                                                        },
+                     "facing=up,frame_material=stripped_jungle_log":  {
+                                                                          "model":  "twistermill:block/twister_sail_frame_block_stripped_jungle_log"
+                                                                      },
+                     "facing=down,frame_material=stripped_jungle_log":  {
+                                                                            "model":  "twistermill:block/twister_sail_frame_block_stripped_jungle_log",
+                                                                            "x":  180
+                                                                        },
+                     "facing=north,frame_material=stripped_mangrove_log":  {
+                                                                               "model":  "twistermill:block/twister_sail_frame_block_stripped_mangrove_log",
+                                                                               "x":  90
+                                                                           },
+                     "facing=south,frame_material=stripped_mangrove_log":  {
+                                                                               "model":  "twistermill:block/twister_sail_frame_block_stripped_mangrove_log",
+                                                                               "y":  180,
+                                                                               "x":  90
+                                                                           },
+                     "facing=east,frame_material=stripped_mangrove_log":  {
+                                                                              "model":  "twistermill:block/twister_sail_frame_block_stripped_mangrove_log",
+                                                                              "y":  90,
+                                                                              "x":  90
+                                                                          },
+                     "facing=west,frame_material=stripped_mangrove_log":  {
+                                                                              "model":  "twistermill:block/twister_sail_frame_block_stripped_mangrove_log",
+                                                                              "y":  270,
+                                                                              "x":  90
+                                                                          },
+                     "facing=up,frame_material=stripped_mangrove_log":  {
+                                                                            "model":  "twistermill:block/twister_sail_frame_block_stripped_mangrove_log"
+                                                                        },
+                     "facing=down,frame_material=stripped_mangrove_log":  {
+                                                                              "model":  "twistermill:block/twister_sail_frame_block_stripped_mangrove_log",
+                                                                              "x":  180
+                                                                          },
+                     "facing=north,frame_material=stripped_oak_log":  {
+                                                                          "model":  "twistermill:block/twister_sail_frame_block_stripped_oak_log",
+                                                                          "x":  90
+                                                                      },
+                     "facing=south,frame_material=stripped_oak_log":  {
+                                                                          "model":  "twistermill:block/twister_sail_frame_block_stripped_oak_log",
+                                                                          "y":  180,
+                                                                          "x":  90
+                                                                      },
+                     "facing=east,frame_material=stripped_oak_log":  {
+                                                                         "model":  "twistermill:block/twister_sail_frame_block_stripped_oak_log",
+                                                                         "y":  90,
+                                                                         "x":  90
+                                                                     },
+                     "facing=west,frame_material=stripped_oak_log":  {
+                                                                         "model":  "twistermill:block/twister_sail_frame_block_stripped_oak_log",
+                                                                         "y":  270,
+                                                                         "x":  90
+                                                                     },
+                     "facing=up,frame_material=stripped_oak_log":  {
+                                                                       "model":  "twistermill:block/twister_sail_frame_block_stripped_oak_log"
+                                                                   },
+                     "facing=down,frame_material=stripped_oak_log":  {
+                                                                         "model":  "twistermill:block/twister_sail_frame_block_stripped_oak_log",
+                                                                         "x":  180
+                                                                     },
+                     "facing=north,frame_material=stripped_spruce_log":  {
+                                                                             "model":  "twistermill:block/twister_sail_frame_block_stripped_spruce_log",
+                                                                             "x":  90
+                                                                         },
+                     "facing=south,frame_material=stripped_spruce_log":  {
+                                                                             "model":  "twistermill:block/twister_sail_frame_block_stripped_spruce_log",
+                                                                             "y":  180,
+                                                                             "x":  90
+                                                                         },
+                     "facing=east,frame_material=stripped_spruce_log":  {
+                                                                            "model":  "twistermill:block/twister_sail_frame_block_stripped_spruce_log",
+                                                                            "y":  90,
+                                                                            "x":  90
+                                                                        },
+                     "facing=west,frame_material=stripped_spruce_log":  {
+                                                                            "model":  "twistermill:block/twister_sail_frame_block_stripped_spruce_log",
+                                                                            "y":  270,
+                                                                            "x":  90
+                                                                        },
+                     "facing=up,frame_material=stripped_spruce_log":  {
+                                                                          "model":  "twistermill:block/twister_sail_frame_block_stripped_spruce_log"
+                                                                      },
+                     "facing=down,frame_material=stripped_spruce_log":  {
+                                                                            "model":  "twistermill:block/twister_sail_frame_block_stripped_spruce_log",
+                                                                            "x":  180
+                                                                        },
+                     "facing=north,frame_material=crimson_stem":  {
+                                                                       "model":  "twistermill:block/twister_sail_frame_block_crimson_stem",
+                                                                       "x":  90
+                                                                   },
+                     "facing=south,frame_material=crimson_stem":  {
+                                                                       "model":  "twistermill:block/twister_sail_frame_block_crimson_stem",
+                                                                       "y":  180,
+                                                                       "x":  90
+                                                                   },
+                     "facing=east,frame_material=crimson_stem":  {
+                                                                      "model":  "twistermill:block/twister_sail_frame_block_crimson_stem",
+                                                                      "y":  90,
+                                                                      "x":  90
+                                                                  },
+                     "facing=west,frame_material=crimson_stem":  {
+                                                                      "model":  "twistermill:block/twister_sail_frame_block_crimson_stem",
+                                                                      "y":  270,
+                                                                      "x":  90
+                                                                  },
+                     "facing=up,frame_material=crimson_stem":  {
+                                                                    "model":  "twistermill:block/twister_sail_frame_block_crimson_stem"
+                                                                },
+                     "facing=down,frame_material=crimson_stem":  {
+                                                                      "model":  "twistermill:block/twister_sail_frame_block_crimson_stem",
+                                                                      "x":  180
+                                                                  },
+                     "facing=north,frame_material=warped_stem":  {
+                                                                      "model":  "twistermill:block/twister_sail_frame_block_warped_stem",
+                                                                      "x":  90
+                                                                  },
+                     "facing=south,frame_material=warped_stem":  {
+                                                                      "model":  "twistermill:block/twister_sail_frame_block_warped_stem",
+                                                                      "y":  180,
+                                                                      "x":  90
+                                                                  },
+                     "facing=east,frame_material=warped_stem":  {
+                                                                     "model":  "twistermill:block/twister_sail_frame_block_warped_stem",
+                                                                     "y":  90,
+                                                                     "x":  90
+                                                                 },
+                     "facing=west,frame_material=warped_stem":  {
+                                                                     "model":  "twistermill:block/twister_sail_frame_block_warped_stem",
+                                                                     "y":  270,
+                                                                     "x":  90
+                                                                 },
+                     "facing=up,frame_material=warped_stem":  {
+                                                                   "model":  "twistermill:block/twister_sail_frame_block_warped_stem"
+                                                               },
+                     "facing=down,frame_material=warped_stem":  {
+                                                                     "model":  "twistermill:block/twister_sail_frame_block_warped_stem",
+                                                                     "x":  180
+                                                                 },
+                     "facing=north,frame_material=stripped_crimson_stem":  {
+                                                                                "model":  "twistermill:block/twister_sail_frame_block_stripped_crimson_stem",
+                                                                                "x":  90
+                                                                            },
+                     "facing=south,frame_material=stripped_crimson_stem":  {
+                                                                                "model":  "twistermill:block/twister_sail_frame_block_stripped_crimson_stem",
+                                                                                "y":  180,
+                                                                                "x":  90
+                                                                            },
+                     "facing=east,frame_material=stripped_crimson_stem":  {
+                                                                               "model":  "twistermill:block/twister_sail_frame_block_stripped_crimson_stem",
+                                                                               "y":  90,
+                                                                               "x":  90
+                                                                           },
+                     "facing=west,frame_material=stripped_crimson_stem":  {
+                                                                               "model":  "twistermill:block/twister_sail_frame_block_stripped_crimson_stem",
+                                                                               "y":  270,
+                                                                               "x":  90
+                                                                           },
+                     "facing=up,frame_material=stripped_crimson_stem":  {
+                                                                             "model":  "twistermill:block/twister_sail_frame_block_stripped_crimson_stem"
+                                                                         },
+                     "facing=down,frame_material=stripped_crimson_stem":  {
+                                                                               "model":  "twistermill:block/twister_sail_frame_block_stripped_crimson_stem",
+                                                                               "x":  180
+                                                                           },
+                     "facing=north,frame_material=stripped_warped_stem":  {
+                                                                              "model":  "twistermill:block/twister_sail_frame_block_stripped_warped_stem",
+                                                                              "x":  90
+                                                                          },
+                     "facing=south,frame_material=stripped_warped_stem":  {
+                                                                              "model":  "twistermill:block/twister_sail_frame_block_stripped_warped_stem",
+                                                                              "y":  180,
+                                                                              "x":  90
+                                                                          },
+                     "facing=east,frame_material=stripped_warped_stem":  {
+                                                                             "model":  "twistermill:block/twister_sail_frame_block_stripped_warped_stem",
+                                                                             "y":  90,
+                                                                             "x":  90
+                                                                         },
+                     "facing=west,frame_material=stripped_warped_stem":  {
+                                                                             "model":  "twistermill:block/twister_sail_frame_block_stripped_warped_stem",
+                                                                             "y":  270,
+                                                                             "x":  90
+                                                                         },
+                     "facing=up,frame_material=stripped_warped_stem":  {
+                                                                           "model":  "twistermill:block/twister_sail_frame_block_stripped_warped_stem"
+                                                                       },
+                     "facing=down,frame_material=stripped_warped_stem":  {
+                                                                             "model":  "twistermill:block/twister_sail_frame_block_stripped_warped_stem",
+                                                                             "x":  180
+                                                                        }
+                 }
+}

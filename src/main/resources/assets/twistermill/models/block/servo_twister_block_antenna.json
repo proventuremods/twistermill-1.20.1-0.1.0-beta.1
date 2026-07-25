@@ -1,0 +1,158 @@
+{
+	"format_version": "1.9.0",
+	"credit": "Made with Blockbench",
+	"parent": "block/block",
+	"ambientocclusion": false,
+	"texture_size": [128, 128],
+	"textures": {
+		"0": "twistermill:block/texture_twister_block",
+		"2": "twistermill:block/servo_twister_block_unpowered",
+		"particle": "twistermill:block/servo_particle"
+	},
+	"elements": [
+		{
+			"name": "antenna_part_block",
+			"neoforge_data": {"sky_light": 15},
+			"from": [2.01, 14.5, 13.99],
+			"to": [2.99, 19, 14.97],
+			"rotation": {"angle": 0, "axis": "y", "origin": [3, 15, 14.5]},
+			"faces": {
+				"north": {"uv": [0.5, 13.125, 0.625, 13.25], "texture": "#0"},
+				"east": {"uv": [0.5, 13, 0.625, 13.125], "texture": "#0"},
+				"south": {"uv": [0.5, 13.125, 0.625, 13.25], "texture": "#0"},
+				"west": {"uv": [0.5, 13, 0.625, 13.125], "texture": "#0"},
+				"up": {"uv": [0.5, 12.875, 0.625, 13], "rotation": 90, "texture": "#0"},
+				"down": {"uv": [0.75, 13.875, 0.875, 14], "rotation": 90, "texture": "#0"}
+			}
+		},
+		{
+			"name": "antenna_part_block",
+			"neoforge_data": {"sky_light": 15},
+			"from": [2.175, 16.5, 14.125],
+			"to": [2.825, 22, 14.875],
+			"rotation": {"angle": 0, "axis": "y", "origin": [3, 15, 14.5]},
+			"faces": {
+				"north": {"uv": [0.5, 12.875, 0.625, 13], "texture": "#0"},
+				"east": {"uv": [0.5, 12.875, 0.625, 13], "texture": "#0"},
+				"south": {"uv": [0.5, 12.875, 0.625, 13], "texture": "#0"},
+				"west": {"uv": [0.5, 12.875, 0.625, 13], "texture": "#0"},
+				"up": {"uv": [0.5, 12.875, 0.625, 13], "rotation": 90, "texture": "#0"},
+				"down": {"uv": [0, 0, 0.125, 0.125], "rotation": 90, "texture": "#0"}
+			}
+		},
+		{
+			"name": "antenna_part_block",
+			"neoforge_data": {"sky_light": 15},
+			"from": [2.25, 21.875, 13.8125],
+			"to": [2.75, 23.075, 14.3125],
+			"rotation": {"angle": -45, "axis": "x", "origin": [2.5, 22.5, 14.5]},
+			"faces": {
+				"north": {"uv": [0.5, 12.875, 0.625, 13], "texture": "#0"},
+				"east": {"uv": [0.5, 12.875, 0.625, 13], "texture": "#0"},
+				"south": {"uv": [0.5, 12.875, 0.625, 13], "texture": "#0"},
+				"west": {"uv": [0.5, 12.875, 0.625, 13], "texture": "#0"},
+				"up": {"uv": [0.125, 12, 0.25, 12.125], "rotation": 90, "texture": "#0"},
+				"down": {"uv": [0, 0, 0.125, 0.125], "rotation": 90, "texture": "#0"}
+			}
+		},
+		{
+			"name": "antenna_part_block",
+			"neoforge_data": {"sky_light": 15},
+			"from": [0.5, 19.50567, 9.70877],
+			"to": [4.5, 20.00567, 12.72877],
+			"rotation": {"angle": -22.5, "axis": "x", "origin": [2.5, 22.1125, 13.79727]},
+			"faces": {
+				"north": {"uv": [1.64583, 12, 1.72917, 13.925], "texture": "#0"},
+				"east": {"uv": [0.25, 12.5, 0.375, 12.625], "texture": "#0"},
+				"south": {"uv": [1.52083, 12, 1.60417, 14.05], "texture": "#0"},
+				"west": {"uv": [0.25, 12.25, 0.375, 12.375], "texture": "#0"},
+				"up": {"uv": [0.625, 12, 0.75, 12.125], "texture": "#0"},
+				"down": {"uv": [1.25, 12.5, 1.125, 12.625], "rotation": 270, "texture": "#0"}
+			}
+		},
+		{
+			"name": "antenna_part_block",
+			"neoforge_data": {"sky_light": 15},
+			"from": [0.5, 20.09939, 11.80594],
+			"to": [4.5, 20.58939, 15.80594],
+			"rotation": {"angle": -45, "axis": "x", "origin": [2.5, 22.1125, 13.79727]},
+			"faces": {
+				"north": {"uv": [1.64583, 12, 1.72917, 13.925], "texture": "#0"},
+				"east": {"uv": [0.25, 12.375, 0.375, 12.5], "texture": "#0"},
+				"south": {"uv": [1.52083, 12, 1.60417, 14.05], "texture": "#0"},
+				"west": {"uv": [0.25, 12.375, 0.375, 12.5], "texture": "#0"},
+				"up": {"uv": [0.625, 12, 0.75, 12.125], "texture": "#0"},
+				"down": {"uv": [1.25, 12.375, 1.375, 12.5], "rotation": 270, "texture": "#0"}
+			}
+		},
+		{
+			"name": "antenna_part_block",
+			"neoforge_data": {"sky_light": 15},
+			"from": [0.5, 23.19519, 15.97963],
+			"to": [4.5, 26.19519, 16.45463],
+			"rotation": {"angle": 22.5, "axis": "x", "origin": [2.5, 22.1125, 13.79727]},
+			"faces": {
+				"north": {"uv": [0.75, 12, 0.625, 12.125], "rotation": 90, "texture": "#0"},
+				"east": {"uv": [0.25, 12.375, 0.375, 12.5], "rotation": 90, "texture": "#0"},
+				"south": {"uv": [1.625, 12.375, 1.5, 12.5], "rotation": 270, "texture": "#0"},
+				"west": {"uv": [0.25, 12.5, 0.375, 12.625], "rotation": 270, "texture": "#0"},
+				"up": {"uv": [1.52083, 12, 1.60417, 14.05], "texture": "#0"},
+				"down": {"uv": [1.64583, 12, 1.72917, 13.925], "rotation": 180, "texture": "#0"}
+			}
+		},
+		{
+			"name": "antenna_part_block",
+			"neoforge_data": {"sky_light": 15},
+			"from": [1.125, 23.2, 12],
+			"to": [3.925, 23.5, 14.8],
+			"rotation": {"angle": -45, "axis": "x", "origin": [2.5, 23.35, 14.5]},
+			"faces": {
+				"north": {"uv": [0, 12.3, 0.75, 12.88214], "rotation": 90, "texture": "#0"},
+				"east": {"uv": [0, 12.25, 0.75, 12.875], "rotation": 90, "texture": "#0"},
+				"south": {"uv": [0, 12.25, 0.75, 12.875], "rotation": 90, "texture": "#0"},
+				"west": {"uv": [0, 12.25, 0.75, 12.875], "rotation": 90, "texture": "#0"},
+				"up": {"uv": [0.125, 12, 0.25, 12.125], "rotation": 90, "texture": "#0"},
+				"down": {"uv": [0.5, 12.75, 0.625, 12.875], "rotation": 90, "texture": "#0"}
+			}
+		},
+		{
+			"name": "antenna_part_block",
+			"neoforge_data": {"sky_light": 15},
+			"from": [0.5, 24.85, 17.35],
+			"to": [4.5, 26.85, 17.8],
+			"rotation": {"angle": 0, "axis": "y", "origin": [2.5, 22.1125, 13.79727]},
+			"faces": {
+				"north": {"uv": [0.625, 12.25, 0.75, 12.125], "texture": "#0"},
+				"east": {"uv": [0.25, 12.375, 0.375, 12.5], "rotation": 90, "texture": "#0"},
+				"south": {"uv": [1.625, 12.375, 1.5, 12.5], "rotation": 90, "texture": "#0"},
+				"west": {"uv": [0.375, 12.625, 0.25, 12.75], "rotation": 270, "texture": "#0"},
+				"up": {"uv": [0.25, 13.125, 0.375, 13.25], "texture": "#0"},
+				"down": {"uv": [1.52083, 12, 1.60417, 14.05], "rotation": 180, "texture": "#0"}
+			}
+		},
+		{
+			"name": "antenna_part_block",
+			"neoforge_data": {"sky_light": 15},
+			"from": [0.5, 18.125, 9.01954],
+			"to": [4.5, 18.625, 11.01954],
+			"rotation": {"angle": 0, "axis": "y", "origin": [2.5, 22.1125, 13.79727]},
+			"faces": {
+				"north": {"uv": [0.25, 12.5, 0.375, 12.625], "rotation": 90, "texture": "#0"},
+				"east": {"uv": [0.25, 12.5, 0.375, 12.625], "texture": "#0"},
+				"south": {"uv": [1.52083, 12, 1.60417, 14.05], "texture": "#0"},
+				"west": {"uv": [0.25, 12.5, 0.375, 12.625], "texture": "#0"},
+				"up": {"uv": [0.625, 12, 0.75, 12.125], "texture": "#0"},
+				"down": {"uv": [1.5, 12.625, 1.375, 12.75], "rotation": 270, "texture": "#0"}
+			}
+		}
+	],
+	"groups": [
+		{
+			"name": "Antenna",
+			"origin": [8, 8, 8],
+			"scope": 0,
+			"color": 0,
+			"children": [0, 1, 2, 3, 4, 5, 6, 7, 8]
+		}
+	]
+}

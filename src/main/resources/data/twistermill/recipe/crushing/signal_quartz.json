@@ -1,0 +1,35 @@
+{
+  "type": "create:crushing",
+  "ingredients": [
+    {
+      "item": "twistermill:signal_quartz_ore_block"
+    }
+  ],
+  "processing_time": 250,
+  "results": [
+    {
+      "count": 1,
+      "id": "twistermill:signal_quartz"
+    },
+    {
+      "chance": 0.75,
+      "id": "twistermill:signal_quartz"
+    },
+    {
+      "chance": 0.6,
+      "id": "minecraft:sand"
+    },
+    {
+      "chance": 0.75,
+      "id": "create:experience_nugget"
+    },
+    {
+      "chance": 0.6,
+      "id": "twistermill:signal_quartz_dust"
+    },
+    {
+      "chance": 0.75,
+      "id": "minecraft:gravel"
+    }
+  ]
+}

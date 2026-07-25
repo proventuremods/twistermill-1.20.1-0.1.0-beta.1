@@ -1,0 +1,4 @@
+{
+  "render_type": "minecraft:cutout",
+  "parent": "twistermill:block/control_table_block_item"
+}

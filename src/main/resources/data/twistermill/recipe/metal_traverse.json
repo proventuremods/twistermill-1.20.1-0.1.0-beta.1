@@ -1,0 +1,27 @@
+{
+  "neoforge:conditions": [
+    {
+      "type": "twistermill:config_enabled",
+      "key": "showAluminumTruss"
+    }
+  ],
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "key": {
+    "C": {
+      "item": "twistermill:signal_steel_sheet"
+    },
+    "P": {
+      "item": "twistermill:signal_steel_rod"
+    }
+  },
+  "pattern": [
+    "PPP",
+    "CCC",
+    "CPC"
+  ],
+  "result": {
+    "count": 8,
+    "id": "twistermill:metal_traverse"
+  }
+}

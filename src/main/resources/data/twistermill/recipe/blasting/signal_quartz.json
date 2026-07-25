@@ -1,0 +1,13 @@
+{
+  "type": "minecraft:blasting",
+  "category": "misc",
+  "cookingtime": 100,
+  "experience": 0.2,
+  "ingredient": {
+    "item": "create:rose_quartz"
+  },
+  "result": {
+    "count": 1,
+    "id": "twistermill:signal_quartz"
+  }
+}

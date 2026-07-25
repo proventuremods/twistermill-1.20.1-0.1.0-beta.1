@@ -1,0 +1,18 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "building",
+  "pattern": [
+    "SSS",
+    "SSS",
+    "SSS"
+  ],
+  "key": {
+    "S": {
+      "item": "twistermill:signal_steel_ingot"
+    }
+  },
+  "result": {
+    "id": "twistermill:signal_steel_block",
+    "count": 1
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "parent": "twistermill:signal_quartz_ore",
+  "display": {
+    "icon": {
+      "id": "twistermill:inv_servo_twister_block"
+    },
+    "title": {
+      "translate": "advancements.twistermill.craft.inv_servo_twister_block.title"
+    },
+    "description": {
+      "translate": "advancements.twistermill.craft.inv_servo_twister_block.description"
+    },
+    "show_toast": true,
+    "announce_to_chat": true
+  },
+  "criteria": {
+    "has_item": {
+      "trigger": "minecraft:inventory_changed",
+      "conditions": {
+        "items": [
+          {
+            "items": [
+              "twistermill:inv_servo_twister_block"
+            ]
+          }
+        ]
+      }
+    }
+  }
+}

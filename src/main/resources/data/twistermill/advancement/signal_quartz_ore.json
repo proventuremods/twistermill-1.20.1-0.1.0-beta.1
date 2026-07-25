@@ -1,0 +1,55 @@
+{
+  "parent": "twistermill:root",
+  "display": {
+    "icon": {
+      "id": "twistermill:signal_quartz_ore_block"
+    },
+    "title": {
+      "translate": "advancements.twistermill.signal_quartz_ore.title"
+    },
+    "description": {
+      "translate": "advancements.twistermill.signal_quartz_ore.description",
+      "color": "green"
+    },
+    "frame": "task",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "hit_signal_quartz_ore": {
+      "trigger": "minecraft:impossible"
+    },
+    "has_signal_quartz": {
+      "trigger": "minecraft:inventory_changed",
+      "conditions": {
+        "items": [
+          {
+            "items": [
+              "twistermill:signal_quartz"
+            ]
+          }
+        ]
+      }
+    },
+    "has_signal_quartz_ore_block": {
+      "trigger": "minecraft:inventory_changed",
+      "conditions": {
+        "items": [
+          {
+            "items": [
+              "twistermill:signal_quartz_ore_block"
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "requirements": [
+    [
+      "hit_signal_quartz_ore",
+      "has_signal_quartz",
+      "has_signal_quartz_ore_block"
+    ]
+  ]
+}

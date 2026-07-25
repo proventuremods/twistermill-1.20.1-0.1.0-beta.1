@@ -1,0 +1,7 @@
+{
+  "selector": "twistermill:twister_sail_frame_block",
+  "priority": 2000,
+  "properties": {
+    "sable:mass": 0.25
+  }
+}

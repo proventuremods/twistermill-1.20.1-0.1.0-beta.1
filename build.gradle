@@ -1,0 +1,247 @@
+// build.gradle
+
+plugins {
+    id 'java-library'
+    id 'eclipse'
+    id 'idea'
+    id 'maven-publish'
+    id 'net.neoforged.moddev' version '1.0.14'
+}
+
+tasks.named('wrapper', Wrapper).configure {
+    distributionType = Wrapper.DistributionType.BIN
+}
+
+version = mod_version
+group = mod_group_id
+
+repositories {
+    mavenLocal()
+
+    maven {
+        name = 'Create Maven'
+        url = 'https://maven.createmod.net'
+    }
+
+    maven {
+        name = 'IThundxr Snapshots'
+        url = 'https://maven.ithundxr.dev/snapshots'
+    }
+
+    maven {
+        name = 'BlameJared Maven'
+        url = 'https://maven.blamejared.com'
+    }
+
+    maven {
+        name = 'Fuzs Maven'
+        url = 'https://raw.githubusercontent.com/Fuzss/modresources/main/maven/'
+    }
+
+    exclusiveContent {
+        forRepository {
+            maven {
+                url = "https://maven.ryanhcode.dev/releases"
+                name = "RyanHCode Maven"
+            }
+        }
+        filter {
+            includeGroup("dev.ryanhcode.sable")
+            includeGroup("dev.ryanhcode.sable-companion")
+        }
+    }
+
+    maven {
+        name = 'CurseMaven'
+        url = 'https://cursemaven.com'
+        content {
+            includeGroup 'curse.maven'
+        }
+    }
+}
+
+base {
+    archivesName = mod_id
+}
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(21)
+
+neoForge {
+    version = project.neo_version
+
+    parchment {
+        mappingsVersion = project.parchment_mappings_version
+        minecraftVersion = project.parchment_minecraft_version
+    }
+
+    runs {
+        client {
+            client()
+            systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
+        }
+
+        server {
+            server()
+            programArgument '--nogui'
+            systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
+        }
+
+        gameTestServer {
+            type = "gameTestServer"
+            systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
+        }
+
+        data {
+            data()
+            programArguments.addAll(
+                    '--mod', project.mod_id,
+                    '--all',
+                    '--output', file('src/generated/resources/').getAbsolutePath(),
+                    '--existing', file('src/main/resources/').getAbsolutePath()
+            )
+        }
+
+        configureEach {
+            systemProperty 'forge.logging.markers', 'REGISTRIES'
+            logLevel = org.slf4j.event.Level.DEBUG
+        }
+    }
+
+    mods {
+        "${mod_id}" {
+            sourceSet(sourceSets.main)
+        }
+    }
+}
+
+sourceSets.main.resources {
+    srcDir 'src/generated/resources'
+}
+
+configurations {
+    runtimeClasspath.extendsFrom localRuntime
+    sableInspectionSource {
+        canBeConsumed = false
+        canBeResolved = true
+        transitive = false
+    }
+}
+
+dependencies {
+    implementation("com.simibubi.create:create-${minecraft_version}:${create_version}:slim") {
+        transitive = false
+    }
+
+    implementation("net.createmod.ponder:ponder-neoforge:${ponder_version}+mc${minecraft_version}")
+    compileOnly("dev.engine-room.flywheel:flywheel-neoforge-api-${minecraft_version}:${flywheel_version}")
+    runtimeOnly("dev.engine-room.flywheel:flywheel-neoforge-${minecraft_version}:${flywheel_version}")
+    implementation("com.tterrag.registrate:Registrate:${registrate_version}")
+
+    sableInspectionSource("dev.ryanhcode.sable:sable-neoforge-${project.minecraft_version}:${project.sable_version}") {
+        exclude group: "com.simibubi.create", module: "create-${project.minecraft_version}"
+        exclude group: "net.createmod.ponder", module: "ponder-neoforge"
+        exclude group: "dev.engine-room.flywheel", module: "flywheel-neoforge-${project.minecraft_version}"
+        exclude group: "com.tterrag.registrate", module: "Registrate"
+    }
+    implementation("dev.ryanhcode.sable:sable-neoforge-${project.minecraft_version}:${project.sable_version}") {
+        transitive = false
+    }
+    implementation("dev.ryanhcode.sable-companion:sable-companion-common-${project.minecraft_version}:${project.sable_companion_version}")
+    implementation("foundry.veil:veil-neoforge-${project.minecraft_version}:${project.veil_version}") {
+        exclude group: "maven.modrinth", module: "*"
+        exclude group: "me.fallenbreath", module: "*"
+    }
+
+    implementation "curse.maven:weather-storms-tornadoes-237746:6926103"
+    compileOnly("curse.maven:weather-storms-tornadoes-237746:6926103")
+    runtimeOnly("curse.maven:weather-storms-tornadoes-237746:6926103")
+
+    implementation "curse.maven:coroutil-237749:7796187"
+    compileOnly("curse.maven:coroutil-237749:7796187")
+    runtimeOnly("curse.maven:coroutil-237749:7796187")
+
+    implementation "curse.maven:framedblocks-441647:8139800"
+}
+
+tasks.withType(ProcessResources).configureEach {
+    def replaceProperties = [
+            minecraft_version      : minecraft_version,
+            minecraft_version_range: minecraft_version_range,
+            neo_version            : neo_version,
+            neo_version_range      : neo_version_range,
+            loader_version_range   : loader_version_range,
+            mod_id                 : mod_id,
+            mod_name               : mod_name,
+            mod_license            : mod_license,
+            mod_version            : mod_version,
+            mod_authors            : mod_authors,
+            mod_description        : mod_description
+    ]
+
+    inputs.properties replaceProperties
+
+    filesMatching(['META-INF/neoforge.mods.toml']) {
+        expand replaceProperties
+    }
+}
+
+publishing {
+    publications {
+        register('mavenJava', MavenPublication) {
+            from components.java
+        }
+    }
+    repositories {
+        maven {
+            url = layout.projectDirectory.dir("repo").asFile.toURI()
+        }
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    dependsOn "prepareSableJarInspection"
+    options.encoding = 'UTF-8'
+}
+
+tasks.register("prepareSableJarInspection") {
+    def extractedSableDir = layout.buildDirectory.dir("tmp/sableJarPatch")
+    def expectedSableVersion = project.sable_version.toString()
+    inputs.files(configurations.sableInspectionSource)
+    outputs.dir(extractedSableDir)
+    notCompatibleWithConfigurationCache("Build-time jar inspection refreshes an unpacked dependency jar copy.")
+
+    doLast {
+        File sourceJar = configurations.sableInspectionSource.singleFile
+        if (!sourceJar.name.contains(expectedSableVersion)) {
+            throw new GradleException("Expected Sable ${expectedSableVersion}, got ${sourceJar.name}")
+        }
+        if (sourceJar.name.contains("1.2.2")) {
+            throw new GradleException("Refusing to inspect stale Sable 1.2.2 jar: ${sourceJar.name}")
+        }
+
+        File tempDir = extractedSableDir.get().asFile
+
+        delete(tempDir)
+        copy {
+            from zipTree(sourceJar)
+            into tempDir
+        }
+
+        File neoForgeMixinConfig = new File(tempDir, "sable-neoforge.mixins.json")
+        if (!neoForgeMixinConfig.exists()) {
+            throw new GradleException("Expected sable-neoforge.mixins.json in ${sourceJar.name}")
+        }
+
+        File commonMixinConfig = new File(tempDir, "sable.mixins.json")
+        if (!commonMixinConfig.exists()) {
+            throw new GradleException("Expected sable.mixins.json in ${sourceJar.name}")
+        }
+    }
+}
+
+idea {
+    module {
+        downloadSources = true
+        downloadJavadoc = true
+    }
+}

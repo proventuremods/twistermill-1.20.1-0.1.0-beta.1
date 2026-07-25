@@ -1,0 +1,6 @@
+{
+    "parent":  "twistermill:block/twister_sail_frame_block",
+    "textures":  {
+                     "2":  "minecraft:block/jungle_log"
+                 }
+}

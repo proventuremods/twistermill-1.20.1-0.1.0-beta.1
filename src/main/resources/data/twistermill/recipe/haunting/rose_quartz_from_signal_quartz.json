@@ -1,0 +1,13 @@
+{
+  "type": "create:haunting",
+  "ingredients": [
+    {
+      "item": "twistermill:signal_quartz"
+    }
+  ],
+  "results": [
+    {
+      "id": "create:rose_quartz"
+    }
+  ]
+}

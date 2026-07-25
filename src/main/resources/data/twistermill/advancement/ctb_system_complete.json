@@ -1,0 +1,21 @@
+{
+  "parent": "twistermill:signal_quartz_ore",
+  "display": {
+    "icon": {
+      "id": "twistermill:control_table_block"
+    },
+    "title": {
+      "translate": "advancements.twistermill.ctb_system_complete.title"
+    },
+    "description": {
+      "translate": "advancements.twistermill.ctb_system_complete.description"
+    },
+    "show_toast": true,
+    "announce_to_chat": true
+  },
+  "criteria": {
+    "system_complete": {
+      "trigger": "twistermill:ctb_system_complete"
+    }
+  }
+}

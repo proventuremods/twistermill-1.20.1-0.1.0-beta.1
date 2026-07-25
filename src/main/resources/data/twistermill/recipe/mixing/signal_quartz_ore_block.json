@@ -1,0 +1,19 @@
+{
+  "type": "create:mixing",
+  "heat_requirement": "superheated",
+  "ingredients": [
+    {
+      "item": "twistermill:signal_quartz_dust"
+    },
+    {
+      "type": "fluid_stack",
+      "amount": 200,
+      "fluid": "minecraft:lava"
+    }
+  ],
+  "results": [
+    {
+      "id": "twistermill:signal_quartz_ore_block"
+    }
+  ]
+}

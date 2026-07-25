@@ -1,0 +1,21 @@
+{
+  "display": {
+    "icon": {
+      "id": "twistermill:wind_roto_block"
+    },
+    "title": {
+      "translate": "advancements.twistermill.root.title"
+    },
+    "description": {
+      "translate": "advancements.twistermill.root.description"
+    },
+    "background": "minecraft:textures/gui/advancements/backgrounds/stone.png",
+    "show_toast": false,
+    "announce_to_chat": false
+  },
+  "criteria": {
+    "tick": {
+      "trigger": "minecraft:tick"
+    }
+  }
+}

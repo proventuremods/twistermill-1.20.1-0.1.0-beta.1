@@ -1,0 +1,7 @@
+{
+  "variants": {
+    "": {
+      "model": "twistermill:block/signal_quartz_ore_block"
+    }
+  }
+}

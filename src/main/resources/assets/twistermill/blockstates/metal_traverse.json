@@ -1,0 +1,616 @@
+{
+  "multipart": [
+    {
+      "apply": {
+        "model": "twistermill:block/metal_traverse/block_pole"
+      },
+      "when": {
+        "x": "false",
+        "z": "false",
+        "y_rotated": "false"
+      }
+    },
+    {
+      "apply": {
+        "model": "twistermill:block/metal_traverse/block_x"
+      },
+      "when": {
+        "x": "true",
+        "z": "false",
+        "top": "false",
+        "y_rotated": "false"
+      }
+    },
+    {
+      "apply": {
+        "model": "twistermill:block/metal_traverse/block_x"
+      },
+      "when": {
+        "x": "true",
+        "z": "false",
+        "top": "true",
+        "bottom": "false",
+        "y_rotated": "false"
+      }
+    },
+    {
+      "apply": {
+        "model": "twistermill:block/metal_traverse/block_z"
+      },
+      "when": {
+        "x": "false",
+        "z": "true",
+        "top": "false",
+        "y_rotated": "false"
+      }
+    },
+    {
+      "apply": {
+        "model": "twistermill:block/metal_traverse/block_z"
+      },
+      "when": {
+        "x": "false",
+        "z": "true",
+        "top": "true",
+        "bottom": "false",
+        "y_rotated": "false"
+      }
+    },
+    {
+      "apply": {
+        "model": "twistermill:block/metal_traverse/block_top"
+      },
+      "when": {
+        "top": "true",
+        "bottom": "false",
+        "x": "true",
+        "z": "false",
+        "y_rotated": "false"
+      }
+    },
+    {
+      "apply": {
+        "model": "twistermill:block/metal_traverse/block_bottom"
+      },
+      "when": {
+        "top": "false",
+        "bottom": "true",
+        "x": "true",
+        "z": "false",
+        "y_rotated": "false"
+      }
+    },
+    {
+      "apply": {
+        "model": "twistermill:block/metal_traverse/block_top"
+      },
+      "when": {
+        "top": "true",
+        "bottom": "false",
+        "x": "false",
+        "z": "true",
+        "y_rotated": "false"
+      }
+    },
+    {
+      "apply": {
+        "model": "twistermill:block/metal_traverse/block_bottom"
+      },
+      "when": {
+        "top": "false",
+        "bottom": "true",
+        "x": "false",
+        "z": "true",
+        "y_rotated": "false"
+      }
+    },
+    {
+      "apply": {
+        "model": "twistermill:block/metal_traverse/block_cross"
+      },
+      "when": {
+        "top": "true",
+        "bottom": "true",
+        "x": "true",
+        "z": "false",
+        "y_rotated": "false"
+      }
+    },
+    {
+      "apply": {
+        "model": "twistermill:block/metal_traverse/block_cross"
+      },
+      "when": {
+        "top": "true",
+        "bottom": "true",
+        "x": "false",
+        "z": "true",
+        "y_rotated": "false"
+      }
+    },
+    {
+      "apply": {
+        "model": "twistermill:block/metal_traverse/block_cross"
+      },
+      "when": {
+        "x": "true",
+        "z": "true",
+        "y_rotated": "false"
+      }
+    },
+    {
+      "apply": {
+        "model": "twistermill:block/metal_traverse/block_pole",
+        "y": 90
+      },
+      "when": {
+        "x": "false",
+        "z": "false",
+        "y_rotated": "true",
+        "axis": "y"
+      }
+    },
+    {
+      "apply": {
+        "model": "twistermill:block/metal_traverse/block_pole",
+        "x": 90
+      },
+      "when": {
+        "x": "false",
+        "z": "false",
+        "y_rotated": "true",
+        "axis": "x"
+      }
+    },
+    {
+      "apply": {
+        "model": "twistermill:block/metal_traverse/block_pole_z90"
+      },
+      "when": {
+        "x": "false",
+        "z": "false",
+        "y_rotated": "true",
+        "axis": "z"
+      }
+    },
+    {
+      "apply": {
+        "model": "twistermill:block/metal_traverse/block_x",
+        "y": 90
+      },
+      "when": {
+        "x": "true",
+        "z": "false",
+        "top": "false",
+        "y_rotated": "true",
+        "axis": "y"
+      }
+    },
+    {
+      "apply": {
+        "model": "twistermill:block/metal_traverse/block_x",
+        "y": 90
+      },
+      "when": {
+        "x": "true",
+        "z": "false",
+        "top": "true",
+        "bottom": "false",
+        "y_rotated": "true",
+        "axis": "y"
+      }
+    },
+    {
+      "apply": {
+        "model": "twistermill:block/metal_traverse/block_x",
+        "x": 90
+      },
+      "when": {
+        "x": "true",
+        "z": "false",
+        "top": "false",
+        "y_rotated": "true",
+        "axis": "x"
+      }
+    },
+    {
+      "apply": {
+        "model": "twistermill:block/metal_traverse/block_x",
+        "x": 90
+      },
+      "when": {
+        "x": "true",
+        "z": "false",
+        "top": "true",
+        "bottom": "false",
+        "y_rotated": "true",
+        "axis": "x"
+      }
+    },
+    {
+      "apply": {
+        "model": "twistermill:block/metal_traverse/block_x_z90"
+      },
+      "when": {
+        "x": "true",
+        "z": "false",
+        "top": "false",
+        "y_rotated": "true",
+        "axis": "z"
+      }
+    },
+    {
+      "apply": {
+        "model": "twistermill:block/metal_traverse/block_x_z90"
+      },
+      "when": {
+        "x": "true",
+        "z": "false",
+        "top": "true",
+        "bottom": "false",
+        "y_rotated": "true",
+        "axis": "z"
+      }
+    },
+    {
+      "apply": {
+        "model": "twistermill:block/metal_traverse/block_z",
+        "y": 90
+      },
+      "when": {
+        "x": "false",
+        "z": "true",
+        "top": "false",
+        "y_rotated": "true",
+        "axis": "y"
+      }
+    },
+    {
+      "apply": {
+        "model": "twistermill:block/metal_traverse/block_z",
+        "y": 90
+      },
+      "when": {
+        "x": "false",
+        "z": "true",
+        "top": "true",
+        "bottom": "false",
+        "y_rotated": "true",
+        "axis": "y"
+      }
+    },
+    {
+      "apply": {
+        "model": "twistermill:block/metal_traverse/block_z",
+        "x": 90
+      },
+      "when": {
+        "x": "false",
+        "z": "true",
+        "top": "false",
+        "y_rotated": "true",
+        "axis": "x"
+      }
+    },
+    {
+      "apply": {
+        "model": "twistermill:block/metal_traverse/block_z",
+        "x": 90
+      },
+      "when": {
+        "x": "false",
+        "z": "true",
+        "top": "true",
+        "bottom": "false",
+        "y_rotated": "true",
+        "axis": "x"
+      }
+    },
+    {
+      "apply": {
+        "model": "twistermill:block/metal_traverse/block_z_z90"
+      },
+      "when": {
+        "x": "false",
+        "z": "true",
+        "top": "false",
+        "y_rotated": "true",
+        "axis": "z"
+      }
+    },
+    {
+      "apply": {
+        "model": "twistermill:block/metal_traverse/block_z_z90"
+      },
+      "when": {
+        "x": "false",
+        "z": "true",
+        "top": "true",
+        "bottom": "false",
+        "y_rotated": "true",
+        "axis": "z"
+      }
+    },
+    {
+      "apply": {
+        "model": "twistermill:block/metal_traverse/block_top",
+        "y": 90
+      },
+      "when": {
+        "top": "true",
+        "bottom": "false",
+        "x": "true",
+        "z": "false",
+        "y_rotated": "true",
+        "axis": "y"
+      }
+    },
+    {
+      "apply": {
+        "model": "twistermill:block/metal_traverse/block_top",
+        "x": 90
+      },
+      "when": {
+        "top": "true",
+        "bottom": "false",
+        "x": "true",
+        "z": "false",
+        "y_rotated": "true",
+        "axis": "x"
+      }
+    },
+    {
+      "apply": {
+        "model": "twistermill:block/metal_traverse/block_top_z90"
+      },
+      "when": {
+        "top": "true",
+        "bottom": "false",
+        "x": "true",
+        "z": "false",
+        "y_rotated": "true",
+        "axis": "z"
+      }
+    },
+    {
+      "apply": {
+        "model": "twistermill:block/metal_traverse/block_bottom",
+        "y": 90
+      },
+      "when": {
+        "top": "false",
+        "bottom": "true",
+        "x": "true",
+        "z": "false",
+        "y_rotated": "true",
+        "axis": "y"
+      }
+    },
+    {
+      "apply": {
+        "model": "twistermill:block/metal_traverse/block_bottom",
+        "x": 90
+      },
+      "when": {
+        "top": "false",
+        "bottom": "true",
+        "x": "true",
+        "z": "false",
+        "y_rotated": "true",
+        "axis": "x"
+      }
+    },
+    {
+      "apply": {
+        "model": "twistermill:block/metal_traverse/block_bottom_z90"
+      },
+      "when": {
+        "top": "false",
+        "bottom": "true",
+        "x": "true",
+        "z": "false",
+        "y_rotated": "true",
+        "axis": "z"
+      }
+    },
+    {
+      "apply": {
+        "model": "twistermill:block/metal_traverse/block_top",
+        "y": 90
+      },
+      "when": {
+        "top": "true",
+        "bottom": "false",
+        "x": "false",
+        "z": "true",
+        "y_rotated": "true",
+        "axis": "y"
+      }
+    },
+    {
+      "apply": {
+        "model": "twistermill:block/metal_traverse/block_top",
+        "x": 90
+      },
+      "when": {
+        "top": "true",
+        "bottom": "false",
+        "x": "false",
+        "z": "true",
+        "y_rotated": "true",
+        "axis": "x"
+      }
+    },
+    {
+      "apply": {
+        "model": "twistermill:block/metal_traverse/block_top_z90"
+      },
+      "when": {
+        "top": "true",
+        "bottom": "false",
+        "x": "false",
+        "z": "true",
+        "y_rotated": "true",
+        "axis": "z"
+      }
+    },
+    {
+      "apply": {
+        "model": "twistermill:block/metal_traverse/block_bottom",
+        "y": 90
+      },
+      "when": {
+        "top": "false",
+        "bottom": "true",
+        "x": "false",
+        "z": "true",
+        "y_rotated": "true",
+        "axis": "y"
+      }
+    },
+    {
+      "apply": {
+        "model": "twistermill:block/metal_traverse/block_bottom",
+        "x": 90
+      },
+      "when": {
+        "top": "false",
+        "bottom": "true",
+        "x": "false",
+        "z": "true",
+        "y_rotated": "true",
+        "axis": "x"
+      }
+    },
+    {
+      "apply": {
+        "model": "twistermill:block/metal_traverse/block_bottom_z90"
+      },
+      "when": {
+        "top": "false",
+        "bottom": "true",
+        "x": "false",
+        "z": "true",
+        "y_rotated": "true",
+        "axis": "z"
+      }
+    },
+    {
+      "apply": {
+        "model": "twistermill:block/metal_traverse/block_cross",
+        "y": 90
+      },
+      "when": {
+        "top": "true",
+        "bottom": "true",
+        "x": "true",
+        "z": "false",
+        "y_rotated": "true",
+        "axis": "y"
+      }
+    },
+    {
+      "apply": {
+        "model": "twistermill:block/metal_traverse/block_cross",
+        "y": 90
+      },
+      "when": {
+        "top": "true",
+        "bottom": "true",
+        "x": "false",
+        "z": "true",
+        "y_rotated": "true",
+        "axis": "y"
+      }
+    },
+    {
+      "apply": {
+        "model": "twistermill:block/metal_traverse/block_cross",
+        "x": 90
+      },
+      "when": {
+        "top": "true",
+        "bottom": "true",
+        "x": "true",
+        "z": "false",
+        "y_rotated": "true",
+        "axis": "x"
+      }
+    },
+    {
+      "apply": {
+        "model": "twistermill:block/metal_traverse/block_cross",
+        "x": 90
+      },
+      "when": {
+        "top": "true",
+        "bottom": "true",
+        "x": "false",
+        "z": "true",
+        "y_rotated": "true",
+        "axis": "x"
+      }
+    },
+    {
+      "apply": {
+        "model": "twistermill:block/metal_traverse/block_cross_z90"
+      },
+      "when": {
+        "top": "true",
+        "bottom": "true",
+        "x": "true",
+        "z": "false",
+        "y_rotated": "true",
+        "axis": "z"
+      }
+    },
+    {
+      "apply": {
+        "model": "twistermill:block/metal_traverse/block_cross_z90"
+      },
+      "when": {
+        "top": "true",
+        "bottom": "true",
+        "x": "false",
+        "z": "true",
+        "y_rotated": "true",
+        "axis": "z"
+      }
+    },
+    {
+      "apply": {
+        "model": "twistermill:block/metal_traverse/block_cross",
+        "y": 90
+      },
+      "when": {
+        "x": "true",
+        "z": "true",
+        "y_rotated": "true",
+        "axis": "y"
+      }
+    },
+    {
+      "apply": {
+        "model": "twistermill:block/metal_traverse/block_cross",
+        "x": 90
+      },
+      "when": {
+        "x": "true",
+        "z": "true",
+        "y_rotated": "true",
+        "axis": "x"
+      }
+    },
+    {
+      "apply": {
+        "model": "twistermill:block/metal_traverse/block_cross_z90"
+      },
+      "when": {
+        "x": "true",
+        "z": "true",
+        "y_rotated": "true",
+        "axis": "z"
+      }
+    }
+  ]
+}

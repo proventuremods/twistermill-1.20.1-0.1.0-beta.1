@@ -1,0 +1,21 @@
+{
+  "type": "create:mixing",
+  "heat_requirement": "heated",
+  "ingredients": [
+    {
+      "item": "twistermill:polished_signal_quartz"
+    },
+    {
+      "item": "minecraft:coal"
+    },
+    {
+      "tag": "c:ingots/iron"
+    }
+  ],
+  "results": [
+    {
+      "count": 1,
+      "id": "twistermill:signal_steel_ingot"
+    }
+  ]
+}

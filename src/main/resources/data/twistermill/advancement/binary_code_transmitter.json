@@ -1,0 +1,21 @@
+{
+  "parent": "twistermill:ctb_system_complete",
+  "display": {
+    "icon": {
+      "id": "twistermill:digital_signal_tx_block"
+    },
+    "title": {
+      "translate": "advancements.twistermill.binary_code_transmitter.title"
+    },
+    "description": {
+      "translate": "advancements.twistermill.binary_code_transmitter.description"
+    },
+    "show_toast": true,
+    "announce_to_chat": true
+  },
+  "criteria": {
+    "binary_frame_sent": {
+      "trigger": "twistermill:binary_code_transmitter"
+    }
+  }
+}

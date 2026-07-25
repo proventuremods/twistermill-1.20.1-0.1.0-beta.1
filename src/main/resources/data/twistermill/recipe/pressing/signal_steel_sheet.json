@@ -1,0 +1,13 @@
+{
+  "type": "create:pressing",
+  "ingredients": [
+    {
+      "item": "twistermill:signal_steel_ingot"
+    }
+  ],
+  "results": [
+    {
+      "id": "twistermill:signal_steel_sheet"
+    }
+  ]
+}

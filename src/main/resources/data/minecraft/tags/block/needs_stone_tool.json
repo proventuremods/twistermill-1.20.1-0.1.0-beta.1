@@ -1,0 +1,18 @@
+{
+  "values": [
+    "twistermill:wind_roto_block",
+    "twistermill:wind_roto_vertical_block",
+    "twistermill:servo_twister_block",
+    "twistermill:inv_servo_twister_block",
+    "twistermill:control_table_block",
+    "twistermill:redstone_in_bit_out_block",
+    "twistermill:digital_signal_tx_block",
+    "twistermill:metal_traverse",
+    "twistermill:signal_steel_block",
+    "twistermill:twister_sail_block",
+    "twistermill:twister_sail_frame_block",
+    "twistermill:blade_arm_block",
+    "twistermill:blade_arm_eastface_block",
+    "twistermill:blade_arm_westface_block"
+  ]
+}

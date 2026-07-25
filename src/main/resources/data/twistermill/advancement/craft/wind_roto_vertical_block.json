@@ -1,0 +1,30 @@
+{
+  "parent": "twistermill:signal_quartz_ore",
+  "display": {
+    "icon": {
+      "id": "twistermill:wind_roto_vertical_block"
+    },
+    "title": {
+      "translate": "advancements.twistermill.craft.wind_roto_vertical_block.title"
+    },
+    "description": {
+      "translate": "advancements.twistermill.craft.wind_roto_vertical_block.description"
+    },
+    "show_toast": true,
+    "announce_to_chat": true
+  },
+  "criteria": {
+    "has_item": {
+      "trigger": "minecraft:inventory_changed",
+      "conditions": {
+        "items": [
+          {
+            "items": [
+              "twistermill:wind_roto_vertical_block"
+            ]
+          }
+        ]
+      }
+    }
+  }
+}

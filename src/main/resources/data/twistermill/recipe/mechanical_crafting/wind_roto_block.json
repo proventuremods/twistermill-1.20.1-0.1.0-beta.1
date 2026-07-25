@@ -1,0 +1,41 @@
+{
+  "type": "create:mechanical_crafting",
+  "accept_mirrored": false,
+  "key": {
+    "A": {
+      "item": "create:windmill_bearing"
+    },
+    "B": {
+      "item": "create:flywheel"
+    },
+    "C": {
+      "item": "create:shaft"
+    },
+    "D": {
+      "item": "minecraft:blue_dye"
+    },
+    "E": {
+      "item": "minecraft:comparator"
+    },
+    "F": {
+      "item": "minecraft:redstone"
+    },
+    "G": {
+      "item": "twistermill:polished_signal_quartz"
+    },
+    "H": {
+      "item": "twistermill:signal_steel_sheet"
+    }
+  },
+  "pattern": [
+    "HDADH",
+    "HFBEH",
+    "HDCDH",
+    "HGGGH"
+  ],
+  "result": {
+    "count": 1,
+    "id": "twistermill:wind_roto_block"
+  },
+  "show_notification": false
+}

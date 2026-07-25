@@ -1,0 +1,35 @@
+{
+  "type": "create:mechanical_crafting",
+  "accept_mirrored": false,
+  "key": {
+    "A": {
+      "item": "create:mechanical_bearing"
+    },
+    "B": {
+      "item": "create:redstone_link"
+    },
+    "C": {
+      "item": "create:shaft"
+    },
+    "D": {
+      "item": "minecraft:red_dye"
+    },
+    "E": {
+      "item": "twistermill:polished_signal_quartz"
+    },
+    "F": {
+      "item": "twistermill:signal_steel_sheet"
+    }
+  },
+  "pattern": [
+    "FDBDF",
+    "FBCAF",
+    "FDBDF",
+    "FEEEF"
+  ],
+  "result": {
+    "count": 1,
+    "id": "twistermill:inv_servo_twister_block"
+  },
+  "show_notification": false
+}

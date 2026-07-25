@@ -1,0 +1,16 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "CAC",
+    "ABA"
+  ],
+  "key": {
+    "A": { "item": "minecraft:stick" },
+    "B": { "item": "create:andesite_alloy" },
+    "C": { "tag": "minecraft:wool" }
+  },
+  "result": {
+    "id": "twistermill:twister_sail_block",
+    "count": 1
+  }
+}

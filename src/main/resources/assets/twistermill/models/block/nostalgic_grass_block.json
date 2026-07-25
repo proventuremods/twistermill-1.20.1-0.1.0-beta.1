@@ -1,0 +1,8 @@
+{
+  "parent": "minecraft:block/cube_bottom_top",
+  "textures": {
+    "top": "twistermill:block/forward_port_grass_top",
+    "side": "twistermill:block/forward_port_grass_side",
+    "bottom": "minecraft:block/dirt"
+  }
+}

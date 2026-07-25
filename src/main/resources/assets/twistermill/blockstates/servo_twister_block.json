@@ -1,0 +1,57 @@
+{
+  "variants": {
+    "running=false,facing=north,power_visual=unpowered": { "model": "twistermill:block/servo_twister_block" },
+    "running=false,facing=north,power_visual=angle": { "model": "twistermill:block/servo_twister_block_angle_powered" },
+    "running=false,facing=north,power_visual=speed": { "model": "twistermill:block/servo_twister_block_speed_powered" },
+    "running=false,facing=north,power_visual=bi": { "model": "twistermill:block/servo_twister_block_bi_powered" },
+    "running=true,facing=north,power_visual=unpowered": { "model": "twistermill:block/servo_twister_block" },
+    "running=true,facing=north,power_visual=angle": { "model": "twistermill:block/servo_twister_block_angle_powered" },
+    "running=true,facing=north,power_visual=speed": { "model": "twistermill:block/servo_twister_block_speed_powered" },
+    "running=true,facing=north,power_visual=bi": { "model": "twistermill:block/servo_twister_block_bi_powered" },
+
+    "running=false,facing=south,power_visual=unpowered": { "model": "twistermill:block/servo_twister_block", "y": 180 },
+    "running=false,facing=south,power_visual=angle": { "model": "twistermill:block/servo_twister_block_angle_powered", "y": 180 },
+    "running=false,facing=south,power_visual=speed": { "model": "twistermill:block/servo_twister_block_speed_powered", "y": 180 },
+    "running=false,facing=south,power_visual=bi": { "model": "twistermill:block/servo_twister_block_bi_powered", "y": 180 },
+    "running=true,facing=south,power_visual=unpowered": { "model": "twistermill:block/servo_twister_block", "y": 180 },
+    "running=true,facing=south,power_visual=angle": { "model": "twistermill:block/servo_twister_block_angle_powered", "y": 180 },
+    "running=true,facing=south,power_visual=speed": { "model": "twistermill:block/servo_twister_block_speed_powered", "y": 180 },
+    "running=true,facing=south,power_visual=bi": { "model": "twistermill:block/servo_twister_block_bi_powered", "y": 180 },
+
+    "running=false,facing=west,power_visual=unpowered": { "model": "twistermill:block/servo_twister_block", "y": 270 },
+    "running=false,facing=west,power_visual=angle": { "model": "twistermill:block/servo_twister_block_angle_powered", "y": 270 },
+    "running=false,facing=west,power_visual=speed": { "model": "twistermill:block/servo_twister_block_speed_powered", "y": 270 },
+    "running=false,facing=west,power_visual=bi": { "model": "twistermill:block/servo_twister_block_bi_powered", "y": 270 },
+    "running=true,facing=west,power_visual=unpowered": { "model": "twistermill:block/servo_twister_block", "y": 270 },
+    "running=true,facing=west,power_visual=angle": { "model": "twistermill:block/servo_twister_block_angle_powered", "y": 270 },
+    "running=true,facing=west,power_visual=speed": { "model": "twistermill:block/servo_twister_block_speed_powered", "y": 270 },
+    "running=true,facing=west,power_visual=bi": { "model": "twistermill:block/servo_twister_block_bi_powered", "y": 270 },
+
+    "running=false,facing=east,power_visual=unpowered": { "model": "twistermill:block/servo_twister_block", "y": 90 },
+    "running=false,facing=east,power_visual=angle": { "model": "twistermill:block/servo_twister_block_angle_powered", "y": 90 },
+    "running=false,facing=east,power_visual=speed": { "model": "twistermill:block/servo_twister_block_speed_powered", "y": 90 },
+    "running=false,facing=east,power_visual=bi": { "model": "twistermill:block/servo_twister_block_bi_powered", "y": 90 },
+    "running=true,facing=east,power_visual=unpowered": { "model": "twistermill:block/servo_twister_block", "y": 90 },
+    "running=true,facing=east,power_visual=angle": { "model": "twistermill:block/servo_twister_block_angle_powered", "y": 90 },
+    "running=true,facing=east,power_visual=speed": { "model": "twistermill:block/servo_twister_block_speed_powered", "y": 90 },
+    "running=true,facing=east,power_visual=bi": { "model": "twistermill:block/servo_twister_block_bi_powered", "y": 90 },
+
+    "running=false,facing=up,power_visual=unpowered": { "model": "twistermill:block/servo_twister_block", "x": 270 },
+    "running=false,facing=up,power_visual=angle": { "model": "twistermill:block/servo_twister_block_angle_powered", "x": 270 },
+    "running=false,facing=up,power_visual=speed": { "model": "twistermill:block/servo_twister_block_speed_powered", "x": 270 },
+    "running=false,facing=up,power_visual=bi": { "model": "twistermill:block/servo_twister_block_bi_powered", "x": 270 },
+    "running=true,facing=up,power_visual=unpowered": { "model": "twistermill:block/servo_twister_block", "x": 270 },
+    "running=true,facing=up,power_visual=angle": { "model": "twistermill:block/servo_twister_block_angle_powered", "x": 270 },
+    "running=true,facing=up,power_visual=speed": { "model": "twistermill:block/servo_twister_block_speed_powered", "x": 270 },
+    "running=true,facing=up,power_visual=bi": { "model": "twistermill:block/servo_twister_block_bi_powered", "x": 270 },
+
+    "running=false,facing=down,power_visual=unpowered": { "model": "twistermill:block/servo_twister_block", "x": 90 },
+    "running=false,facing=down,power_visual=angle": { "model": "twistermill:block/servo_twister_block_angle_powered", "x": 90 },
+    "running=false,facing=down,power_visual=speed": { "model": "twistermill:block/servo_twister_block_speed_powered", "x": 90 },
+    "running=false,facing=down,power_visual=bi": { "model": "twistermill:block/servo_twister_block_bi_powered", "x": 90 },
+    "running=true,facing=down,power_visual=unpowered": { "model": "twistermill:block/servo_twister_block", "x": 90 },
+    "running=true,facing=down,power_visual=angle": { "model": "twistermill:block/servo_twister_block_angle_powered", "x": 90 },
+    "running=true,facing=down,power_visual=speed": { "model": "twistermill:block/servo_twister_block_speed_powered", "x": 90 },
+    "running=true,facing=down,power_visual=bi": { "model": "twistermill:block/servo_twister_block_bi_powered", "x": 90 }
+  }
+}
