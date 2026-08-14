@@ -21,15 +21,18 @@ public final class BinarySignalProtocol {
     public static final int CONTROL_MARKER_TOTAL_TICKS =
             CONTROL_MARKER_HIGH_TICKS * CONTROL_MARKER_HIGH_PHASES + CONTROL_MARKER_LOW_TICKS;
 
+    @SuppressWarnings({"BooleanMethodIsAlwaysInverted", "ConstantValue"})
     public static boolean isControlMarkerConfigurationSafe() {
         return CONTROL_MARKER_MIN_HIGH_TICKS > FRAME_START_MAX_TICKS
-                && CONTROL_MARKER_MIN_HIGH_TICKS > FRAME_HALF_PHASE_TICKS;
+                && CONTROL_MARKER_MIN_HIGH_TICKS > FRAME_HALF_PHASE_TICKS
+                && CONTROL_MARKER_TOTAL_TICKS <= CONTROL_MARKER_RECEIVE_TIMEOUT_TICKS;
     }
 
     public static boolean isControlMarkerHighTicksInRange(int ticks) {
         return ticks >= CONTROL_MARKER_MIN_HIGH_TICKS && ticks <= CONTROL_MARKER_MAX_HIGH_TICKS;
     }
 
+    @SuppressWarnings("BooleanMethodIsAlwaysInverted")
     public static boolean isControlMarkerLowGapTicksInRange(int ticks) {
         return ticks >= CONTROL_MARKER_MIN_LOW_GAP_TICKS && ticks <= CONTROL_MARKER_MAX_LOW_GAP_TICKS;
     }

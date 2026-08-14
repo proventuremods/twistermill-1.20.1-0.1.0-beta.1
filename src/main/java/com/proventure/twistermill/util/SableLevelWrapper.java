@@ -15,6 +15,7 @@ public final class SableLevelWrapper {
     }
 
     public static Level getRootLevel(Level level) {
+        //noinspection ConstantValue
         if (level instanceof SubLevelAccess access && access instanceof SubLevel subLevel) {
             return subLevel.getLevel();
         }
@@ -40,6 +41,7 @@ public final class SableLevelWrapper {
         return center;
     }
 
+    @SuppressWarnings("unused")
     public static BlockPos toLocalPos(Level level, BlockPos pos) {
         Vector3d localCenter = toLocalCenter(level, pos);
         return BlockPos.containing(localCenter.x, localCenter.y, localCenter.z);
@@ -49,6 +51,7 @@ public final class SableLevelWrapper {
         return level instanceof SubLevelAccess;
     }
 
+    @SuppressWarnings("unused")
     public static boolean isSubLevel(Level level, BlockPos pos) {
         return Sable.HELPER.getContaining(level, pos) instanceof ServerSubLevel;
     }

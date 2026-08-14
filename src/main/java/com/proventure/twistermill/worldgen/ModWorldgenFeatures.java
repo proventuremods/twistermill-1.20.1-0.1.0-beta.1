@@ -14,6 +14,7 @@ public final class ModWorldgenFeatures {
     public static final DeferredRegister<Feature<?>> FEATURES =
             DeferredRegister.create(Registries.FEATURE, TwisterMill.MOD_ID);
 
+    @SuppressWarnings("unused")
     public static final DeferredHolder<Feature<?>, SignalQuartzOreFeature> SIGNAL_QUARTZ_ORE =
             FEATURES.register("signal_quartz_ore", () -> new SignalQuartzOreFeature(OreConfiguration.CODEC));
 

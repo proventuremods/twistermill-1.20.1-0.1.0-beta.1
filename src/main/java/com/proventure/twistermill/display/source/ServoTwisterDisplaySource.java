@@ -148,10 +148,7 @@ public class ServoTwisterDisplaySource extends NumericSingleLineDisplaySource {
         if (value < 0) {
             return 0;
         }
-        if (value > 15) {
-            return 15;
-        }
-        return value;
+        return Math.min(value, 15);
     }
 
     private static String formatFloat(float value) {

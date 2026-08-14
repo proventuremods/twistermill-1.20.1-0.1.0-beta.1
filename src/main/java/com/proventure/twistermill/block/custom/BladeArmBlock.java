@@ -12,6 +12,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.StateDefinition;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.state.properties.DirectionProperty;
+import org.jetbrains.annotations.Nullable;
 
 import javax.annotation.ParametersAreNonnullByDefault;
 
@@ -50,7 +51,7 @@ public class BladeArmBlock extends Block {
         return rotate(state, mirror.getRotation(state.getValue(FACING)));
     }
 
-    private static Direction resolveServoSlotAFacing(BlockPlaceContext context) {
+    private static @Nullable Direction resolveServoSlotAFacing(BlockPlaceContext context) {
         Level level = context.getLevel();
         BlockPos placementPos = context.getClickedPos();
 
@@ -70,7 +71,7 @@ public class BladeArmBlock extends Block {
         return null;
     }
 
-    private static Direction resolveServoFacingAt(Level level, BlockPos pos) {
+    private static @Nullable Direction resolveServoFacingAt(Level level, BlockPos pos) {
         BlockState state = level.getBlockState(pos);
         if (!(state.getBlock() instanceof ServoTwisterBlock)
                 || !state.hasProperty(BlockStateProperties.FACING)) {

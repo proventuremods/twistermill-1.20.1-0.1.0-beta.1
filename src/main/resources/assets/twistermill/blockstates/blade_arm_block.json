@@ -1,10 +1,15 @@
 {
   "variants": {
-    "facing=up": { "model": "twistermill:block/blade_arm_block" },
-    "facing=down": { "model": "twistermill:block/blade_arm_block", "x": 180, "y": 180 },
     "facing=north": { "model": "twistermill:block/blade_arm_block", "x": 90 },
+
     "facing=south": { "model": "twistermill:block/blade_arm_block", "x": 90, "y": 180 },
+
+    "facing=west": { "model": "twistermill:block/blade_arm_block", "x": 90, "y": 90 },
+
     "facing=east": { "model": "twistermill:block/blade_arm_block", "x": 90, "y": 270 },
-    "facing=west": { "model": "twistermill:block/blade_arm_block", "x": 90, "y": 90 }
+
+    "facing=up": { "model": "twistermill:block/blade_arm_block" },
+
+    "facing=down": { "model": "twistermill:block/blade_arm_block", "x": 180, "y": 180 }
   }
 }

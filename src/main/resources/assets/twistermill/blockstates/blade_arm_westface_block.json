@@ -1,7 +1,5 @@
 {
   "variants": {
-    "": {
-      "model": "twistermill:block/blade_arm_westface_block"
-    }
+    "": { "model": "twistermill:block/blade_arm_westface_block" }
   }
 }

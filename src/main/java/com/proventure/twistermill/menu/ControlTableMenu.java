@@ -8,6 +8,7 @@ import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.MenuType;
+import org.jetbrains.annotations.NotNull;
 
 public class ControlTableMenu extends AbstractContainerMenu {
 
@@ -28,7 +29,7 @@ public class ControlTableMenu extends AbstractContainerMenu {
         this(ModMenuTypes.CONTROL_TABLE_MENU.get(), containerId, playerInventory, blockEntity);
     }
 
-    private ControlTableMenu(MenuType<?> menuType, int containerId, Inventory playerInventory, ControlTableBlockEntity blockEntity) {
+    private ControlTableMenu(MenuType<?> menuType, int containerId, @SuppressWarnings("unused") Inventory playerInventory, ControlTableBlockEntity blockEntity) {
         super(menuType, containerId);
         this.blockEntity = blockEntity;
         this.blockPos = blockEntity != null ? blockEntity.getBlockPos() : BlockPos.ZERO;
@@ -40,6 +41,7 @@ public class ControlTableMenu extends AbstractContainerMenu {
         this.launchMode = blockEntity != null ? blockEntity.getLaunchMode() : ControlTableBlockEntity.DEFAULT_LAUNCH_MODE;
     }
 
+    @SuppressWarnings("resource")
     private static ControlTableBlockEntity getClientBlockEntity(BlockPos pos) {
         if (Minecraft.getInstance().level == null) {
             return null;
@@ -51,7 +53,7 @@ public class ControlTableMenu extends AbstractContainerMenu {
     }
 
     @Override
-    public boolean stillValid(Player player) {
+    public boolean stillValid(@NotNull Player player) {
         if (blockEntity == null || blockEntity.isRemoved()) {
             return false;
         }
@@ -109,7 +111,7 @@ public class ControlTableMenu extends AbstractContainerMenu {
     }
 
     @Override
-    public net.minecraft.world.item.ItemStack quickMoveStack(Player player, int index) {
+    public @NotNull net.minecraft.world.item.ItemStack quickMoveStack(@NotNull Player player, int index) {
         return net.minecraft.world.item.ItemStack.EMPTY;
     }
 }

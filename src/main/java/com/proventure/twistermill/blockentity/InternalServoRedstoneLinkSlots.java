@@ -17,11 +17,19 @@ public final class InternalServoRedstoneLinkSlots {
     }
 
     public static Pair<ValueBoxTransform, ValueBoxTransform> makeSlots(boolean inverted) {
-        return ValueBoxTransform.Dual.makeSlots(first -> new FrequencySlot(first, inverted));
+        return makeSlots(inverted, false);
+    }
+
+    public static Pair<ValueBoxTransform, ValueBoxTransform> makeSlots(boolean inverted, boolean secondary) {
+        return ValueBoxTransform.Dual.makeSlots(first -> new FrequencySlot(first, inverted, secondary));
     }
 
     public static ValueBoxTransform createSlot(boolean first, boolean inverted) {
-        return new FrequencySlot(first, inverted);
+        return createSlot(first, inverted, false);
+    }
+
+    public static ValueBoxTransform createSlot(boolean first, boolean inverted, boolean secondary) {
+        return new FrequencySlot(first, inverted, secondary);
     }
 
     private static class FrequencySlot extends ValueBoxTransform.Dual {
@@ -30,10 +38,12 @@ public final class InternalServoRedstoneLinkSlots {
         private static final double BOTTOM_SLOT_Y = 5.0D / 16.0D;
 
         private final boolean inverted;
+        private final boolean secondary;
 
-        private FrequencySlot(boolean first, boolean inverted) {
+        private FrequencySlot(boolean first, boolean inverted, boolean secondary) {
             super(first);
             this.inverted = inverted;
+            this.secondary = secondary;
         }
 
         @Override
@@ -67,14 +77,15 @@ public final class InternalServoRedstoneLinkSlots {
                 return null;
 
             if (!(level.getBlockEntity(pos) instanceof InternalServoRedstoneLinkOwner owner)
-                    || !owner.isInternalRedstoneLinkMode())
+                    || !(secondary
+                    ? owner.isSecondaryInternalRedstoneLinkEligible()
+                    : owner.isInternalRedstoneLinkMode()))
                 return null;
 
-            Direction mapped = inverted
-                    ? InternalServoRedstoneLinkOwner.getInvServoInternalLinkSide(state)
-                    : InternalServoRedstoneLinkOwner.getServoInternalLinkSide(state);
-            Direction ownerSide = owner.getInternalRedstoneLinkSide();
-            return mapped == ownerSide ? mapped : ownerSide;
+            Direction ownerSide = secondary
+                    ? owner.getSecondaryInternalRedstoneLinkSide()
+                    : owner.getInternalRedstoneLinkSide();
+            return ownerSide;
         }
     }
 }

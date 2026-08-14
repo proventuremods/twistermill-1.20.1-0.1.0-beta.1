@@ -5,7 +5,6 @@ import com.proventure.twistermill.util.SableLevelWrapper;
 import dev.ryanhcode.sable.Sable;
 import dev.ryanhcode.sable.api.sublevel.SubLevelContainer;
 import dev.ryanhcode.sable.companion.ClientSubLevelAccess;
-import dev.ryanhcode.sable.companion.SubLevelAccess;
 import dev.ryanhcode.sable.companion.math.Pose3d;
 import dev.ryanhcode.sable.companion.math.Pose3dc;
 import dev.ryanhcode.sable.sublevel.SubLevel;
@@ -184,10 +183,6 @@ final class SableTopVisualTransform {
             return directContaining;
         }
 
-        if (blockEntityLevel instanceof SubLevelAccess access && access instanceof SubLevel subLevel && !subLevel.isRemoved()) {
-            return subLevel;
-        }
-
         Vector3d worldCenter = computeWorldCenter(blockEntityLevel, blockEntity.getBlockPos());
         if (!isFinite(worldCenter)) {
             return null;
@@ -207,10 +202,6 @@ final class SableTopVisualTransform {
             BlockEntity blockEntity
     ) {
         if (resolveDirectContainingSubLevel(blockEntity) != null) {
-            return true;
-        }
-
-        if (blockEntityLevel instanceof SubLevelAccess access && access instanceof SubLevel) {
             return true;
         }
 
@@ -254,6 +245,7 @@ final class SableTopVisualTransform {
         }
     }
 
+    @SuppressWarnings("BooleanMethodIsAlwaysInverted")
     private static boolean isFinite(@Nullable Vector3d vector) {
         return vector != null
                 && Double.isFinite(vector.x)

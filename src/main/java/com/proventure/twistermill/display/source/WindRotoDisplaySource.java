@@ -178,10 +178,7 @@ public class WindRotoDisplaySource extends NumericSingleLineDisplaySource {
         if (value < 0) {
             return 0;
         }
-        if (value > 15) {
-            return 15;
-        }
-        return value;
+        return Math.min(value, 15);
     }
 
     private record WindRotoValues(int generatedRpm, float generatedSu, float rawWindSpeed, float smoothedWindSpeed,

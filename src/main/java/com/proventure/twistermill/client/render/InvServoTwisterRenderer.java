@@ -1,8 +1,10 @@
 package com.proventure.twistermill.client.render;
 
 import com.mojang.blaze3d.vertex.PoseStack;
+import com.mojang.math.Axis;
 import com.proventure.twistermill.blockentity.InvServoTwisterBlockEntity;
 import com.proventure.twistermill.client.TwisterMillPartialModels;
+import com.proventure.twistermill.util.ServoTwoAxisRotationMath;
 import com.simibubi.create.content.kinetics.base.KineticBlockEntityRenderer;
 import net.createmod.catnip.render.CachedBuffers;
 import net.createmod.catnip.render.SuperByteBuffer;
@@ -14,9 +16,12 @@ import net.minecraft.core.Direction;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.phys.AABB;
+import org.jetbrains.annotations.NotNull;
+import org.joml.Quaternionf;
 
 public class InvServoTwisterRenderer extends KineticBlockEntityRenderer<InvServoTwisterBlockEntity> {
     private static final double ANTENNA_DOWN_OFFSET = 14.0D / 16.0D;
+    private final Quaternionf twoAxisRotation = new Quaternionf();
 
     public InvServoTwisterRenderer(BlockEntityRendererProvider.Context context) {
         super(context);
@@ -36,9 +41,10 @@ public class InvServoTwisterRenderer extends KineticBlockEntityRenderer<InvServo
 
         rotateTopToFacing(top, facing);
 
-        float angle = be.getInterpolatedAngle(partialTicks);
+        float rawAngle = be.getInterpolatedAngle(partialTicks);
+        float secondRawAngle = be.getInterpolatedSecondAngle(partialTicks);
         float sign = facing.getAxisDirection() == Direction.AxisDirection.POSITIVE ? 1f : -1f;
-        angle *= -sign;
+        float facingAxisAngle = rawAngle * -sign;
 
         int packedLight = be.getLevel() != null
                 ? LevelRenderer.getLightColor(be.getLevel(), be.getBlockPos())
@@ -52,18 +58,38 @@ public class InvServoTwisterRenderer extends KineticBlockEntityRenderer<InvServo
                 ms,
                 () -> top.light(packedLight).renderInto(ms, buffer.getBuffer(RenderType.cutout()))
         )) {
-            top.rotateCentered((float) Math.toRadians(angle), Direction.Axis.Z);
-            top.light(packedLight)
-                    .renderInto(ms, buffer.getBuffer(RenderType.cutout()));
+            if (be.usesTwoAxisTiltRotationForRender()) {
+                ms.pushPose();
+                ms.translate(0.5D, 0.5D, 0.5D);
+                ms.mulPose(ServoTwoAxisRotationMath.setBlockMovementQuaternion(
+                        facing, rawAngle, secondRawAngle, twoAxisRotation));
+                ms.translate(-0.5D, -0.5D, -0.5D);
+                top.light(packedLight)
+                        .renderInto(ms, buffer.getBuffer(RenderType.cutout()));
+                ms.popPose();
+            } else if (be.usesUpPitchRotationForRender()) {
+                ms.pushPose();
+                ms.translate(0.5D, 0.5D, 0.5D);
+                ms.mulPose(Axis.XP.rotationDegrees(rawAngle));
+                ms.translate(-0.5D, -0.5D, -0.5D);
+                top.light(packedLight)
+                        .renderInto(ms, buffer.getBuffer(RenderType.cutout()));
+                ms.popPose();
+            } else {
+                top.rotateCentered((float) Math.toRadians(facingAxisAngle), Direction.Axis.Z);
+                top.light(packedLight)
+                        .renderInto(ms, buffer.getBuffer(RenderType.cutout()));
+            }
         }
 
-        if (be.isInternalRedstoneLinkReceiverActive()) {
+        if (be.isAnyInternalRedstoneLinkReceiverActive()) {
             SuperByteBuffer antenna = CachedBuffers.partial(TwisterMillPartialModels.INV_SERVO_TWISTER_ANTENNA, state);
             rotateHousingFixedPartialToBlockstateFacing(antenna, facing);
             renderHousingFixedAntenna(antenna, facing, packedLight, ms, buffer);
         }
 
-        if (be.shouldRenderInternalRedstoneLinkSlots()) {
+        if (be.shouldRenderInternalRedstoneLinkSlots()
+                || be.shouldRenderSecondaryInternalRedstoneLinkSlots()) {
             InternalServoRedstoneLinkRenderer.renderOnBlockEntity(be, true, ms, buffer, light, overlay);
         }
 
@@ -76,7 +102,7 @@ public class InvServoTwisterRenderer extends KineticBlockEntityRenderer<InvServo
     }
 
     @Override
-    public AABB getRenderBoundingBox(InvServoTwisterBlockEntity be) {
+    public @NotNull AABB getRenderBoundingBox(@NotNull InvServoTwisterBlockEntity be) {
         return SableTopVisualTransform.renderBounds(be.getBlockPos(), be.getActiveTopSubLevelIdForRender());
     }
 
@@ -105,9 +131,6 @@ public class InvServoTwisterRenderer extends KineticBlockEntityRenderer<InvServo
         if (facing == Direction.DOWN) {
             renderTranslatedHousingFixedAntenna(
                     antenna,
-                    0.0D,
-                    ANTENNA_DOWN_OFFSET,
-                    0.0D,
                     packedLight,
                     ms,
                     buffer
@@ -121,15 +144,12 @@ public class InvServoTwisterRenderer extends KineticBlockEntityRenderer<InvServo
 
     private static void renderTranslatedHousingFixedAntenna(
             SuperByteBuffer antenna,
-            double x,
-            double y,
-            double z,
             int packedLight,
             PoseStack ms,
             MultiBufferSource buffer
     ) {
         ms.pushPose();
-        ms.translate(x, y, z);
+        ms.translate(0.0D, ANTENNA_DOWN_OFFSET, 0.0D);
         antenna.light(packedLight)
                 .renderInto(ms, buffer.getBuffer(RenderType.cutout()));
         ms.popPose();

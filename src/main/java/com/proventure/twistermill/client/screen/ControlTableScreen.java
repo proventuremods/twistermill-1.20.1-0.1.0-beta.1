@@ -12,6 +12,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.phys.Vec2;
 import net.neoforged.neoforge.network.PacketDistributor;
+import org.jetbrains.annotations.NotNull;
 
 public class ControlTableScreen extends AbstractSimiContainerScreen<ControlTableMenu> {
 
@@ -118,17 +119,12 @@ public class ControlTableScreen extends AbstractSimiContainerScreen<ControlTable
     }
 
     @Override
-    protected void renderBg(GuiGraphics guiGraphics, float partialTick, int mouseX, int mouseY) {
+    protected void renderBg(@NotNull GuiGraphics guiGraphics, float partialTick, int mouseX, int mouseY) {
         guiGraphics.blit(BACKGROUND, leftPos, topPos, 0, 0, IMAGE_WIDTH, IMAGE_HEIGHT, IMAGE_WIDTH, IMAGE_HEIGHT);
     }
 
     @Override
-    protected void renderLabels(GuiGraphics guiGraphics, int mouseX, int mouseY) {
-    }
-
-    @Override
-    public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
-        renderBackground(guiGraphics, mouseX, mouseY, partialTick);
+    public void render(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
         super.render(guiGraphics, mouseX, mouseY, partialTick);
 
         renderPressedButton(guiGraphics);
@@ -250,9 +246,7 @@ public class ControlTableScreen extends AbstractSimiContainerScreen<ControlTable
                 LAUNCH_BUTTON_X1,
                 LAUNCH_BUTTON_Y1,
                 LAUNCH_BUTTON_X2,
-                LAUNCH_BUTTON_Y2,
-                0xF2F2F2,
-                true
+                LAUNCH_BUTTON_Y2
         );
 
         drawScaledCenteredString(
@@ -261,9 +255,7 @@ public class ControlTableScreen extends AbstractSimiContainerScreen<ControlTable
                 DISASSEMBLE_BUTTON_X1,
                 DISASSEMBLE_BUTTON_Y1,
                 DISASSEMBLE_BUTTON_X2,
-                DISASSEMBLE_BUTTON_Y2,
-                0xF2F2F2,
-                true
+                DISASSEMBLE_BUTTON_Y2
         );
     }
 
@@ -343,42 +335,17 @@ public class ControlTableScreen extends AbstractSimiContainerScreen<ControlTable
             case ControlTableBlockEntity.LAUNCH_MODE_RS_PULSE -> drawScaledCenteredColoredSegments(
                     guiGraphics,
                     new String[]{"ON ", "Pulse"},
-                    new int[]{LAUNCH_MODE_ON_COLOR, LAUNCH_MODE_STATE_COLOR},
-                    LAUNCH_TEXT_X1,
-                    LAUNCH_TEXT_Y1,
-                    LAUNCH_TEXT_X2,
-                    LAUNCH_TEXT_Y2,
-                    true
+                    new int[]{LAUNCH_MODE_ON_COLOR, LAUNCH_MODE_STATE_COLOR}
             );
             case ControlTableBlockEntity.LAUNCH_MODE_ON_CHANGE -> drawScaledCenteredColoredSegments(
                     guiGraphics,
                     new String[]{"ON ", "Change"},
-                    new int[]{LAUNCH_MODE_ON_COLOR, LAUNCH_MODE_STATE_COLOR},
-                    LAUNCH_TEXT_X1,
-                    LAUNCH_TEXT_Y1,
-                    LAUNCH_TEXT_X2,
-                    LAUNCH_TEXT_Y2,
-                    true
-            );
-            case ControlTableBlockEntity.LAUNCH_MODE_OFF -> drawScaledCenteredColoredSegments(
-                    guiGraphics,
-                    new String[]{"OFF"},
-                    new int[]{LAUNCH_MODE_OFF_COLOR},
-                    LAUNCH_TEXT_X1,
-                    LAUNCH_TEXT_Y1,
-                    LAUNCH_TEXT_X2,
-                    LAUNCH_TEXT_Y2,
-                    true
+                    new int[]{LAUNCH_MODE_ON_COLOR, LAUNCH_MODE_STATE_COLOR}
             );
             default -> drawScaledCenteredColoredSegments(
                     guiGraphics,
                     new String[]{"OFF"},
-                    new int[]{LAUNCH_MODE_OFF_COLOR},
-                    LAUNCH_TEXT_X1,
-                    LAUNCH_TEXT_Y1,
-                    LAUNCH_TEXT_X2,
-                    LAUNCH_TEXT_Y2,
-                    true
+                    new int[]{LAUNCH_MODE_OFF_COLOR}
             );
         }
 
@@ -403,7 +370,7 @@ public class ControlTableScreen extends AbstractSimiContainerScreen<ControlTable
         return Integer.toString(signal);
     }
 
-    private void drawScaledCenteredString(GuiGraphics guiGraphics, String text, int areaX1, int areaY1, int areaX2, int areaY2, int color, boolean shadow) {
+    private void drawScaledCenteredString(GuiGraphics guiGraphics, String text, int areaX1, int areaY1, int areaX2, int areaY2) {
         int areaW = areaX2 - areaX1;
         int areaH = areaY2 - areaY1;
         int rawTextW = font.width(text);
@@ -417,26 +384,21 @@ public class ControlTableScreen extends AbstractSimiContainerScreen<ControlTable
         guiGraphics.pose().pushPose();
         guiGraphics.pose().translate(drawX, drawY, 0.0F);
         guiGraphics.pose().scale(scale, scale, 1.0F);
-        guiGraphics.drawString(font, text, 0, 0, color, shadow);
+        guiGraphics.drawString(font, text, 0, 0, 0xF2F2F2, true);
         guiGraphics.pose().popPose();
     }
 
     private void drawScaledCenteredColoredSegments(
             GuiGraphics guiGraphics,
             String[] segments,
-            int[] colors,
-            int areaX1,
-            int areaY1,
-            int areaX2,
-            int areaY2,
-            boolean shadow
+            int[] colors
     ) {
         if (segments.length == 0 || segments.length != colors.length) {
             return;
         }
 
-        int areaW = areaX2 - areaX1;
-        int areaH = areaY2 - areaY1;
+        int areaW = LAUNCH_TEXT_X2 - LAUNCH_TEXT_X1;
+        int areaH = LAUNCH_TEXT_Y2 - LAUNCH_TEXT_Y1;
 
         int rawTextW = 0;
         for (String segment : segments) {
@@ -446,8 +408,8 @@ public class ControlTableScreen extends AbstractSimiContainerScreen<ControlTable
         float scale = rawTextW > areaW ? (float) areaW / (float) rawTextW : 1.0F;
         int scaledTextW = Math.max(1, Math.round(rawTextW * scale));
         int scaledTextH = Math.max(1, Math.round(font.lineHeight * scale));
-        int drawX = leftPos + areaX1 + (areaW - scaledTextW) / 2;
-        int drawY = topPos + areaY1 + (areaH - scaledTextH) / 2;
+        int drawX = leftPos + LAUNCH_TEXT_X1 + (areaW - scaledTextW) / 2;
+        int drawY = topPos + LAUNCH_TEXT_Y1 + (areaH - scaledTextH) / 2;
 
         guiGraphics.pose().pushPose();
         guiGraphics.pose().translate(drawX, drawY, 0.0F);
@@ -455,7 +417,7 @@ public class ControlTableScreen extends AbstractSimiContainerScreen<ControlTable
 
         int xOffset = 0;
         for (int i = 0; i < segments.length; i++) {
-            guiGraphics.drawString(font, segments[i], xOffset, 0, colors[i], shadow);
+            guiGraphics.drawString(font, segments[i], xOffset, 0, colors[i], true);
             xOffset += font.width(segments[i]);
         }
 
@@ -533,7 +495,7 @@ public class ControlTableScreen extends AbstractSimiContainerScreen<ControlTable
         int availableHeight = Math.max(1, (y2 - y1) - (INFO_OVERLAY_TEXT_VERTICAL_PADDING * 2));
 
         float scaleX = maxRawWidth > 0 ? (float) availableWidth / (float) maxRawWidth : 1.0F;
-        float scaleY = rawBlockHeight > 0 ? (float) availableHeight / (float) rawBlockHeight : 1.0F;
+        float scaleY = (float) availableHeight / (float) rawBlockHeight;
         float scale = Math.min(1.0F, Math.min(scaleX, scaleY));
 
         float scaledBlockHeight = rawBlockHeight * scale;

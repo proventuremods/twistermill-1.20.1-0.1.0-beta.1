@@ -8,4 +8,4 @@ crash-reports/
 .DS_Store
 Thumbs.db
 *.tmp
-
+net/

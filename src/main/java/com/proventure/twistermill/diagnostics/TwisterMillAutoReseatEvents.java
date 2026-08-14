@@ -38,7 +38,7 @@ public final class TwisterMillAutoReseatEvents {
 
     public static void onLevelLoad(LevelEvent.Load event) {
         if (event.getLevel() instanceof ServerLevel serverLevel) {
-            queueLevelSweep(serverLevel, TwisterMillReseatService.Trigger.AUTO_LEVEL_LOAD, LEVEL_SWEEP_DELAY_TICKS);
+            queueLevelSweep(serverLevel, TwisterMillReseatService.Trigger.AUTO_LEVEL_LOAD);
         }
     }
 
@@ -51,12 +51,12 @@ public final class TwisterMillAutoReseatEvents {
     }
 
     public static void onServerStarted(ServerStartedEvent event) {
-        queueAllLevelSweeps(event.getServer(), TwisterMillReseatService.Trigger.AUTO_SERVER_STARTED, LEVEL_SWEEP_DELAY_TICKS);
+        queueAllLevelSweeps(event.getServer(), TwisterMillReseatService.Trigger.AUTO_SERVER_STARTED);
     }
 
     public static void onPlayerLoggedIn(PlayerEvent.PlayerLoggedInEvent event) {
         if (event.getEntity() instanceof ServerPlayer player) {
-            queueAllLevelSweeps(player.getServer(), TwisterMillReseatService.Trigger.AUTO_PLAYER_JOIN, LEVEL_SWEEP_DELAY_TICKS);
+            queueAllLevelSweeps(player.getServer(), TwisterMillReseatService.Trigger.AUTO_PLAYER_JOIN);
         }
     }
 
@@ -112,26 +112,24 @@ public final class TwisterMillAutoReseatEvents {
 
     private static void queueAllLevelSweeps(
             MinecraftServer server,
-            TwisterMillReseatService.Trigger trigger,
-            int delayTicks
+            TwisterMillReseatService.Trigger trigger
     ) {
         if (!TwisterMillReseatService.anyAutoReseatOnLoadEnabled()) {
             return;
         }
         for (ServerLevel level : server.getAllLevels()) {
-            queueLevelSweep(level, trigger, delayTicks);
+            queueLevelSweep(level, trigger);
         }
     }
 
     private static void queueLevelSweep(
             ServerLevel level,
-            TwisterMillReseatService.Trigger trigger,
-            int delayTicks
+            TwisterMillReseatService.Trigger trigger
     ) {
         if (!TwisterMillReseatService.anyAutoReseatOnLoadEnabled()) {
             return;
         }
-        int dueTick = level.getServer().getTickCount() + delayTicks;
+        int dueTick = level.getServer().getTickCount() + LEVEL_SWEEP_DELAY_TICKS;
         WorkKey key = WorkKey.level(level.dimension(), trigger);
         if (QUEUED.add(key)) {
             QUEUE.add(QueuedWork.levelSweep(key, dueTick, trigger));

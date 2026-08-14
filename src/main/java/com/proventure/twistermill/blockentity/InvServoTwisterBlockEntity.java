@@ -2,11 +2,13 @@ package com.proventure.twistermill.blockentity;
 
 import com.mojang.logging.LogUtils;
 import com.proventure.twistermill.block.custom.InvServoTwisterBlock;
+import com.proventure.twistermill.binaryredstone.BinarySignalFrameReceiver;
 import com.proventure.twistermill.binaryredstone.BinarySignalProtocol;
 import com.proventure.twistermill.config.TwisterMillConfig;
 import com.proventure.twistermill.diagnostics.TwisterMillDiagnostics;
 import com.proventure.twistermill.diagnostics.TwisterMillReseatService;
 import com.proventure.twistermill.util.ServoRedstoneMappings;
+import com.proventure.twistermill.util.ServoTwoAxisRotationMath;
 import com.simibubi.create.AllSoundEvents;
 import com.simibubi.create.content.contraptions.AssemblyException;
 import com.simibubi.create.content.contraptions.DirectionalExtenderScrollOptionSlot;
@@ -43,6 +45,7 @@ import net.minecraft.util.Mth;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import org.jetbrains.annotations.Nullable;
@@ -59,16 +62,25 @@ public class InvServoTwisterBlockEntity extends KineticBlockEntity implements ID
     private static final float ANGLE_EPSILON = 0.01F;
     private static final float NORMAL_MOTION_EPSILON = 0.0001F;
     private static final float SOUTH_CONTINUOUS_DEGREES_PER_TICK = 1.0F;
-    private static final double SERVO_STIFFNESS_PER_INERTIA = 1600.0;
-    private static final double SERVO_DAMPING_PER_INERTIA = 40.0;
-    private static final double FREE_BEARING_DAMPING_PER_INERTIA = 0.03D;
-    private static final double MIN_EFFECTIVE_INERTIA = 10.0;
     private static final float MIN_DISASSEMBLE_DEGREES_PER_TICK = 0.25F;
     private static final float DISASSEMBLE_RETURN_DECEL_START_DEGREES = 30.0F;
     private static final float DISASSEMBLE_RETURN_SLOW_ZONE_DEGREES = 5.0F;
     private static final float DISASSEMBLE_ZERO_SNAP_DEGREES = 0.25F;
     private static final int DISASSEMBLE_ZERO_HOLD_TICKS = 2;
+    private static final int MODE3_DISASSEMBLY_CONFIRMATION_TICKS = 20;
+    private static final int LATER_GUI_DISASSEMBLY_CONFIRMATION_TICKS = 3;
+    private static final float LATER_GUI_DISASSEMBLY_PHYSICAL_ZERO_LIMIT_DEGREES = 0.49F;
+    private static final float LATER_GUI_DISASSEMBLY_MAX_ANGLE_DELTA_DEGREES_PER_TICK = 0.5F;
+    private static final float ROTATION_PROFILE_NEUTRAL_SCALAR_TOLERANCE_DEGREES = 0.25F;
+    private static final float ROTATION_PROFILE_NEUTRAL_PHYSICAL_TOLERANCE_DEGREES = 0.25F;
+    private static final int ROTATION_PROFILE_NEUTRAL_STABLE_TICKS = 2;
     private static final float MODE3_EXIT_RETURN_DEGREES_PER_TICK = 2.0F;
+    private static final float MODE3_DISASSEMBLY_MIN_TARGET_STEP_DEGREES = 0.5F;
+    private static final float MODE3_DISASSEMBLY_MAX_TARGET_SPEED_DEGREES_PER_TICK = 4.0F;
+    private static final float MODE3_DISASSEMBLY_TARGET_ACCELERATION_DEGREES_PER_TICK_SQUARED =
+            0.5F;
+    private static final float MODE3_DISASSEMBLY_TARGET_DECELERATION_DEGREES_PER_TICK_SQUARED =
+            0.5F;
     private static final float MODE6_MIN_DEGREES_PER_TICK = 0.05F;
     private static final double MODE6_TWO_PI = Math.PI * 2.0D;
     private static final int MODE_3_STEP = 7;
@@ -78,10 +90,9 @@ public class InvServoTwisterBlockEntity extends KineticBlockEntity implements ID
     private static final int MODE_FINE_CENTERED = 11;
     private static final int MODE_FLIP = 12;
     private static final int MODE_INVERTED_FLIP = 13;
-    private static final int MODE_OSCILLATION_0_ANGLE = 14;
-    private static final int MODE_CENTERED_OSCILLATION = 15;
+    private static final int MODE_TWO_AXIS_TILT_INVERTED = 14;
+    private static final int MODE_TWO_AXIS_TILT = 15;
     private static final float MAX_EXTENDED_MODE_DEGREES = 540.0F;
-    private static final float MODE15_MAX_HALF_RANGE_DEGREES = 270.0F;
     private static final long WIND_ROTO_RUNTIME_SYNC_TICKS = 20L;
     private static final int BINARY_HALF_PHASE_TICKS = BinarySignalProtocol.FRAME_HALF_PHASE_TICKS;
     private static final int BINARY_START_MIN_TICKS = BinarySignalProtocol.FRAME_START_MIN_TICKS;
@@ -104,7 +115,15 @@ public class InvServoTwisterBlockEntity extends KineticBlockEntity implements ID
     private static final String TAG_BOUND_TO_WIND_ROTO = "BoundToWindRoto";
     private static final String TAG_SABLE_ACTIVE = "SableActive";
     private static final String TAG_SABLE_SUBLEVEL_ID = "SableSubLevelId";
+    private static final String SABLE_ROTATION_PROFILE_TAG = "SableRotationProfile";
     private static final String TAG_PENDING_DISASSEMBLE_AFTER_ZERO = "PendingDisassembleAfterZero";
+    private static final String TAG_PENDING_MODE3_DISASSEMBLY_RETURN =
+            "PendingMode3DisassemblyReturn";
+    private static final String TAG_PENDING_EXTENDED_BINARY_DISASSEMBLY_RETURN =
+            "PendingExtendedBinaryDisassemblyReturn";
+    private static final String TAG_PENDING_LATER_GUI_ROTATION_PROFILE =
+            "PendingLaterGuiRotationProfile";
+    private static final String TAG_PHYSICAL_BEARING_MEASURED_ANGLE = "PhysicalBearingMeasuredAngle";
     private static final String TAG_BOUND_WIND_ROTO_DIMENSION = "BoundWindRotoDimension";
     private static final String TAG_BOUND_WIND_ROTO_POS = "BoundWindRotoPos";
     private static final String TAG_BOUND_SERVO_ORIGINAL_POS = "BoundServoOriginalPos";
@@ -115,9 +134,19 @@ public class InvServoTwisterBlockEntity extends KineticBlockEntity implements ID
     private static final String TAG_INTERNAL_REDSTONE_LINK_ACTIVE = "InternalRedstoneLinkActive";
     private static final String TAG_INTERNAL_REDSTONE_LINK_RECEIVED_SIGNAL = "InternalRedstoneLinkReceivedSignal";
     private static final String TAG_SPEED_ZERO_MOVEMENT_ENABLED = "SpeedZeroMovementEnabled";
+    private static final String TAG_SECOND_ANGLE = "SecondAngle";
+    private static final String TAG_SECOND_PREV_ANGLE = "SecondPrevAngle";
+    private static final String TAG_SECOND_TARGET_ANGLE = "SecondTargetAngle";
+    private static final String TAG_SECONDARY_BINARY_ANGLE_SIGNAL = "SecondaryBinaryAngleSignal";
+    private static final String TAG_SECONDARY_HAS_VALID_BINARY_FRAME = "SecondaryHasValidBinaryFrame";
+    private static final String TAG_SECONDARY_INTERNAL_REDSTONE_LINK_ACTIVE =
+            "SecondaryInternalRedstoneLinkActive";
+    private static final String TAG_SECONDARY_INTERNAL_REDSTONE_LINK_RECEIVED_SIGNAL =
+            "SecondaryInternalRedstoneLinkReceivedSignal";
 
     protected ScrollOptionBehaviour<MaxAngleOption> maxAngleBehaviour;
     private LinkBehaviour internalRedstoneLink;
+    private SecondaryServoRedstoneLinkBehaviour secondaryInternalRedstoneLink;
     @Nullable
     protected AssemblyException lastException;
 
@@ -126,6 +155,9 @@ public class InvServoTwisterBlockEntity extends KineticBlockEntity implements ID
     private boolean assembleNextTick = false;
     private float angle = 0.0F;
     private float prevAngle = 0.0F;
+    private float secondAngle = 0.0F;
+    private float secondPrevAngle = 0.0F;
+    private float secondTargetAngle = 0.0F;
 
     private boolean lastVisualRunning = false;
     private boolean needsStateRefresh = true;
@@ -154,11 +186,43 @@ public class InvServoTwisterBlockEntity extends KineticBlockEntity implements ID
     private boolean hasValidBinaryFrame = false;
     private boolean internalRedstoneLinkActive = false;
     private int internalRedstoneLinkReceivedSignal = 0;
+    private boolean secondaryInternalRedstoneLinkActive = false;
+    private int secondaryInternalRedstoneLinkReceivedSignal = 0;
+    private int secondaryBinaryAngleSignal = 0;
+    private boolean secondaryHasValidBinaryFrame = false;
+    private final BinarySignalFrameReceiver secondaryBinaryReceiver = new BinarySignalFrameReceiver();
+    private transient boolean previousSecondaryInternalRedstoneLinkEligibility = false;
     private boolean pendingDisassembleAfterZero = false;
     private int pendingDisassembleZeroHoldTicks = 0;
+    private boolean pendingMode3DisassemblyReturn = false;
+    private boolean pendingExtendedBinaryDisassemblyReturn = false;
+    @Nullable
+    private SableInteractiveContraptionBackend.RotationProfile pendingLaterGuiRotationProfile = null;
+    @Nullable
+    private transient Float laterGuiPreviousPhysicalAngle = null;
+    private transient long laterGuiPreviousPhysicalSampleGameTime = Long.MIN_VALUE;
+    private transient int laterGuiDisassemblyConfirmationTicks = 0;
+    private transient boolean laterGuiAssemblyCompletedThisTick = false;
+    private transient boolean mode3DisassemblyReturnInitialized = false;
+    private transient float mode3DisassemblyReturnCommandAngle = 0.0F;
+    private transient float mode3DisassemblyReturnTargetSpeed = 0.0F;
+    private transient int mode3DisassemblyConfirmationTicks = 0;
+    @Nullable
+    private transient SableInteractiveContraptionBackend.Mode3RelativePoseProbe
+            mode3PreviousDisassemblyPoseProbe = null;
+    private transient float physicalBearingMeasuredAngle = 0.0F;
+    private transient boolean physicalBearingAngleSamplePublishedThisTick = false;
     private boolean speedZeroMovementEnabled = true;
     private boolean mode3ExitReturnActive = false;
     private double mode6OscillationPhase = 0.0D;
+    private SableInteractiveContraptionBackend.RotationProfile activeRotationProfile =
+            SableInteractiveContraptionBackend.RotationProfile.FACING_AXIS;
+    private transient boolean rotationProfileTagPresent = false;
+    private transient boolean rotationProfileTransitionActive = false;
+    private transient SableInteractiveContraptionBackend.RotationProfile rotationProfileTransitionTarget =
+            SableInteractiveContraptionBackend.RotationProfile.FACING_AXIS;
+    private transient int rotationProfileNeutralStableTicks = 0;
+    private transient int pitchClearanceNeutralStableTicks = 0;
     private transient boolean diagnosticFirstRefreshLogged = false;
     private transient boolean diagnosticRefreshFailureLogged = false;
 
@@ -341,12 +405,12 @@ public class InvServoTwisterBlockEntity extends KineticBlockEntity implements ID
 
     @SuppressWarnings("unused")
     public enum MaxAngleOption implements INamedIconOptions {
-        DEG_60(60, "twistermill.max_angle.option.60", AllIcons.I_ROTATE_NEVER_PLACE),
-        DEG_120(120, "twistermill.max_angle.option.1.20", AllIcons.I_ROTATE_PLACE),
-        DEG_240(240, "twistermill.max_angle.option.2.40", AllIcons.I_ROTATE_PLACE_RETURNED),
-        DEG_60_LINK(60, "twistermill.max_angle.option.60_link", AllIcons.I_ROTATE_NEVER_PLACE, true),
-        DEG_120_LINK(120, "twistermill.max_angle.option.1.20_link", AllIcons.I_ROTATE_PLACE, true),
-        DEG_240_LINK(240, "twistermill.max_angle.option.2.40_link", AllIcons.I_ROTATE_PLACE_RETURNED, true);
+        DEG_60(60, "twistermill.servo.max_angle.option.1", AllIcons.I_ROTATE_NEVER_PLACE),
+        DEG_120(120, "twistermill.servo.max_angle.option.2", AllIcons.I_ROTATE_PLACE),
+        DEG_240(240, "twistermill.servo.max_angle.option.3", AllIcons.I_ROTATE_PLACE_RETURNED),
+        DEG_60_LINK(60, "twistermill.servo.max_angle.option.4", AllIcons.I_ROTATE_NEVER_PLACE, true),
+        DEG_120_LINK(120, "twistermill.servo.max_angle.option.5", AllIcons.I_ROTATE_PLACE, true),
+        DEG_240_LINK(240, "twistermill.servo.max_angle.option.6", AllIcons.I_ROTATE_PLACE_RETURNED, true);
 
         private final int maxDegrees;
         private final String translationKey;
@@ -395,14 +459,82 @@ public class InvServoTwisterBlockEntity extends KineticBlockEntity implements ID
         return maxAngleBehaviour != null && maxAngleBehaviour.get().isInternalRedstoneLink();
     }
 
+    private static boolean isExtendedBinaryDisassemblyCode(int modeSignal) {
+        return modeSignal >= 1 && modeSignal <= 15 && modeSignal != 3;
+    }
+
+    private boolean isExtendedBinaryDisassemblyRequest() {
+        return isInternalRedstoneLinkMode()
+                && isExtendedBinaryDisassemblyCode(lastOppositeTopSignal);
+    }
+
+    private boolean isSafeBinaryDisassemblyReturnActive() {
+        return pendingMode3DisassemblyReturn || pendingExtendedBinaryDisassemblyReturn;
+    }
+
+    private boolean isLaterGuiAssemblyOption() {
+        if (maxAngleBehaviour == null)
+            return false;
+
+        MaxAngleOption option = maxAngleBehaviour.get();
+        return option == MaxAngleOption.DEG_60_LINK
+                || option == MaxAngleOption.DEG_120_LINK
+                || option == MaxAngleOption.DEG_240_LINK;
+    }
+
     @Override
     public boolean isInternalRedstoneLinkReceiverActive() {
         return isInternalRedstoneLinkMode() && internalRedstoneLinkActive;
     }
 
+    @Override
+    public boolean isSecondaryInternalRedstoneLinkEligible() {
+        return isInternalRedstoneLinkMode()
+                && hasValidBinaryFrame
+                && isTwoAxisTiltModeSignal(binaryModeSignal);
+    }
+
+    @Override
+    public boolean isSecondaryInternalRedstoneLinkReceiverActive() {
+        return isSecondaryInternalRedstoneLinkEligible() && secondaryInternalRedstoneLinkActive;
+    }
+
+    private boolean requiresTwoAxisLoadedPoseRecovery() {
+        return running
+                && !pendingDisassembleAfterZero
+                && isInternalRedstoneLinkMode()
+                && hasValidBinaryFrame
+                && isTwoAxisTiltModeSignal(binaryModeSignal)
+                && activeRotationProfile
+                == SableInteractiveContraptionBackend.RotationProfile.TWO_AXIS_TILT
+                && sableBackend.isActive()
+                && sableBackend.getActiveSubLevelId() != null
+                && sableBackend.requiresConstraintAttachment(
+                        SableInteractiveContraptionBackend.RotationProfile.TWO_AXIS_TILT);
+    }
+
     @Nullable
     private MaxAngleOption getCurrentMaxAngleOption() {
         return maxAngleBehaviour == null ? null : maxAngleBehaviour.get();
+    }
+
+    private float getDisassemblyReturnSpeedMultiplierForCurrentGuiMode() {
+        if (maxAngleBehaviour == null) {
+            return 1.0F;
+        }
+
+        int rawOptionValue = maxAngleBehaviour.getValue();
+        MaxAngleOption[] options = MaxAngleOption.values();
+        if (rawOptionValue < 0 || rawOptionValue >= options.length) {
+            return 1.0F;
+        }
+
+        return switch (options[rawOptionValue]) {
+            case DEG_60, DEG_120, DEG_240 ->
+                    TwisterMillConfig.getServoDisassemblyReturnSpeedMultiplierModes1To3();
+            case DEG_60_LINK, DEG_120_LINK, DEG_240_LINK ->
+                    TwisterMillConfig.getServoDisassemblyReturnSpeedMultiplierModes4To6();
+        };
     }
 
     private static boolean isBinaryInputTooltipActiveMode(@Nullable MaxAngleOption option) {
@@ -444,16 +576,17 @@ public class InvServoTwisterBlockEntity extends KineticBlockEntity implements ID
         return modeSignal == 6;
     }
 
+    private static boolean isTwoAxisTiltModeSignal(int modeSignal) {
+        return modeSignal == MODE_TWO_AXIS_TILT_INVERTED
+                || modeSignal == MODE_TWO_AXIS_TILT;
+    }
+
     private static boolean isExtendedTargetModeSignal(int modeSignal) {
         return modeSignal >= MODE_3_STEP && modeSignal <= MODE_INVERTED_FLIP;
     }
 
-    private static boolean isExtendedOscillationModeSignal(int modeSignal) {
-        return modeSignal == MODE_OSCILLATION_0_ANGLE || modeSignal == MODE_CENTERED_OSCILLATION;
-    }
-
     private static boolean isOscillationModeSignal(int modeSignal) {
-        return isMode6OscillationSignal(modeSignal) || isExtendedOscillationModeSignal(modeSignal);
+        return isMode6OscillationSignal(modeSignal);
     }
 
     private static boolean isUnboundedModeSignal(int modeSignal) {
@@ -468,8 +601,15 @@ public class InvServoTwisterBlockEntity extends KineticBlockEntity implements ID
         if (level == null || level.isClientSide)
             return;
 
+        if (isSafeBinaryDisassemblyReturnActive()) {
+            resetMode3DisassemblyConfirmation();
+        }
+        if (pendingExtendedBinaryDisassemblyReturn) {
+            rotationProfileNeutralStableTicks = 0;
+        }
+
         if (!isInternalRedstoneLinkMode()) {
-            disableInternalRedstoneLink(true);
+            disableInternalRedstoneLink();
         }
 
         updateControlSignalsFromInputs(false);
@@ -483,8 +623,69 @@ public class InvServoTwisterBlockEntity extends KineticBlockEntity implements ID
         updateVisualPowerState();
 
         boolean visualRunning =
-                running && (manualEnabled || lastEastSignal > 0 || lastOppositeTopSignal > 0 || Math.abs(angle) > ANGLE_EPSILON);
+                running && (manualEnabled || lastEastSignal > 0 || lastOppositeTopSignal > 0
+                || Math.abs(angle) > ANGLE_EPSILON || Math.abs(secondAngle) > ANGLE_EPSILON);
         updateVisualRunning(visualRunning);
+    }
+
+    private boolean isBinaryMode3PhysicalAngleTooltipActive() {
+        return isInternalRedstoneLinkMode()
+                && (lastOppositeTopSignal == 3 || pendingMode3DisassemblyReturn);
+    }
+
+    private boolean isPhysicalBearingAngleTooltipActive() {
+        return pendingDisassembleAfterZero || isBinaryMode3PhysicalAngleTooltipActive();
+    }
+
+    private void updatePhysicalBearingMeasuredAngleForClient(ServerLevel serverLevel) {
+        float visibleAngle = 0.0F;
+        if (isPhysicalBearingAngleTooltipActive()) {
+            if (pendingDisassembleAfterZero && physicalBearingAngleSamplePublishedThisTick) {
+                return;
+            }
+            Float measuredAngle;
+            if (pendingDisassembleAfterZero) {
+                measuredAngle = sableBackend.measureBearingAxisRelativeAngleDegrees(
+                        serverLevel,
+                        worldPosition,
+                        getFacingDirection()
+                );
+            } else {
+                measuredAngle = sableBackend.measureFacingAxisRelativeAngleDegrees(
+                        serverLevel,
+                        worldPosition,
+                        getFacingDirection()
+                );
+            }
+            visibleAngle = normalizePhysicalBearingMeasuredAngle(measuredAngle);
+        }
+
+        setPhysicalBearingMeasuredAngleForClient(visibleAngle);
+    }
+
+    private void publishPhysicalBearingMeasuredAngleForClient(@Nullable Float measuredAngle) {
+        physicalBearingAngleSamplePublishedThisTick = true;
+        setPhysicalBearingMeasuredAngleForClient(normalizePhysicalBearingMeasuredAngle(measuredAngle));
+    }
+
+    private void setPhysicalBearingMeasuredAngleForClient(float visibleAngle) {
+        if (Float.compare(physicalBearingMeasuredAngle, visibleAngle) == 0) {
+            return;
+        }
+
+        physicalBearingMeasuredAngle = visibleAngle;
+        if (canSendData()) {
+            sendData();
+        }
+    }
+
+    private static float normalizePhysicalBearingMeasuredAngle(@Nullable Float measuredAngle) {
+        if (measuredAngle == null || !Float.isFinite(measuredAngle)) {
+            return 0.0F;
+        }
+
+        float wrappedAngle = Mth.wrapDegrees(measuredAngle);
+        return Float.isFinite(wrappedAngle) ? Math.abs(wrappedAngle) : 0.0F;
     }
 
     @SuppressWarnings("unused")
@@ -492,15 +693,76 @@ public class InvServoTwisterBlockEntity extends KineticBlockEntity implements ID
         if (level == null || level.isClientSide)
             return;
 
-        executeManualToggle();
+        if (isLaterGuiAssemblyOption()) {
+            executeLaterGuiToggle();
+        } else {
+            executeManualToggle();
+        }
     }
 
-    private void executeManualToggle() {
+    private void executeLaterGuiToggle() {
+        if (running && pendingDisassembleAfterZero)
+            return;
+
+        if (running && (activeRotationProfile
+                != SableInteractiveContraptionBackend.RotationProfile.FACING_AXIS
+                || lastOppositeTopSignal == 3
+                || (isExtendedBinaryDisassemblyRequest() && sableBackend.isActive()))) {
+            clearLaterGuiDisassemblyReturnState();
+            executeManualToggle();
+            return;
+        }
+
         if (running) {
             assembleNextTick = false;
             manualEnabled = false;
             pendingDisassembleAfterZero = true;
             pendingDisassembleZeroHoldTicks = 0;
+            clearMode3DisassemblyReturnState();
+            pendingLaterGuiRotationProfile = activeRotationProfile;
+            resetLaterGuiDisassemblyRuntimeState();
+            targetAngle = 0.0F;
+            stopMotion();
+            setChanged();
+            if (canSendData()) sendData();
+            return;
+        }
+
+        if (assembleNextTick) {
+            manualEnabled = false;
+            assembleNextTick = false;
+            stopMotion();
+            updateVisualRunning(false);
+            setChanged();
+            if (canSendData()) sendData();
+            return;
+        }
+
+        manualEnabled = true;
+        assembleNextTick = true;
+        setChanged();
+        if (canSendData()) sendData();
+    }
+
+    private void executeManualToggle() {
+        if (running) {
+            boolean mode3DisassemblyToggle = lastOppositeTopSignal == 3
+                    && activeRotationProfile
+                    == SableInteractiveContraptionBackend.RotationProfile.FACING_AXIS
+                    && sableBackend.isActive();
+            boolean extendedBinaryDisassemblyToggle = isExtendedBinaryDisassemblyRequest()
+                    && sableBackend.isActive();
+            assembleNextTick = false;
+            manualEnabled = false;
+            pendingDisassembleAfterZero = true;
+            pendingDisassembleZeroHoldTicks = 0;
+            if (mode3DisassemblyToggle) {
+                beginMode3DisassemblyReturn();
+            } else if (extendedBinaryDisassemblyToggle) {
+                beginExtendedBinaryDisassemblyReturn();
+            } else {
+                clearMode3DisassemblyReturnState();
+            }
             targetAngle = 0.0F;
             stopMotion();
             setChanged();
@@ -526,6 +788,59 @@ public class InvServoTwisterBlockEntity extends KineticBlockEntity implements ID
 
     private void stopMotion() {
         targetAngle = 0.0F;
+        secondTargetAngle = 0.0F;
+    }
+
+    private boolean isLaterGuiDisassemblyReturnActive() {
+        return pendingDisassembleAfterZero && pendingLaterGuiRotationProfile != null;
+    }
+
+    private void resetLaterGuiDisassemblyRuntimeState() {
+        laterGuiPreviousPhysicalAngle = null;
+        laterGuiPreviousPhysicalSampleGameTime = Long.MIN_VALUE;
+        laterGuiDisassemblyConfirmationTicks = 0;
+    }
+
+    private void clearLaterGuiDisassemblyReturnState() {
+        pendingLaterGuiRotationProfile = null;
+        resetLaterGuiDisassemblyRuntimeState();
+    }
+
+    private boolean tickLaterGuiPhysicalNeutralConfirmation(ServerLevel serverLevel) {
+        if (pendingLaterGuiRotationProfile
+                != SableInteractiveContraptionBackend.RotationProfile.FACING_AXIS) {
+            resetLaterGuiDisassemblyRuntimeState();
+            return false;
+        }
+
+        Float measuredAngle = sableBackend.measureCurrentMotorAngleDegrees(
+                serverLevel,
+                worldPosition,
+                getFacingDirection(),
+                pendingLaterGuiRotationProfile
+        );
+        if (measuredAngle == null || !Float.isFinite(measuredAngle)) {
+            resetLaterGuiDisassemblyRuntimeState();
+            return false;
+        }
+
+        long gameTime = serverLevel.getGameTime();
+        float currentAngle = Mth.wrapDegrees(measuredAngle);
+        boolean consecutive = laterGuiPreviousPhysicalAngle != null
+                && gameTime == laterGuiPreviousPhysicalSampleGameTime + 1L;
+        boolean safe = false;
+        if (consecutive) {
+            float angleDelta = Math.abs(Mth.wrapDegrees(currentAngle - laterGuiPreviousPhysicalAngle));
+            safe = Math.abs(currentAngle) < LATER_GUI_DISASSEMBLY_PHYSICAL_ZERO_LIMIT_DEGREES
+                    && angleDelta <= LATER_GUI_DISASSEMBLY_MAX_ANGLE_DELTA_DEGREES_PER_TICK;
+        }
+
+        laterGuiPreviousPhysicalAngle = currentAngle;
+        laterGuiPreviousPhysicalSampleGameTime = gameTime;
+        laterGuiDisassemblyConfirmationTicks = safe
+                ? laterGuiDisassemblyConfirmationTicks + 1
+                : 0;
+        return laterGuiDisassemblyConfirmationTicks >= LATER_GUI_DISASSEMBLY_CONFIRMATION_TICKS;
     }
 
     private int getSideSignal(Direction side) {
@@ -576,10 +891,12 @@ public class InvServoTwisterBlockEntity extends KineticBlockEntity implements ID
     }
 
     public boolean shouldHandleInternalRedstoneLinkWrench(Direction side) {
-        return isInternalRedstoneLinkMode()
-                && side == getInternalRedstoneLinkSide();
+        return isInternalRedstoneLinkMode() && side == getInternalRedstoneLinkSide()
+                || isSecondaryInternalRedstoneLinkEligible()
+                && side == getSecondaryInternalRedstoneLinkSide();
     }
 
+    @SuppressWarnings("UnusedReturnValue")
     public boolean tryToggleInternalRedstoneLinkReceiver(Direction side, @Nullable Player player) {
         if (!shouldHandleInternalRedstoneLinkWrench(side))
             return false;
@@ -587,21 +904,37 @@ public class InvServoTwisterBlockEntity extends KineticBlockEntity implements ID
         if (level == null || level.isClientSide)
             return true;
 
-        internalRedstoneLinkActive = !internalRedstoneLinkActive;
-        internalRedstoneLinkReceivedSignal = 0;
-
-        if (internalRedstoneLink != null) {
-            internalRedstoneLink.notifySignalChange();
+        boolean secondary = side == getSecondaryInternalRedstoneLinkSide()
+                && isSecondaryInternalRedstoneLinkEligible();
+        boolean receiverActive;
+        if (secondary) {
+            secondaryInternalRedstoneLinkActive = !secondaryInternalRedstoneLinkActive;
+            secondaryInternalRedstoneLinkReceivedSignal = 0;
+            secondaryBinaryReceiver.reset(false);
+            secondaryHasValidBinaryFrame = false;
+            secondaryBinaryAngleSignal = 0;
+            secondTargetAngle = 0.0F;
+            receiverActive = secondaryInternalRedstoneLinkActive;
+            if (secondaryInternalRedstoneLink != null) {
+                secondaryInternalRedstoneLink.notifySignalChange();
+            }
+        } else {
+            internalRedstoneLinkActive = !internalRedstoneLinkActive;
+            internalRedstoneLinkReceivedSignal = 0;
+            receiverActive = internalRedstoneLinkActive;
+            if (internalRedstoneLink != null) {
+                internalRedstoneLink.notifySignalChange();
+            }
         }
 
         updateVisualPowerState();
 
         if (player != null) {
             player.displayClientMessage(
-                    Component.translatable(internalRedstoneLinkActive
-                                    ? "twistermill.servo.redstone_link.receiver_active"
-                                    : "twistermill.servo.redstone_link.receiver_inactive")
-                            .withStyle(internalRedstoneLinkActive ? ChatFormatting.GREEN : ChatFormatting.RED),
+                    Component.translatable(receiverActive
+                                     ? "twistermill.servo.redstone_link.receiver_active"
+                                     : "twistermill.servo.redstone_link.receiver_inactive")
+                            .withStyle(receiverActive ? ChatFormatting.GREEN : ChatFormatting.RED),
                     true
             );
         }
@@ -628,11 +961,28 @@ public class InvServoTwisterBlockEntity extends KineticBlockEntity implements ID
         if (canSendData()) sendData();
     }
 
-    private void disableInternalRedstoneLink(boolean clearFrequencies) {
+    private void setSecondaryInternalRedstoneLinkSignal(int power) {
+        if (level == null || level.isClientSide
+                || !isSecondaryInternalRedstoneLinkEligible()
+                || !secondaryInternalRedstoneLinkActive) {
+            return;
+        }
+
+        int clampedPower = Mth.clamp(power, 0, 15);
+        if (secondaryInternalRedstoneLinkReceivedSignal == clampedPower) {
+            return;
+        }
+        secondaryInternalRedstoneLinkReceivedSignal = clampedPower;
+        updateVisualPowerState();
+        setChanged();
+        if (canSendData()) sendData();
+    }
+
+    private void disableInternalRedstoneLink() {
         internalRedstoneLinkActive = false;
         internalRedstoneLinkReceivedSignal = 0;
 
-        if (clearFrequencies && internalRedstoneLink != null) {
+        if (internalRedstoneLink != null) {
             internalRedstoneLink.setFrequency(true, ItemStack.EMPTY);
             internalRedstoneLink.setFrequency(false, ItemStack.EMPTY);
         }
@@ -666,6 +1016,7 @@ public class InvServoTwisterBlockEntity extends KineticBlockEntity implements ID
             resetBinaryReceiver(oppositeHigh);
             lastOppositeTopSignal = getOppositeTopInputLocked() ? 0 : rawOppositeTopSignal;
             targetAngle = pendingDisassembleAfterZero ? 0.0F : getTargetAngleForSignal(lastEastSignal);
+            updateSecondaryBinaryInput(advanceBinaryReceiver);
             return;
         }
 
@@ -675,6 +1026,7 @@ public class InvServoTwisterBlockEntity extends KineticBlockEntity implements ID
             clearBinaryControlState();
             lastOppositeTopSignal = 0;
             targetAngle = pendingDisassembleAfterZero ? 0.0F : angle;
+            updateSecondaryBinaryInput(advanceBinaryReceiver);
             return;
         }
 
@@ -682,9 +1034,13 @@ public class InvServoTwisterBlockEntity extends KineticBlockEntity implements ID
         if (advanceBinaryReceiver) {
             controlMarkerTriggered = tickControlMarkerReceiver(oppositeHigh);
             if (controlMarkerTriggered) {
-                executeManualToggle();
+                if (isLaterGuiAssemblyOption()) {
+                    executeLaterGuiToggle();
+                } else {
+                    executeManualToggle();
+                }
                 resetBinaryReceiver(oppositeHigh);
-                clearBinaryControlState();
+                secondaryBinaryReceiver.reset(secondaryInternalRedstoneLinkReceivedSignal > 0);
             } else {
                 tickBinaryReceiver(oppositeHigh);
             }
@@ -694,8 +1050,12 @@ public class InvServoTwisterBlockEntity extends KineticBlockEntity implements ID
         }
 
         if (controlMarkerTriggered) {
-            lastOppositeTopSignal = 0;
-            targetAngle = pendingDisassembleAfterZero ? 0.0F : angle;
+            int resolvedBinaryMode = getOppositeTopInputLocked() ? 0 : binaryModeSignal;
+            lastOppositeTopSignal = resolvedBinaryMode;
+            targetAngle = pendingDisassembleAfterZero
+                    ? 0.0F
+                    : getBinaryTargetAngleForMode(resolvedBinaryMode, binaryAngleSignal);
+            updateSecondaryBinaryInput(false);
             return;
         }
 
@@ -704,6 +1064,61 @@ public class InvServoTwisterBlockEntity extends KineticBlockEntity implements ID
         targetAngle = pendingDisassembleAfterZero
                 ? 0.0F
                 : getBinaryTargetAngleForMode(resolvedBinaryMode, binaryAngleSignal);
+        updateSecondaryBinaryInput(advanceBinaryReceiver);
+    }
+
+    private void updateSecondaryBinaryInput(boolean advanceReceiver) {
+        boolean eligible = isSecondaryInternalRedstoneLinkEligible();
+        synchronizeSecondaryInternalRedstoneLinkEligibility(eligible);
+        boolean inputHigh = eligible
+                && secondaryInternalRedstoneLinkActive
+                && secondaryInternalRedstoneLinkReceivedSignal > 0;
+        if (!eligible) {
+            secondaryInternalRedstoneLinkReceivedSignal = 0;
+            //noinspection ConstantValue
+            secondaryBinaryReceiver.reset(inputHigh);
+            secondaryHasValidBinaryFrame = false;
+            secondaryBinaryAngleSignal = 0;
+            secondTargetAngle = 0.0F;
+            return;
+        }
+
+        boolean secondaryStateChanged = false;
+        if (advanceReceiver) {
+            int frame = secondaryBinaryReceiver.tick(inputHigh);
+            if (frame != BinarySignalFrameReceiver.NO_FRAME) {
+                secondaryBinaryAngleSignal = frame & 0xF;
+                secondaryHasValidBinaryFrame = true;
+                secondaryStateChanged = true;
+            }
+        } else {
+            secondaryBinaryReceiver.synchronizeInput(inputHigh);
+        }
+
+        float resolvedSecondTargetAngle = secondaryHasValidBinaryFrame && !pendingDisassembleAfterZero
+                ? computeTwoAxisTiltTarget(binaryModeSignal, secondaryBinaryAngleSignal)
+                : 0.0F;
+        if (Math.abs(resolvedSecondTargetAngle - secondTargetAngle) > ANGLE_EPSILON) {
+            secondTargetAngle = resolvedSecondTargetAngle;
+            secondaryStateChanged = true;
+        }
+
+        if (secondaryStateChanged) {
+            setChanged();
+            if (canSendData()) sendData();
+        }
+    }
+
+    private void synchronizeSecondaryInternalRedstoneLinkEligibility(boolean eligible) {
+        if (previousSecondaryInternalRedstoneLinkEligibility == eligible) {
+            return;
+        }
+        previousSecondaryInternalRedstoneLinkEligibility = eligible;
+        if (secondaryInternalRedstoneLink != null) {
+            secondaryInternalRedstoneLink.notifySignalChange();
+        }
+        setChanged();
+        if (canSendData()) sendData();
     }
 
     private void clearBinaryControlState() {
@@ -909,6 +1324,9 @@ public class InvServoTwisterBlockEntity extends KineticBlockEntity implements ID
     }
 
     private float getTargetAngleForSignal(int redstonePower) {
+        if (isTwoAxisTiltModeSignal(lastOppositeTopSignal)) {
+            return computeTwoAxisTiltTarget(lastOppositeTopSignal, redstonePower);
+        }
         if (isExtendedTargetModeSignal(lastOppositeTopSignal)) {
             return computeExtendedTargetAngle(lastOppositeTopSignal, redstonePower);
         }
@@ -917,6 +1335,9 @@ public class InvServoTwisterBlockEntity extends KineticBlockEntity implements ID
     }
 
     private float getBinaryTargetAngleForMode(int modeSignal, int angleSignal) {
+        if (isTwoAxisTiltModeSignal(modeSignal)) {
+            return computeTwoAxisTiltTarget(modeSignal, angleSignal);
+        }
         if (isExtendedTargetModeSignal(modeSignal)) {
             return computeExtendedTargetAngle(modeSignal, angleSignal);
         }
@@ -928,6 +1349,11 @@ public class InvServoTwisterBlockEntity extends KineticBlockEntity implements ID
             return magnitude;
         }
         return angle;
+    }
+
+    private static float computeTwoAxisTiltTarget(int modeSignal, int angleSignal) {
+        float magnitude = ServoTwoAxisRotationMath.magnitudeFromSignal(angleSignal);
+        return modeSignal == MODE_TWO_AXIS_TILT ? magnitude : -magnitude;
     }
 
     private float getDegreesPerTickForSignal(int redstonePower) {
@@ -951,11 +1377,10 @@ public class InvServoTwisterBlockEntity extends KineticBlockEntity implements ID
                 }
                 yield clampedAngle <= 10 ? 120.0F : 240.0F;
             }
-            case MODE_ABSOLUTE_0_540 -> clampedAngle * 36.0F;
+            case MODE_ABSOLUTE_0_540, MODE_FLIP -> clampedAngle * 36.0F;
             case MODE_CENTERED -> (clampedAngle - 8) * 36.0F;
             case MODE_FINE_0_180 -> clampedAngle * 12.0F;
             case MODE_FINE_CENTERED -> (clampedAngle - 8) * 12.0F;
-            case MODE_FLIP -> clampedAngle * 36.0F;
             case MODE_INVERTED_FLIP -> -(clampedAngle * 36.0F);
             default -> -angle;
         };
@@ -968,25 +1393,6 @@ public class InvServoTwisterBlockEntity extends KineticBlockEntity implements ID
         return -computePositiveOscillationTarget(amplitude, amplitude, speedSignal);
     }
 
-    private float computeExtendedOscillationTarget(int modeSignal, boolean directInputPriority) {
-        int angleSignal = directInputPriority ? lastEastSignal : binaryAngleSignal;
-        int speedSignal = directInputPriority ? lastWestSignal : binarySpeedSignal;
-        int clampedAngle = ServoRedstoneMappings.clampSignal(angleSignal);
-        if (clampedAngle <= 0) {
-            return 0.0F;
-        }
-
-        if (modeSignal == MODE_OSCILLATION_0_ANGLE) {
-            float amplitude = Mth.clamp(clampedAngle * 36.0F, 0.0F, MAX_EXTENDED_MODE_DEGREES);
-            return -computePositiveOscillationTarget(amplitude, amplitude, speedSignal);
-        }
-        if (modeSignal == MODE_CENTERED_OSCILLATION) {
-            float halfRange = Mth.clamp(clampedAngle * 18.0F, 0.0F, MODE15_MAX_HALF_RANGE_DEGREES);
-            return -computeCenteredOscillationTarget(halfRange, halfRange * 2.0F, speedSignal);
-        }
-        return angle;
-    }
-
     private float computePositiveOscillationTarget(float amplitude, float spanDegrees, int speedSignal) {
         if (amplitude <= 0.0F || spanDegrees <= 0.0F) {
             return 0.0F;
@@ -997,17 +1403,6 @@ public class InvServoTwisterBlockEntity extends KineticBlockEntity implements ID
 
         double normalized = (1.0D - Math.cos(mode6OscillationPhase)) * 0.5D;
         return Mth.clamp((float) (normalized * amplitude), 0.0F, MAX_EXTENDED_MODE_DEGREES);
-    }
-
-    private float computeCenteredOscillationTarget(float halfRange, float spanDegrees, int speedSignal) {
-        if (halfRange <= 0.0F || spanDegrees <= 0.0F) {
-            return 0.0F;
-        }
-        if (!advanceOscillationPhase(spanDegrees, speedSignal)) {
-            return -angle;
-        }
-
-        return clampServoTargetDegrees((float) (Math.sin(mode6OscillationPhase) * halfRange));
     }
 
     private boolean advanceOscillationPhase(float spanDegrees, int speedSignal) {
@@ -1038,7 +1433,32 @@ public class InvServoTwisterBlockEntity extends KineticBlockEntity implements ID
         return current + Math.signum(diff) * maxStep;
     }
 
-    private static float computeDisassembleReturnStepDegrees(float currentAngle, float requestedStep) {
+    private boolean approachTwoAxisTargets(float axis1Target, float axis2Target, float maxStep) {
+        if (!(maxStep > 0.0F) || !Float.isFinite(maxStep)) {
+            return false;
+        }
+        float delta1 = axis1Target - angle;
+        float delta2 = axis2Target - secondAngle;
+        double distance = Math.hypot(delta1, delta2);
+        if (!(distance > NORMAL_MOTION_EPSILON) || !Double.isFinite(distance)) {
+            return false;
+        }
+        if (distance <= maxStep) {
+            angle = axis1Target;
+            secondAngle = axis2Target;
+        } else {
+            float scale = (float) (maxStep / distance);
+            angle += delta1 * scale;
+            secondAngle += delta2 * scale;
+        }
+        return true;
+    }
+
+    private static float computeDisassembleReturnStepDegrees(
+            float currentAngle,
+            float requestedStep,
+            float multiplier
+    ) {
         float remaining = Math.abs(currentAngle);
         if (remaining <= 0.0F) {
             return 0.0F;
@@ -1057,7 +1477,234 @@ public class InvServoTwisterBlockEntity extends KineticBlockEntity implements ID
                     + (normalStep - MIN_DISASSEMBLE_DEGREES_PER_TICK) * t;
         }
 
-        return Math.min(remaining, Math.max(MIN_DISASSEMBLE_DEGREES_PER_TICK, limitedStep));
+        float unscaledRate = Math.max(MIN_DISASSEMBLE_DEGREES_PER_TICK, limitedStep);
+        return scaleAndClampDisassemblyReturnRate(remaining, unscaledRate, multiplier);
+    }
+
+    private static float scaleAndClampDisassemblyReturnRate(
+            float remaining,
+            float unscaledRate,
+            float multiplier
+    ) {
+        float scaledRate = unscaledRate * multiplier;
+        return Math.min(remaining, scaledRate);
+    }
+
+    private static float computeMode3DisassemblyReturnTargetSpeed(
+            float remaining,
+            float previousSpeed
+    ) {
+        if (!Float.isFinite(remaining)
+                || !Float.isFinite(previousSpeed)
+                || remaining <= 0.0F) {
+            return 0.0F;
+        }
+
+        float brakingSpeed = (float) Math.sqrt(
+                MODE3_DISASSEMBLY_MIN_TARGET_STEP_DEGREES
+                        * MODE3_DISASSEMBLY_MIN_TARGET_STEP_DEGREES
+                        + 2.0F
+                        * MODE3_DISASSEMBLY_TARGET_DECELERATION_DEGREES_PER_TICK_SQUARED
+                        * remaining
+        );
+        float desiredSpeed = Math.min(
+                MODE3_DISASSEMBLY_MAX_TARGET_SPEED_DEGREES_PER_TICK,
+                brakingSpeed
+        );
+        float minimumNextSpeed = Math.max(
+                MODE3_DISASSEMBLY_MIN_TARGET_STEP_DEGREES,
+                previousSpeed
+                        - MODE3_DISASSEMBLY_TARGET_DECELERATION_DEGREES_PER_TICK_SQUARED
+        );
+        float maximumNextSpeed = Math.min(
+                MODE3_DISASSEMBLY_MAX_TARGET_SPEED_DEGREES_PER_TICK,
+                previousSpeed
+                        + MODE3_DISASSEMBLY_TARGET_ACCELERATION_DEGREES_PER_TICK_SQUARED
+        );
+        return Mth.clamp(desiredSpeed, minimumNextSpeed, maximumNextSpeed);
+    }
+
+    private void tickMode3DisassemblyReturn(
+            ServerLevel serverLevel,
+            boolean allowConfirmationThisTick
+    ) {
+        targetAngle = 0.0F;
+        secondTargetAngle = 0.0F;
+        pendingDisassembleZeroHoldTicks = 0;
+
+        if (!running
+                || !pendingDisassembleAfterZero
+                || !isSafeBinaryDisassemblyReturnActive()
+                || !sableBackend.isActive()
+                || activeRotationProfile
+                != SableInteractiveContraptionBackend.RotationProfile.FACING_AXIS) {
+            resetMode3DisassemblyConfirmation();
+            return;
+        }
+
+        Float physicalAngle = sableBackend.measureCurrentMotorAngleDegrees(
+                serverLevel,
+                worldPosition,
+                getFacingDirection(),
+                SableInteractiveContraptionBackend.RotationProfile.FACING_AXIS
+        );
+        publishPhysicalBearingMeasuredAngleForClient(physicalAngle);
+        if (physicalAngle == null || !Float.isFinite(physicalAngle)) {
+            resetMode3DisassemblyConfirmation();
+            return;
+        }
+
+        if (!mode3DisassemblyReturnInitialized) {
+            mode3DisassemblyReturnCommandAngle = physicalAngle;
+            mode3DisassemblyReturnTargetSpeed = 0.0F;
+            mode3DisassemblyReturnInitialized = true;
+            resetMode3DisassemblyConfirmation();
+        }
+
+        float remaining = Math.abs(mode3DisassemblyReturnCommandAngle);
+        if (remaining > 0.0F) {
+            mode3DisassemblyReturnTargetSpeed = computeMode3DisassemblyReturnTargetSpeed(
+                    remaining,
+                    mode3DisassemblyReturnTargetSpeed
+            );
+            float multiplier = getDisassemblyReturnSpeedMultiplierForCurrentGuiMode();
+            float step = scaleAndClampDisassemblyReturnRate(
+                    remaining,
+                    mode3DisassemblyReturnTargetSpeed,
+                    multiplier
+            );
+            mode3DisassemblyReturnCommandAngle = remaining <= step
+                    ? 0.0F
+                    : approachAngle(mode3DisassemblyReturnCommandAngle, 0.0F, step);
+        } else {
+            mode3DisassemblyReturnCommandAngle = 0.0F;
+            mode3DisassemblyReturnTargetSpeed = 0.0F;
+        }
+
+        SableInteractiveContraptionBackend.Mode3ReturnMotorCommand command =
+                sableBackend.applyMode3DisassemblyReturnMotor(
+                        serverLevel,
+                        worldPosition,
+                        getFacingDirection(),
+                        mode3DisassemblyReturnCommandAngle,
+                        TwisterMillConfig.getServoStiffnessPerInertia()
+                );
+        if (command == null) {
+            resetMode3DisassemblyConfirmation();
+            return;
+        }
+
+        SableInteractiveContraptionBackend.Mode3RelativePoseProbe currentProbe =
+                sableBackend.sampleMode3RelativePose(
+                        serverLevel,
+                        worldPosition,
+                        getFacingDirection(),
+                        command
+                );
+        if (currentProbe == null) {
+            resetMode3DisassemblyConfirmation();
+            return;
+        }
+        publishPhysicalBearingMeasuredAngleForClient(currentProbe.facingAxisAngleDegrees());
+
+        if (Float.floatToRawIntBits(mode3DisassemblyReturnCommandAngle)
+                != Float.floatToRawIntBits(0.0F)) {
+            resetMode3DisassemblyConfirmation(currentProbe);
+            return;
+        }
+
+        if (!allowConfirmationThisTick) {
+            resetMode3DisassemblyConfirmation(currentProbe);
+            return;
+        }
+
+        SableInteractiveContraptionBackend.Mode3PosePrecheck precheck =
+                sableBackend.precheckMode3DisassemblyPose(
+                        mode3PreviousDisassemblyPoseProbe,
+                        currentProbe
+                );
+        if (!precheck.eligible()) {
+            resetMode3DisassemblyConfirmation(currentProbe);
+            return;
+        }
+
+        SableInteractiveContraptionBackend.Mode3DisassemblySafety safety =
+                sableBackend.inspectMode3DisassemblySafety(
+                        serverLevel,
+                        worldPosition,
+                        getFacingDirection(),
+                        command,
+                        mode3PreviousDisassemblyPoseProbe,
+                        currentProbe,
+                        precheck
+                );
+        if (!safety.safe() || safety.currentProbe() == null) {
+            resetMode3DisassemblyConfirmation(safety.currentProbe());
+            return;
+        }
+
+        mode3DisassemblyConfirmationTicks = Math.min(
+                MODE3_DISASSEMBLY_CONFIRMATION_TICKS,
+                mode3DisassemblyConfirmationTicks + 1
+        );
+        if (mode3DisassemblyConfirmationTicks < MODE3_DISASSEMBLY_CONFIRMATION_TICKS) {
+            mode3PreviousDisassemblyPoseProbe = safety.currentProbe();
+            return;
+        }
+
+        SableInteractiveContraptionBackend.Mode3DisassemblySafety finalSafety =
+                sableBackend.inspectMode3DisassemblySafety(
+                        serverLevel,
+                        worldPosition,
+                        getFacingDirection(),
+                        command,
+                        mode3PreviousDisassemblyPoseProbe,
+                        safety.currentProbe(),
+                        precheck
+                );
+        if (!finalSafety.safe() || finalSafety.currentProbe() == null) {
+            resetMode3DisassemblyConfirmation(finalSafety.currentProbe());
+            return;
+        }
+
+        mode3PreviousDisassemblyPoseProbe = finalSafety.currentProbe();
+        disassemble();
+    }
+
+    private void beginMode3DisassemblyReturn() {
+        pendingMode3DisassemblyReturn = true;
+        pendingExtendedBinaryDisassemblyReturn = false;
+        resetMode3DisassemblyRuntimeState();
+    }
+
+    private void beginExtendedBinaryDisassemblyReturn() {
+        pendingMode3DisassemblyReturn = false;
+        pendingExtendedBinaryDisassemblyReturn = true;
+        resetMode3DisassemblyRuntimeState();
+    }
+
+    private void clearMode3DisassemblyReturnState() {
+        pendingMode3DisassemblyReturn = false;
+        pendingExtendedBinaryDisassemblyReturn = false;
+        resetMode3DisassemblyRuntimeState();
+    }
+
+    private void resetMode3DisassemblyRuntimeState() {
+        mode3DisassemblyReturnInitialized = false;
+        mode3DisassemblyReturnCommandAngle = 0.0F;
+        mode3DisassemblyReturnTargetSpeed = 0.0F;
+        resetMode3DisassemblyConfirmation();
+    }
+
+    private void resetMode3DisassemblyConfirmation() {
+        resetMode3DisassemblyConfirmation(null);
+    }
+
+    private void resetMode3DisassemblyConfirmation(
+            @Nullable SableInteractiveContraptionBackend.Mode3RelativePoseProbe baselineProbe
+    ) {
+        mode3DisassemblyConfirmationTicks = 0;
+        mode3PreviousDisassemblyPoseProbe = baselineProbe;
     }
 
     private int getContraptionBlockCount() {
@@ -1195,6 +1842,13 @@ public class InvServoTwisterBlockEntity extends KineticBlockEntity implements ID
                 this::setInternalRedstoneLinkSignal
         );
         behaviours.add(internalRedstoneLink);
+
+        secondaryInternalRedstoneLink = new SecondaryServoRedstoneLinkBehaviour(
+                this,
+                InternalServoRedstoneLinkSlots.makeSlots(true, true),
+                this::setSecondaryInternalRedstoneLinkSignal
+        );
+        behaviours.add(secondaryInternalRedstoneLink);
     }
 
     @Override
@@ -1205,9 +1859,12 @@ public class InvServoTwisterBlockEntity extends KineticBlockEntity implements ID
             return;
 
         prevAngle = angle;
+        secondPrevAngle = secondAngle;
 
         if (level.isClientSide)
             return;
+
+        physicalBearingAngleSamplePublishedThisTick = false;
 
         if (refreshSpeedZeroMovementConfigFromServer()) {
             setChanged();
@@ -1223,20 +1880,58 @@ public class InvServoTwisterBlockEntity extends KineticBlockEntity implements ID
             needsStateRefresh = false;
         }
 
+        boolean pitchClearanceReadyForRefresh = ensurePitchClearanceBeforeRefresh();
+
+        boolean sableConstraintRefreshPending = false;
         if (sableBackend.isActive()) {
-            boolean refreshed = level instanceof ServerLevel serverLevel
-                    && sableBackend.refresh(serverLevel, worldPosition, getFacingDirection());
-            if (refreshed) {
-                logSableLifecycleDiagnostics("refresh-success");
+            if (!pitchClearanceReadyForRefresh) {
+                sableConstraintRefreshPending = true;
             } else {
-                logSableLifecycleDiagnostics("refresh-failure");
-                running = false;
-                pendingDisassembleAfterZero = false;
-                pendingDisassembleZeroHoldTicks = 0;
-                mode3ExitReturnActive = false;
-                sableBackend.clearState();
-                setChanged();
-                if (canSendData()) sendData();
+                boolean refreshSucceeded;
+                boolean refreshRetryable;
+                if (level instanceof ServerLevel serverLevel && requiresTwoAxisLoadedPoseRecovery()) {
+                    SableInteractiveContraptionBackend.TwoAxisRecoveryRefreshResult recoveryResult =
+                            sableBackend.refreshTwoAxisFromLoadedPoseDetailed(
+                                    serverLevel,
+                                    worldPosition,
+                                    getFacingDirection(),
+                                    TwisterMillConfig.getServoStiffnessPerInertia(),
+                                    TwisterMillConfig.getServoDampingPerInertia(),
+                                    TwisterMillConfig.getServoMinEffectiveInertia(),
+                                    ROTATION_PROFILE_NEUTRAL_PHYSICAL_TOLERANCE_DEGREES
+                            );
+                    refreshSucceeded = recoveryResult.readyForControl();
+                    refreshRetryable = recoveryResult.retryable();
+                    if (refreshSucceeded && recoveryResult.initializedAngles() != null) {
+                        applyRecoveredTwoAxisPose(recoveryResult.initializedAngles());
+                    }
+                } else {
+                    SableInteractiveContraptionBackend.RefreshResult refreshResult =
+                            level instanceof ServerLevel serverLevel
+                                    ? sableBackend.refreshDetailed(serverLevel, worldPosition, getFacingDirection(),
+                                    activeRotationProfile)
+                                    : SableInteractiveContraptionBackend.RefreshResult.failed(
+                                    SableInteractiveContraptionBackend.RefreshFailureReason.CONSTRAINT_ATTACH_FAILED);
+                    refreshSucceeded = refreshResult.success();
+                    refreshRetryable = refreshResult.failureReason()
+                            == SableInteractiveContraptionBackend.RefreshFailureReason.CONSTRAINT_REATTACH_PENDING;
+                }
+                if (refreshSucceeded) {
+                    logSableLifecycleDiagnostics("refresh-success");
+                } else if (refreshRetryable) {
+                    sableConstraintRefreshPending = true;
+                    logSableLifecycleDiagnostics("refresh-reattach-pending");
+                } else {
+                    logSableLifecycleDiagnostics("refresh-failure");
+                    running = false;
+                    pendingDisassembleAfterZero = false;
+                    pendingDisassembleZeroHoldTicks = 0;
+                    clearMode3DisassemblyReturnState();
+                    mode3ExitReturnActive = false;
+                    sableBackend.clearState();
+                    setChanged();
+                    if (canSendData()) sendData();
+                }
             }
         }
 
@@ -1245,6 +1940,7 @@ public class InvServoTwisterBlockEntity extends KineticBlockEntity implements ID
             if (running) {
                 pendingDisassembleAfterZero = true;
                 pendingDisassembleZeroHoldTicks = 0;
+                clearMode3DisassemblyReturnState();
                 mode3ExitReturnActive = false;
                 targetAngle = 0.0F;
                 stopMotion();
@@ -1253,10 +1949,20 @@ public class InvServoTwisterBlockEntity extends KineticBlockEntity implements ID
             }
         }
 
+        SableInteractiveContraptionBackend.RotationProfile desiredRotationProfile =
+                activeRotationProfile;
+        boolean deferLaterGuiControl = laterGuiAssemblyCompletedThisTick;
+        laterGuiAssemblyCompletedThisTick = false;
+        if (!deferLaterGuiControl) {
         int previousModeSignal = lastOppositeTopSignal;
         updateControlSignalsFromInputs(true);
         updateVisualPowerState();
+        boolean safeBinaryDisassemblySignalChangedThisTick = isSafeBinaryDisassemblyReturnActive()
+                && previousModeSignal != lastOppositeTopSignal;
         boolean directInputPriority = hasDirectInputPriority(lastWestSignal, lastEastSignal);
+        desiredRotationProfile = getDesiredRotationProfile();
+        boolean pitchClearanceMotionReady =
+                ensurePitchClearanceBeforeMotion(desiredRotationProfile, sableConstraintRefreshPending);
         boolean freeBearingMode = lastOppositeTopSignal == 3;
         boolean worldLockedMode = isWorldLockedModeSignal(lastOppositeTopSignal);
         boolean oscillationMode = isOscillationModeSignal(lastOppositeTopSignal);
@@ -1265,6 +1971,7 @@ public class InvServoTwisterBlockEntity extends KineticBlockEntity implements ID
         }
         boolean unboundedExitToPositioningMode = isUnboundedModeSignal(previousModeSignal)
                 && isBoundedPositioningModeSignal(lastOppositeTopSignal)
+                && desiredRotationProfile == activeRotationProfile
                 && running
                 && !pendingDisassembleAfterZero;
 
@@ -1293,40 +2000,110 @@ public class InvServoTwisterBlockEntity extends KineticBlockEntity implements ID
         if (running) {
             boolean skipFinalSableApplyRotation = false;
 
-            if (pendingDisassembleAfterZero) {
-                float requestedStep = Math.max(
-                        getDegreesPerTickForSignal(lastWestSignal),
-                        MIN_DISASSEMBLE_DEGREES_PER_TICK
-                );
-                targetAngle = 0.0F;
-
-                if (Math.abs(angle) <= DISASSEMBLE_ZERO_SNAP_DEGREES) {
-                    boolean changed = Math.abs(angle) > ANGLE_EPSILON;
-                    angle = 0.0F;
-                    applyRotation();
-                    pendingDisassembleZeroHoldTicks++;
-
-                    if (changed) {
-                        setChanged();
-                        if (canSendData()) sendData();
+            if (!pitchClearanceMotionReady) {
+                if (isSafeBinaryDisassemblyReturnActive()) {
+                    resetMode3DisassemblyConfirmation();
+                }
+                if (pendingExtendedBinaryDisassemblyReturn) {
+                    rotationProfileNeutralStableTicks = 0;
+                }
+                skipFinalSableApplyRotation = true;
+            } else if (pendingDisassembleAfterZero) {
+                if (isSafeBinaryDisassemblyReturnActive()
+                        && level instanceof ServerLevel serverLevel) {
+                    if (activeRotationProfile
+                            == SableInteractiveContraptionBackend.RotationProfile.FACING_AXIS) {
+                        tickMode3DisassemblyReturn(
+                                serverLevel,
+                                !safeBinaryDisassemblySignalChangedThisTick
+                        );
+                    } else {
+                        resetMode3DisassemblyRuntimeState();
+                        if (sableConstraintRefreshPending) {
+                            rotationProfileNeutralStableTicks = 0;
+                        } else if (pendingExtendedBinaryDisassemblyReturn) {
+                            tickRotationProfileTransition(
+                                    SableInteractiveContraptionBackend.RotationProfile.FACING_AXIS,
+                                    directInputPriority,
+                                    true
+                            );
+                        }
                     }
-
-                    if (pendingDisassembleZeroHoldTicks >= DISASSEMBLE_ZERO_HOLD_TICKS) {
-                        pendingDisassembleAfterZero = false;
-                        pendingDisassembleZeroHoldTicks = 0;
-                        disassemble();
-                    }
+                } else if (isLaterGuiDisassemblyReturnActive() && sableConstraintRefreshPending) {
+                    resetLaterGuiDisassemblyRuntimeState();
                 } else {
-                    pendingDisassembleZeroHoldTicks = 0;
-                    float step = computeDisassembleReturnStepDegrees(angle, requestedStep);
-                    float newAngle = approachAngle(angle, 0.0F, step);
+                    float requestedStep = Math.max(
+                            getDegreesPerTickForSignal(lastWestSignal),
+                            MIN_DISASSEMBLE_DEGREES_PER_TICK
+                    );
+                    targetAngle = 0.0F;
+                    secondTargetAngle = 0.0F;
 
-                    if (Math.abs(newAngle - angle) > ANGLE_EPSILON) {
-                        angle = newAngle;
+                    if (Math.max(Math.abs(angle), Math.abs(secondAngle)) <= DISASSEMBLE_ZERO_SNAP_DEGREES) {
+                        boolean changed = Math.abs(angle) > ANGLE_EPSILON
+                                || Math.abs(secondAngle) > ANGLE_EPSILON;
+                        angle = 0.0F;
+                        secondAngle = 0.0F;
                         applyRotation();
-                        setChanged();
-                        if (canSendData()) sendData();
+                        boolean laterGuiDisassemblyReady = isLaterGuiDisassemblyReturnActive()
+                                && level instanceof ServerLevel serverLevel
+                                && tickLaterGuiPhysicalNeutralConfirmation(serverLevel);
+                        if (!isLaterGuiDisassemblyReturnActive()) {
+                            boolean physicallyNeutral = !isTiltRotationProfile(activeRotationProfile)
+                                    || isActiveRotationProfilePhysicallyNeutral();
+                            if (physicallyNeutral) {
+                                pendingDisassembleZeroHoldTicks++;
+                            } else {
+                                pendingDisassembleZeroHoldTicks = 0;
+                            }
+                        }
+
+                        if (changed) {
+                            setChanged();
+                            if (canSendData()) sendData();
+                        }
+
+                        if (laterGuiDisassemblyReady
+                                || (!isLaterGuiDisassemblyReturnActive()
+                                && pendingDisassembleZeroHoldTicks >= DISASSEMBLE_ZERO_HOLD_TICKS)) {
+                            pendingDisassembleAfterZero = false;
+                            pendingDisassembleZeroHoldTicks = 0;
+                            clearMode3DisassemblyReturnState();
+                            clearLaterGuiDisassemblyReturnState();
+                            disassemble();
+                        }
+                    } else {
+                        pendingDisassembleZeroHoldTicks = 0;
+                        if (isLaterGuiDisassemblyReturnActive()) {
+                            resetLaterGuiDisassemblyRuntimeState();
+                        }
+                        float maximumAngle = Math.max(Math.abs(angle), Math.abs(secondAngle));
+                        float multiplier = getDisassemblyReturnSpeedMultiplierForCurrentGuiMode();
+                        float step = computeDisassembleReturnStepDegrees(
+                                maximumAngle,
+                                requestedStep,
+                                multiplier
+                        );
+                        if (approachTwoAxisTargets(0.0F, 0.0F, step)) {
+                            applyRotation();
+                            setChanged();
+                            if (canSendData()) sendData();
+                        }
                     }
+                }
+                skipFinalSableApplyRotation = true;
+            } else if (sableConstraintRefreshPending) {
+                skipFinalSableApplyRotation = true;
+            } else if (rotationProfileTransitionActive || desiredRotationProfile != activeRotationProfile) {
+                tickRotationProfileTransition(desiredRotationProfile, directInputPriority);
+                skipFinalSableApplyRotation = true;
+            } else if (isTwoAxisTiltModeSignal(lastOppositeTopSignal)) {
+                float speed = getDegreesPerTickForSignal(
+                        directInputPriority ? lastWestSignal : binarySpeedSignal);
+                if (approachTwoAxisTargets(targetAngle, secondTargetAngle, speed)) {
+                    applyRotation();
+                    setChanged();
+                    if (canSendData()) sendData();
                 }
                 skipFinalSableApplyRotation = true;
             } else if (mode3ExitReturnActive) {
@@ -1347,70 +2124,464 @@ public class InvServoTwisterBlockEntity extends KineticBlockEntity implements ID
                 }
 
                 skipFinalSableApplyRotation = true;
-            //noinspection StatementWithEmptyBody
-            } else if (freeBearingMode) {
-                // Intentionally empty: free bearing mode suppresses direct-input fallback.
-            } else if (worldLockedMode) {
-                if (!applyWorldLockedMotor(lastOppositeTopSignal)) {
-                    applyFreeBearingNeutralMotor();
-                }
-                skipFinalSableApplyRotation = true;
-            } else if (oscillationMode) {
-                applyMode6Oscillation(directInputPriority);
-                skipFinalSableApplyRotation = true;
-            } else if (directInputPriority) {
-                if (lastOppositeTopSignal == 1) {
-                    angle += SOUTH_CONTINUOUS_DEGREES_PER_TICK;
-                    applyRotation();
-                    setChanged();
-                    if (canSendData()) sendData();
-                } else if (lastOppositeTopSignal == 2) {
-                    angle -= SOUTH_CONTINUOUS_DEGREES_PER_TICK;
-                    applyRotation();
-                    setChanged();
-                    if (canSendData()) sendData();
-                } else if (lastOppositeTopSignal < 6 || isExtendedTargetModeSignal(lastOppositeTopSignal)) {
-                    float step = getDegreesPerTickForSignal(lastWestSignal);
-                    float newAngle = approachAngle(angle, targetAngle, step);
-
-                    if (Math.abs(newAngle - angle) > NORMAL_MOTION_EPSILON) {
-                        angle = newAngle;
-                        applyRotation();
-                        setChanged();
-                        if (canSendData()) sendData();
+            } else if (!freeBearingMode) {
+                if (worldLockedMode) {
+                    if (applyWorldLockedMotorNeedsFallback(lastOppositeTopSignal)) {
+                        applyFreeBearingNeutralMotor();
                     }
-                }
-            } else {
-                float step = getDegreesPerTickForSignal(binarySpeedSignal);
-                if (lastOppositeTopSignal == 1 || lastOppositeTopSignal == 2 || lastOppositeTopSignal >= 3) {
-                    float newAngle = approachAngle(angle, targetAngle, step);
-                    if (Math.abs(newAngle - angle) > NORMAL_MOTION_EPSILON) {
-                        angle = newAngle;
+                    skipFinalSableApplyRotation = true;
+                } else if (oscillationMode) {
+                    applyMode6Oscillation(directInputPriority);
+                    skipFinalSableApplyRotation = true;
+                } else if (directInputPriority) {
+                    if (lastOppositeTopSignal == 1) {
+                        angle += SOUTH_CONTINUOUS_DEGREES_PER_TICK;
                         applyRotation();
                         setChanged();
                         if (canSendData()) sendData();
+                    } else if (lastOppositeTopSignal == 2) {
+                        angle -= SOUTH_CONTINUOUS_DEGREES_PER_TICK;
+                        applyRotation();
+                        setChanged();
+                        if (canSendData()) sendData();
+                    } else if (lastOppositeTopSignal < 6 || isExtendedTargetModeSignal(lastOppositeTopSignal)) {
+                        float step = getDegreesPerTickForSignal(lastWestSignal);
+                        float newAngle = approachAngle(angle, targetAngle, step);
+
+                        if (Math.abs(newAngle - angle) > NORMAL_MOTION_EPSILON) {
+                            angle = newAngle;
+                            applyRotation();
+                            setChanged();
+                            if (canSendData()) sendData();
+                        }
+                    }
+                } else {
+                    float step = getDegreesPerTickForSignal(binarySpeedSignal);
+                    if (lastOppositeTopSignal == 1 || lastOppositeTopSignal == 2 || lastOppositeTopSignal >= 3) {
+                        float newAngle = approachAngle(angle, targetAngle, step);
+                        if (Math.abs(newAngle - angle) > NORMAL_MOTION_EPSILON) {
+                            angle = newAngle;
+                            applyRotation();
+                            setChanged();
+                            if (canSendData()) sendData();
+                        }
                     }
                 }
             }
 
             if (sableBackend.isActive() && !skipFinalSableApplyRotation) {
-                if (freeBearingMode && !pendingDisassembleAfterZero) {
+                if (freeBearingMode) {
                     applyFreeBearingNeutralMotor();
-                } else if (worldLockedMode && !pendingDisassembleAfterZero) {
-                    if (!applyWorldLockedMotor(lastOppositeTopSignal)) {
-                        applyFreeBearingNeutralMotor();
-                    }
                 } else {
                     applyRotation();
                 }
             }
 
         }
+        }
+
+        reconcilePitchClearanceRelease(desiredRotationProfile, sableConstraintRefreshPending);
 
         boolean visualRunning =
-                running && (manualEnabled || lastEastSignal > 0 || lastOppositeTopSignal > 0 || Math.abs(angle) > ANGLE_EPSILON);
+                running && (manualEnabled || lastEastSignal > 0 || lastOppositeTopSignal > 0
+                || Math.abs(angle) > ANGLE_EPSILON || Math.abs(secondAngle) > ANGLE_EPSILON);
 
         updateVisualRunning(visualRunning);
+
+        if (level instanceof ServerLevel serverLevel) {
+            updatePhysicalBearingMeasuredAngleForClient(serverLevel);
+        }
+    }
+
+    private SableInteractiveContraptionBackend.RotationProfile getDesiredRotationProfile() {
+        if (isTwoAxisTiltModeSignal(lastOppositeTopSignal)) {
+            return SableInteractiveContraptionBackend.RotationProfile.TWO_AXIS_TILT;
+        }
+        return SableInteractiveContraptionBackend.RotationProfile.FACING_AXIS;
+    }
+
+    private static boolean isTiltRotationProfile(
+            SableInteractiveContraptionBackend.RotationProfile profile
+    ) {
+        return profile == SableInteractiveContraptionBackend.RotationProfile.UP_PITCH_X
+                || profile == SableInteractiveContraptionBackend.RotationProfile.TWO_AXIS_TILT;
+    }
+
+    private boolean ensurePitchClearanceBeforeRefresh() {
+        return ensurePitchClearanceBeforeMotion(getDesiredRotationProfile(), false);
+    }
+
+    private boolean ensurePitchClearanceBeforeMotion(
+            SableInteractiveContraptionBackend.RotationProfile desiredProfile,
+            boolean sableConstraintRefreshPending
+    ) {
+        if (!requiresPitchClearance(desiredProfile, sableConstraintRefreshPending)) {
+            return true;
+        }
+
+        pitchClearanceNeutralStableTicks = 0;
+        return setPitchClearanceState(true);
+    }
+
+    private boolean requiresPitchClearance(
+            SableInteractiveContraptionBackend.RotationProfile desiredProfile,
+            boolean sableConstraintRefreshPending
+    ) {
+        boolean assembledOrRememberedActive = running || sableBackend.isActive();
+        boolean activePitchProfile = assembledOrRememberedActive
+                && isTiltRotationProfile(activeRotationProfile);
+        boolean transitionTouchesPitch = assembledOrRememberedActive
+                && rotationProfileTransitionActive
+                && (isTiltRotationProfile(activeRotationProfile)
+                || isTiltRotationProfile(rotationProfileTransitionTarget));
+        boolean disassemblyTouchesPitch = pendingDisassembleAfterZero
+                && (activePitchProfile
+                || isTiltRotationProfile(desiredProfile)
+                || isTiltRotationProfile(rotationProfileTransitionTarget));
+        boolean pendingRefreshTouchesPitch = sableConstraintRefreshPending
+                && (activePitchProfile
+                || isTiltRotationProfile(desiredProfile)
+                || isTiltRotationProfile(rotationProfileTransitionTarget));
+
+        return isTiltRotationProfile(desiredProfile)
+                || activePitchProfile
+                || transitionTouchesPitch
+                || disassemblyTouchesPitch
+                || pendingRefreshTouchesPitch;
+    }
+
+    private boolean setPitchClearanceState(boolean enabled) {
+        if (!(level instanceof ServerLevel serverLevel)) {
+            return !enabled;
+        }
+
+        BlockState state = serverLevel.getBlockState(worldPosition);
+        if (!(state.getBlock() instanceof InvServoTwisterBlock)
+                || !state.hasProperty(InvServoTwisterBlock.PITCH_CLEARANCE)) {
+            return !enabled;
+        }
+
+        //noinspection UnnecessaryLocalVariable
+        boolean targetValue = enabled;
+        if (state.getValue(InvServoTwisterBlock.PITCH_CLEARANCE) == targetValue) {
+            return true;
+        }
+
+        return serverLevel.setBlock(
+                worldPosition,
+                state.setValue(InvServoTwisterBlock.PITCH_CLEARANCE, targetValue),
+                Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE
+        );
+    }
+
+    private void reconcilePitchClearanceRelease(
+            SableInteractiveContraptionBackend.RotationProfile desiredProfile,
+            boolean sableConstraintRefreshPending
+    ) {
+        if (!(level instanceof ServerLevel serverLevel)) {
+            return;
+        }
+
+        if (requiresPitchClearance(desiredProfile, sableConstraintRefreshPending)) {
+            pitchClearanceNeutralStableTicks = 0;
+            return;
+        }
+
+        BlockState state = serverLevel.getBlockState(worldPosition);
+        if (!(state.getBlock() instanceof InvServoTwisterBlock)
+                || !state.hasProperty(InvServoTwisterBlock.PITCH_CLEARANCE)
+                || !state.getValue(InvServoTwisterBlock.PITCH_CLEARANCE)) {
+            pitchClearanceNeutralStableTicks = 0;
+            return;
+        }
+
+        if (!sableBackend.isActive()) {
+            pitchClearanceNeutralStableTicks = 0;
+            setPitchClearanceState(false);
+            return;
+        }
+
+        if (activeRotationProfile != SableInteractiveContraptionBackend.RotationProfile.FACING_AXIS
+                || rotationProfileTransitionActive
+                || pendingDisassembleAfterZero
+                || sableConstraintRefreshPending) {
+            pitchClearanceNeutralStableTicks = 0;
+            return;
+        }
+
+        Float physicalPitchAngle = measurePitchClearanceAngle();
+        boolean physicallyNeutral = physicalPitchAngle != null
+                && Float.isFinite(physicalPitchAngle)
+                && Math.abs(physicalPitchAngle)
+                <= ROTATION_PROFILE_NEUTRAL_PHYSICAL_TOLERANCE_DEGREES;
+        if (!physicallyNeutral) {
+            pitchClearanceNeutralStableTicks = 0;
+            return;
+        }
+
+        pitchClearanceNeutralStableTicks++;
+        if (pitchClearanceNeutralStableTicks < ROTATION_PROFILE_NEUTRAL_STABLE_TICKS) {
+            return;
+        }
+
+        pitchClearanceNeutralStableTicks = 0;
+        setPitchClearanceState(false);
+    }
+
+    @Nullable
+    private Float measurePitchClearanceAngle() {
+        if (!(level instanceof ServerLevel serverLevel) || !sableBackend.isActive()) {
+            return null;
+        }
+        SableInteractiveContraptionBackend.TwoAxisAngles measured =
+                sableBackend.measureCurrentTwoAxisAnglesDegrees(
+                        serverLevel,
+                        worldPosition,
+                        getFacingDirection()
+                );
+        if (measured == null) {
+            return null;
+        }
+        return Math.max(Math.abs(measured.totalSwingDegrees()), Math.abs(measured.twistDegrees()));
+    }
+
+    @SuppressWarnings("BooleanMethodIsAlwaysInverted")
+    public boolean preparePitchClearanceForDisassembly() {
+        if (!(level instanceof ServerLevel)) {
+            return true;
+        }
+
+        SableInteractiveContraptionBackend.RotationProfile desiredProfile =
+                getDesiredRotationProfile();
+        if (!requiresPitchClearance(desiredProfile, false)) {
+            return true;
+        }
+
+        pitchClearanceNeutralStableTicks = 0;
+        return setPitchClearanceState(true);
+    }
+
+    private void tickRotationProfileTransition(
+            SableInteractiveContraptionBackend.RotationProfile desiredProfile,
+            boolean directInputPriority
+    ) {
+        tickRotationProfileTransition(desiredProfile, directInputPriority, false);
+    }
+
+    private void tickRotationProfileTransition(
+            SableInteractiveContraptionBackend.RotationProfile desiredProfile,
+            boolean directInputPriority,
+            boolean disassemblyReturn
+    ) {
+        if (!(level instanceof ServerLevel serverLevel) || !sableBackend.isActive()) {
+            rotationProfileTransitionActive = false;
+            rotationProfileNeutralStableTicks = 0;
+            return;
+        }
+
+        if (disassemblyReturn
+                && activeRotationProfile
+                == SableInteractiveContraptionBackend.RotationProfile.TWO_AXIS_TILT) {
+            publishPhysicalBearingMeasuredAngleForClient(
+                    sableBackend.measureBearingAxisRelativeAngleDegrees(
+                            serverLevel,
+                            worldPosition,
+                            getFacingDirection()
+                    )
+            );
+        }
+
+        if (desiredProfile == activeRotationProfile) {
+            rotationProfileTransitionActive = false;
+            rotationProfileTransitionTarget = activeRotationProfile;
+            rotationProfileNeutralStableTicks = 0;
+            return;
+        }
+
+        if (!rotationProfileTransitionActive || rotationProfileTransitionTarget != desiredProfile) {
+            rotationProfileTransitionActive = true;
+            rotationProfileTransitionTarget = desiredProfile;
+            rotationProfileNeutralStableTicks = 0;
+            if (activeRotationProfile == SableInteractiveContraptionBackend.RotationProfile.TWO_AXIS_TILT) {
+                SableInteractiveContraptionBackend.TwoAxisAngles measured =
+                        measureActiveTwoAxisAngles();
+                if (measured != null) {
+                    angle = measured.axis1Degrees();
+                    prevAngle = angle;
+                    secondAngle = measured.axis2Degrees();
+                    secondPrevAngle = secondAngle;
+                }
+            } else {
+                Float physicalAngle = measureActiveRotationProfileAngle();
+                if (physicalAngle != null && Float.isFinite(physicalAngle)) {
+                    angle = physicalAngle;
+                    prevAngle = physicalAngle;
+                }
+            }
+            targetAngle = 0.0F;
+            secondTargetAngle = 0.0F;
+            setChanged();
+            if (canSendData()) sendData();
+        }
+
+        float speed;
+        if (disassemblyReturn) {
+            float maximumAngle = Math.max(Math.abs(angle), Math.abs(secondAngle));
+            float requestedStep = Math.max(
+                    getDegreesPerTickForSignal(lastWestSignal),
+                    MIN_DISASSEMBLE_DEGREES_PER_TICK
+            );
+            speed = computeDisassembleReturnStepDegrees(
+                    maximumAngle,
+                    requestedStep,
+                    getDisassemblyReturnSpeedMultiplierForCurrentGuiMode()
+            );
+        } else {
+            speed = getDegreesPerTickForSignal(
+                    directInputPriority ? lastWestSignal : binarySpeedSignal);
+        }
+        if (speed > 0.0F) {
+            if (approachTwoAxisTargets(0.0F, 0.0F, speed)) {
+                setChanged();
+                if (canSendData()) sendData();
+            }
+        }
+
+        targetAngle = 0.0F;
+        secondTargetAngle = 0.0F;
+        applyRotation();
+        if (!running || !sableBackend.isActive()) {
+            rotationProfileNeutralStableTicks = 0;
+            return;
+        }
+
+        boolean scalarNeutral = Float.isFinite(angle)
+                && Float.isFinite(secondAngle)
+                && Math.abs(angle) <= ROTATION_PROFILE_NEUTRAL_SCALAR_TOLERANCE_DEGREES
+                && Math.abs(secondAngle) <= ROTATION_PROFILE_NEUTRAL_SCALAR_TOLERANCE_DEGREES;
+        boolean disassemblyTwoAxisToFacingHandoff = disassemblyReturn
+                && activeRotationProfile == SableInteractiveContraptionBackend.RotationProfile.TWO_AXIS_TILT
+                && desiredProfile == SableInteractiveContraptionBackend.RotationProfile.FACING_AXIS;
+        boolean physicalNeutral = isActiveRotationProfilePhysicallyNeutral(
+                disassemblyTwoAxisToFacingHandoff
+        );
+        if (scalarNeutral && physicalNeutral) {
+            rotationProfileNeutralStableTicks++;
+        } else {
+            rotationProfileNeutralStableTicks = 0;
+        }
+
+        if (rotationProfileNeutralStableTicks < ROTATION_PROFILE_NEUTRAL_STABLE_TICKS) {
+            return;
+        }
+
+        Float disassemblyHandoffBearingAngle = null;
+        if (disassemblyTwoAxisToFacingHandoff) {
+            disassemblyHandoffBearingAngle = sableBackend.measureBearingAxisRelativeAngleDegrees(
+                    serverLevel,
+                    worldPosition,
+                    getFacingDirection()
+            );
+            if (disassemblyHandoffBearingAngle == null
+                    || !Float.isFinite(disassemblyHandoffBearingAngle)) {
+                rotationProfileNeutralStableTicks = 0;
+                return;
+            }
+            publishPhysicalBearingMeasuredAngleForClient(disassemblyHandoffBearingAngle);
+        }
+
+        double stiffnessPerInertia = TwisterMillConfig.getServoStiffnessPerInertia();
+        double dampingPerInertia = TwisterMillConfig.getServoDampingPerInertia();
+        double minEffectiveInertia = TwisterMillConfig.getServoMinEffectiveInertia();
+        boolean switched;
+        if (disassemblyHandoffBearingAngle != null) {
+            switched = sableBackend.switchTwoAxisToFacingAxisForDisassemblyAtTiltNeutral(
+                    serverLevel,
+                    worldPosition,
+                    getFacingDirection(),
+                    disassemblyHandoffBearingAngle,
+                    stiffnessPerInertia,
+                    dampingPerInertia,
+                    minEffectiveInertia
+            );
+        } else {
+            switched = sableBackend.switchRotationProfileAtNeutral(
+                    serverLevel,
+                    worldPosition,
+                    getFacingDirection(),
+                    activeRotationProfile,
+                    desiredProfile,
+                    stiffnessPerInertia,
+                    dampingPerInertia,
+                    minEffectiveInertia
+            );
+        }
+        rotationProfileNeutralStableTicks = 0;
+        if (!switched) {
+            return;
+        }
+
+        activeRotationProfile = desiredProfile;
+        rotationProfileTagPresent = true;
+        rotationProfileTransitionActive = false;
+        rotationProfileTransitionTarget = desiredProfile;
+        angle = 0.0F;
+        prevAngle = 0.0F;
+        targetAngle = 0.0F;
+        secondAngle = 0.0F;
+        secondPrevAngle = 0.0F;
+        secondTargetAngle = 0.0F;
+        setChanged();
+        if (canSendData()) sendData();
+    }
+
+    @Nullable
+    private Float measureActiveRotationProfileAngle() {
+        if (!(level instanceof ServerLevel serverLevel) || !running || !sableBackend.isActive()) {
+            return null;
+        }
+        return sableBackend.measureCurrentMotorAngleDegrees(
+                serverLevel,
+                worldPosition,
+                getFacingDirection(),
+                activeRotationProfile
+        );
+    }
+
+    @Nullable
+    private SableInteractiveContraptionBackend.TwoAxisAngles measureActiveTwoAxisAngles() {
+        if (!(level instanceof ServerLevel serverLevel) || !running || !sableBackend.isActive()) {
+            return null;
+        }
+        return sableBackend.measureCurrentTwoAxisAnglesDegrees(
+                serverLevel,
+                worldPosition,
+                getFacingDirection()
+        );
+    }
+
+    private boolean isActiveRotationProfilePhysicallyNeutral() {
+        return isActiveRotationProfilePhysicallyNeutral(false);
+    }
+
+    private boolean isActiveRotationProfilePhysicallyNeutral(boolean allowBearingAxisTwist) {
+        if (activeRotationProfile == SableInteractiveContraptionBackend.RotationProfile.TWO_AXIS_TILT) {
+            SableInteractiveContraptionBackend.TwoAxisAngles measured = measureActiveTwoAxisAngles();
+            return measured != null
+                    && Math.abs(measured.axis1Degrees())
+                    <= ROTATION_PROFILE_NEUTRAL_PHYSICAL_TOLERANCE_DEGREES
+                    && Math.abs(measured.axis2Degrees())
+                    <= ROTATION_PROFILE_NEUTRAL_PHYSICAL_TOLERANCE_DEGREES
+                    && Math.abs(measured.totalSwingDegrees())
+                    <= ROTATION_PROFILE_NEUTRAL_PHYSICAL_TOLERANCE_DEGREES
+                    && (allowBearingAxisTwist
+                    || Math.abs(measured.twistDegrees())
+                            <= ROTATION_PROFILE_NEUTRAL_PHYSICAL_TOLERANCE_DEGREES);
+        }
+        Float physicalAngle = measureActiveRotationProfileAngle();
+        return physicalAngle != null
+                && Float.isFinite(physicalAngle)
+                && Math.abs(physicalAngle) <= ROTATION_PROFILE_NEUTRAL_PHYSICAL_TOLERANCE_DEGREES;
     }
 
     private void refreshLiveContraptionBlockCountIfNeeded(long time) {
@@ -1472,6 +2643,8 @@ public class InvServoTwisterBlockEntity extends KineticBlockEntity implements ID
 
     @Override
     public void remove() {
+        clearMode3DisassemblyReturnState();
+
         if (level != null && !level.isClientSide)
             notifyBoundWindRotoRemoved();
 
@@ -1505,6 +2678,10 @@ public class InvServoTwisterBlockEntity extends KineticBlockEntity implements ID
 
     @Override
     public void onChunkUnloaded() {
+        resetMode3DisassemblyRuntimeState();
+        if (pendingExtendedBinaryDisassemblyReturn) {
+            rotationProfileNeutralStableTicks = 0;
+        }
         sableBackend.clearRuntimeForUnload();
         super.onChunkUnloaded();
     }
@@ -1529,19 +2706,30 @@ public class InvServoTwisterBlockEntity extends KineticBlockEntity implements ID
         if (!(serverLevel.getBlockState(worldPosition).getBlock() instanceof BearingBlock))
             return false;
 
+        if (isInternalRedstoneLinkMode()) {
+            updateControlSignalsFromInputs(false);
+        }
+
         Direction facing = getFacingDirection();
+        SableInteractiveContraptionBackend.RotationProfile assemblyRotationProfile =
+                getDesiredRotationProfile();
+        if (isTiltRotationProfile(assemblyRotationProfile)
+                && !setPitchClearanceState(true)) {
+            return false;
+        }
         SableInteractiveContraptionBackend.AssemblyResult assembly = sableBackend.tryAssemble(
                 serverLevel,
                 worldPosition,
                 facing,
                 false,
                 this::handleAssemblyException,
-                RememberedSableShipMemory.enabledFor(getBlockState(), rememberedShipMemory)
+                RememberedSableShipMemory.enabledFor(getBlockState(), rememberedShipMemory),
+                assemblyRotationProfile
         );
         if (assembly == null)
             return false;
 
-        finishSuccessfulSableAssembly(assembly);
+        finishSuccessfulSableAssembly(assembly, assemblyRotationProfile);
         return true;
     }
 
@@ -1552,19 +2740,36 @@ public class InvServoTwisterBlockEntity extends KineticBlockEntity implements ID
         }
     }
 
-    private void finishSuccessfulSableAssembly(SableInteractiveContraptionBackend.AssemblyResult assembly) {
+    private void finishSuccessfulSableAssembly(
+            SableInteractiveContraptionBackend.AssemblyResult assembly,
+            SableInteractiveContraptionBackend.RotationProfile assemblyRotationProfile
+    ) {
         lastException = null;
 
         AllSoundEvents.CONTRAPTION_ASSEMBLE.playOnServer(level, worldPosition);
 
         running = true;
+        activeRotationProfile = assemblyRotationProfile;
+        rotationProfileTagPresent = true;
+        rotationProfileTransitionActive = false;
+        rotationProfileTransitionTarget = activeRotationProfile;
+        rotationProfileNeutralStableTicks = 0;
         pendingDisassembleAfterZero = false;
         pendingDisassembleZeroHoldTicks = 0;
+        clearMode3DisassemblyReturnState();
         angle = 0.0F;
         prevAngle = 0.0F;
+        secondAngle = 0.0F;
+        secondPrevAngle = 0.0F;
+        secondTargetAngle = 0.0F;
         assembledBlockCount = assembly.blockCount();
         assembleNextTick = false;
+        clearLaterGuiDisassemblyReturnState();
         applyRotation();
+        laterGuiAssemblyCompletedThisTick = running
+                && isLaterGuiAssemblyOption()
+                && activeRotationProfile
+                == SableInteractiveContraptionBackend.RotationProfile.FACING_AXIS;
         if (canSendData()) sendData();
     }
 
@@ -1572,12 +2777,19 @@ public class InvServoTwisterBlockEntity extends KineticBlockEntity implements ID
         if (!running && !sableBackend.isActive())
             return;
 
+        if (!preparePitchClearanceForDisassembly())
+            return;
+
         if (!(level instanceof ServerLevel serverLevel)) {
             running = false;
             pendingDisassembleAfterZero = false;
             pendingDisassembleZeroHoldTicks = 0;
+            clearMode3DisassemblyReturnState();
             angle = 0.0F;
             prevAngle = 0.0F;
+            secondAngle = 0.0F;
+            secondPrevAngle = 0.0F;
+            secondTargetAngle = 0.0F;
             assembleNextTick = false;
             assembledBlockCount = 0;
             sableBackend.clearClientFallback();
@@ -1589,8 +2801,12 @@ public class InvServoTwisterBlockEntity extends KineticBlockEntity implements ID
 
         pendingDisassembleAfterZero = false;
         pendingDisassembleZeroHoldTicks = 0;
+        clearMode3DisassemblyReturnState();
         angle = 0.0F;
         prevAngle = 0.0F;
+        secondAngle = 0.0F;
+        secondPrevAngle = 0.0F;
+        secondTargetAngle = 0.0F;
         if (RememberedSableShipMemory.isRememberContraptionEnabledFor(getBlockState())) {
             rememberedShipMemory.replaceFromWorldPositions(
                     worldPosition,
@@ -1617,20 +2833,59 @@ public class InvServoTwisterBlockEntity extends KineticBlockEntity implements ID
         if (!sableBackend.isActive())
             return;
 
-        boolean applied = sableBackend.applyMotor(
-                serverLevel,
-                worldPosition,
-                getFacingDirection(),
-                angle,
-                SERVO_STIFFNESS_PER_INERTIA,
-                SERVO_DAMPING_PER_INERTIA,
-                MIN_EFFECTIVE_INERTIA
-        );
+        boolean applied = activeRotationProfile
+                == SableInteractiveContraptionBackend.RotationProfile.TWO_AXIS_TILT
+                ? sableBackend.applyTwoAxisMotors(
+                        serverLevel,
+                        worldPosition,
+                        getFacingDirection(),
+                        angle,
+                        secondAngle,
+                        TwisterMillConfig.getServoStiffnessPerInertia(),
+                        TwisterMillConfig.getServoDampingPerInertia(),
+                        TwisterMillConfig.getServoMinEffectiveInertia()
+                )
+                : sableBackend.applyMotor(
+                        serverLevel,
+                        worldPosition,
+                        getFacingDirection(),
+                        activeRotationProfile,
+                        angle,
+                        TwisterMillConfig.getServoStiffnessPerInertia(),
+                        TwisterMillConfig.getServoDampingPerInertia(),
+                        TwisterMillConfig.getServoMinEffectiveInertia()
+                );
         if (!applied) {
             running = false;
             pendingDisassembleAfterZero = false;
             pendingDisassembleZeroHoldTicks = 0;
+            clearMode3DisassemblyReturnState();
             sableBackend.clearState();
+            setChanged();
+            if (canSendData()) sendData();
+        }
+    }
+
+    private void applyRecoveredTwoAxisPose(SableInteractiveContraptionBackend.TwoAxisAngles measured) {
+        float recoveredAxis1 = Mth.clamp(
+                measured.axis1Degrees(),
+                -ServoTwoAxisRotationMath.MAX_AXIS_DEGREES,
+                ServoTwoAxisRotationMath.MAX_AXIS_DEGREES
+        );
+        float recoveredAxis2 = Mth.clamp(
+                measured.axis2Degrees(),
+                -ServoTwoAxisRotationMath.MAX_AXIS_DEGREES,
+                ServoTwoAxisRotationMath.MAX_AXIS_DEGREES
+        );
+        boolean changed = Float.floatToIntBits(angle) != Float.floatToIntBits(recoveredAxis1)
+                || Float.floatToIntBits(prevAngle) != Float.floatToIntBits(recoveredAxis1)
+                || Float.floatToIntBits(secondAngle) != Float.floatToIntBits(recoveredAxis2)
+                || Float.floatToIntBits(secondPrevAngle) != Float.floatToIntBits(recoveredAxis2);
+        angle = recoveredAxis1;
+        prevAngle = recoveredAxis1;
+        secondAngle = recoveredAxis2;
+        secondPrevAngle = recoveredAxis2;
+        if (changed) {
             setChanged();
             if (canSendData()) sendData();
         }
@@ -1648,9 +2903,13 @@ public class InvServoTwisterBlockEntity extends KineticBlockEntity implements ID
         float visualAngleBefore = getInterpolatedAngle(0.0F);
         pendingDisassembleAfterZero = false;
         pendingDisassembleZeroHoldTicks = 0;
+        clearMode3DisassemblyReturnState();
         angle = 0.0F;
         prevAngle = 0.0F;
         targetAngle = 0.0F;
+        secondAngle = 0.0F;
+        secondPrevAngle = 0.0F;
+        secondTargetAngle = 0.0F;
         updateVisualRunning(false);
 
         SableInteractiveContraptionBackend.ReloadStabilizationResult result =
@@ -1658,9 +2917,10 @@ public class InvServoTwisterBlockEntity extends KineticBlockEntity implements ID
                         serverLevel,
                         worldPosition,
                         getFacingDirection(),
-                        SERVO_STIFFNESS_PER_INERTIA,
-                        SERVO_DAMPING_PER_INERTIA,
-                        MIN_EFFECTIVE_INERTIA,
+                        activeRotationProfile,
+                        TwisterMillConfig.getServoStiffnessPerInertia(),
+                        TwisterMillConfig.getServoDampingPerInertia(),
+                        TwisterMillConfig.getServoMinEffectiveInertia(),
                         trigger.actionPrefix()
                 );
         if (result.poseReseatApplied()) {
@@ -1683,9 +2943,7 @@ public class InvServoTwisterBlockEntity extends KineticBlockEntity implements ID
     }
 
     private void applyMode6Oscillation(boolean directInputPriority) {
-        float nextAngle = isExtendedOscillationModeSignal(lastOppositeTopSignal)
-                ? computeExtendedOscillationTarget(lastOppositeTopSignal, directInputPriority)
-                : computeMode6OscillationTarget(directInputPriority);
+        float nextAngle = computeMode6OscillationTarget(directInputPriority);
         targetAngle = nextAngle;
         boolean changed = Math.abs(nextAngle - angle) > ANGLE_EPSILON;
         if (changed) {
@@ -1700,12 +2958,12 @@ public class InvServoTwisterBlockEntity extends KineticBlockEntity implements ID
         }
     }
 
-    private boolean applyWorldLockedMotor(int modeSignal) {
+    private boolean applyWorldLockedMotorNeedsFallback(int modeSignal) {
         if (!(level instanceof ServerLevel serverLevel))
-            return false;
+            return true;
 
         if (!sableBackend.isActive())
-            return false;
+            return true;
 
         Float targetAngle = sableBackend.computeWorldLockedMotorAngleDegrees(
                 serverLevel,
@@ -1715,7 +2973,7 @@ public class InvServoTwisterBlockEntity extends KineticBlockEntity implements ID
                 angle
         );
         if (targetAngle == null) {
-            return false;
+            return true;
         }
 
         boolean changed = Math.abs(targetAngle - angle) > ANGLE_EPSILON;
@@ -1726,25 +2984,26 @@ public class InvServoTwisterBlockEntity extends KineticBlockEntity implements ID
                 worldPosition,
                 getFacingDirection(),
                 angle,
-                SERVO_STIFFNESS_PER_INERTIA,
-                SERVO_DAMPING_PER_INERTIA,
-                MIN_EFFECTIVE_INERTIA
+                TwisterMillConfig.getServoStiffnessPerInertia(),
+                TwisterMillConfig.getServoDampingPerInertia(),
+                TwisterMillConfig.getServoMinEffectiveInertia()
         );
         if (!applied) {
             running = false;
             pendingDisassembleAfterZero = false;
             pendingDisassembleZeroHoldTicks = 0;
+            clearMode3DisassemblyReturnState();
             sableBackend.clearState();
             setChanged();
             if (canSendData()) sendData();
-            return false;
+            return true;
         }
 
         if (changed) {
             setChanged();
             if (canSendData()) sendData();
         }
-        return true;
+        return false;
     }
 
     private void applyFreeBearingNeutralMotor() {
@@ -1760,13 +3019,14 @@ public class InvServoTwisterBlockEntity extends KineticBlockEntity implements ID
                 getFacingDirection(),
                 0.0F,
                 0.0,
-                FREE_BEARING_DAMPING_PER_INERTIA,
-                MIN_EFFECTIVE_INERTIA
+                TwisterMillConfig.getFreeBearingDampingPerInertia(),
+                TwisterMillConfig.getServoMinEffectiveInertia()
         );
         if (!applied) {
             running = false;
             pendingDisassembleAfterZero = false;
             pendingDisassembleZeroHoldTicks = 0;
+            clearMode3DisassemblyReturnState();
             sableBackend.clearState();
             setChanged();
             if (canSendData()) sendData();
@@ -1786,10 +3046,24 @@ public class InvServoTwisterBlockEntity extends KineticBlockEntity implements ID
 
     public float getInterpolatedAngle(float partialTicks) {
         Float freeBearingVisualAngle = computeFreeBearingVisualAngle(partialTicks);
+        //noinspection ReplaceNullCheck
         if (freeBearingVisualAngle != null) {
             return freeBearingVisualAngle;
         }
         return Mth.lerp(partialTicks, prevAngle, angle);
+    }
+
+    public float getInterpolatedSecondAngle(float partialTicks) {
+        return Mth.lerp(partialTicks, secondPrevAngle, secondAngle);
+    }
+
+    public boolean usesTwoAxisTiltRotationForRender() {
+        return activeRotationProfile == SableInteractiveContraptionBackend.RotationProfile.TWO_AXIS_TILT;
+    }
+
+    public boolean usesUpPitchRotationForRender() {
+        return activeRotationProfile == SableInteractiveContraptionBackend.RotationProfile.UP_PITCH_X
+                && getFacingDirection() == Direction.UP;
     }
 
     @Nullable
@@ -1914,9 +3188,24 @@ public class InvServoTwisterBlockEntity extends KineticBlockEntity implements ID
         tag.putBoolean(TAG_ASSEMBLE_NEXT_TICK, assembleNextTick);
         tag.putFloat(TAG_ANGLE, angle);
         tag.putFloat(TAG_PREV_ANGLE, prevAngle);
+        tag.putFloat(TAG_SECOND_ANGLE, secondAngle);
+        tag.putFloat(TAG_SECOND_PREV_ANGLE, secondPrevAngle);
+        tag.putFloat(TAG_SECOND_TARGET_ANGLE, secondTargetAngle);
+        tag.putInt(SABLE_ROTATION_PROFILE_TAG, activeRotationProfile.storedId());
         tag.putInt(TAG_ASSEMBLED_BLOCK_COUNT, assembledBlockCount);
         tag.putBoolean(TAG_BOUND_TO_WIND_ROTO, boundToWindRoto);
         tag.putBoolean(TAG_PENDING_DISASSEMBLE_AFTER_ZERO, pendingDisassembleAfterZero);
+        tag.putBoolean(TAG_PENDING_MODE3_DISASSEMBLY_RETURN, pendingMode3DisassemblyReturn);
+        if (!clientPacket) {
+            tag.putBoolean(TAG_PENDING_EXTENDED_BINARY_DISASSEMBLY_RETURN,
+                    pendingExtendedBinaryDisassemblyReturn);
+        }
+        if (pendingDisassembleAfterZero && pendingLaterGuiRotationProfile != null) {
+            tag.putInt(TAG_PENDING_LATER_GUI_ROTATION_PROFILE,
+                    pendingLaterGuiRotationProfile.storedId());
+        } else {
+            tag.remove(TAG_PENDING_LATER_GUI_ROTATION_PROFILE);
+        }
         tag.putInt("LastWestSignal", lastWestSignal);
         tag.putInt("LastEastSignal", lastEastSignal);
         tag.putInt("LastOppositeTopSignal", lastOppositeTopSignal);
@@ -1927,8 +3216,14 @@ public class InvServoTwisterBlockEntity extends KineticBlockEntity implements ID
         tag.putBoolean(TAG_HAS_VALID_BINARY_FRAME, hasValidBinaryFrame);
         tag.putBoolean(TAG_INTERNAL_REDSTONE_LINK_ACTIVE, internalRedstoneLinkActive);
         tag.putInt(TAG_INTERNAL_REDSTONE_LINK_RECEIVED_SIGNAL, internalRedstoneLinkReceivedSignal);
+        tag.putInt(TAG_SECONDARY_BINARY_ANGLE_SIGNAL, secondaryBinaryAngleSignal);
+        tag.putBoolean(TAG_SECONDARY_HAS_VALID_BINARY_FRAME, secondaryHasValidBinaryFrame);
+        tag.putBoolean(TAG_SECONDARY_INTERNAL_REDSTONE_LINK_ACTIVE, secondaryInternalRedstoneLinkActive);
+        tag.putInt(TAG_SECONDARY_INTERNAL_REDSTONE_LINK_RECEIVED_SIGNAL,
+                secondaryInternalRedstoneLinkReceivedSignal);
         if (clientPacket) {
             tag.putBoolean(TAG_SPEED_ZERO_MOVEMENT_ENABLED, speedZeroMovementEnabled);
+            tag.putFloat(TAG_PHYSICAL_BEARING_MEASURED_ANGLE, physicalBearingMeasuredAngle);
         }
 
         if (boundWindRotoDimension != null) {
@@ -1952,17 +3247,101 @@ public class InvServoTwisterBlockEntity extends KineticBlockEntity implements ID
     protected void read(CompoundTag tag, HolderLookup.Provider registries, boolean clientPacket) {
         super.read(tag, registries, clientPacket);
 
+        if (clientPacket) {
+            physicalBearingMeasuredAngle = normalizePhysicalBearingMeasuredAngle(
+                    tag.contains(TAG_PHYSICAL_BEARING_MEASURED_ANGLE)
+                            ? tag.getFloat(TAG_PHYSICAL_BEARING_MEASURED_ANGLE)
+                            : null
+            );
+        } else {
+            physicalBearingMeasuredAngle = 0.0F;
+        }
+
         manualEnabled = tag.getBoolean(TAG_MANUAL_ENABLED);
         running = tag.getBoolean(TAG_RUNNING);
         assembleNextTick = tag.getBoolean(TAG_ASSEMBLE_NEXT_TICK);
         angle = tag.getFloat(TAG_ANGLE);
         prevAngle = tag.contains(TAG_PREV_ANGLE) ? tag.getFloat(TAG_PREV_ANGLE) : angle;
+        secondAngle = tag.contains(TAG_SECOND_ANGLE) ? tag.getFloat(TAG_SECOND_ANGLE) : 0.0F;
+        secondPrevAngle = tag.contains(TAG_SECOND_PREV_ANGLE)
+                ? tag.getFloat(TAG_SECOND_PREV_ANGLE)
+                : secondAngle;
+        secondTargetAngle = tag.contains(TAG_SECOND_TARGET_ANGLE)
+                ? tag.getFloat(TAG_SECOND_TARGET_ANGLE)
+                : 0.0F;
+        if (!Float.isFinite(secondAngle)) secondAngle = 0.0F;
+        if (!Float.isFinite(secondPrevAngle)) secondPrevAngle = secondAngle;
+        if (!Float.isFinite(secondTargetAngle)) secondTargetAngle = 0.0F;
+        secondAngle = Mth.clamp(secondAngle, -ServoTwoAxisRotationMath.MAX_AXIS_DEGREES,
+                ServoTwoAxisRotationMath.MAX_AXIS_DEGREES);
+        secondPrevAngle = Mth.clamp(secondPrevAngle, -ServoTwoAxisRotationMath.MAX_AXIS_DEGREES,
+                ServoTwoAxisRotationMath.MAX_AXIS_DEGREES);
+        secondTargetAngle = Mth.clamp(secondTargetAngle, -ServoTwoAxisRotationMath.MAX_AXIS_DEGREES,
+                ServoTwoAxisRotationMath.MAX_AXIS_DEGREES);
+        rotationProfileTagPresent = tag.contains(SABLE_ROTATION_PROFILE_TAG);
+        activeRotationProfile = rotationProfileTagPresent
+                ? SableInteractiveContraptionBackend.RotationProfile.fromStoredId(
+                tag.getInt(SABLE_ROTATION_PROFILE_TAG))
+                : SableInteractiveContraptionBackend.RotationProfile.FACING_AXIS;
+        rotationProfileTransitionActive = false;
+        rotationProfileTransitionTarget = activeRotationProfile;
+        rotationProfileNeutralStableTicks = 0;
+        pitchClearanceNeutralStableTicks = 0;
         assembledBlockCount = tag.getInt(TAG_ASSEMBLED_BLOCK_COUNT);
         if (tag.contains(TAG_BOUND_TO_WIND_ROTO))
             boundToWindRoto = tag.getBoolean(TAG_BOUND_TO_WIND_ROTO);
-        if (tag.contains(TAG_PENDING_DISASSEMBLE_AFTER_ZERO))
-            pendingDisassembleAfterZero = tag.getBoolean(TAG_PENDING_DISASSEMBLE_AFTER_ZERO);
+        pendingDisassembleAfterZero = tag.contains(TAG_PENDING_DISASSEMBLE_AFTER_ZERO)
+                && tag.getBoolean(TAG_PENDING_DISASSEMBLE_AFTER_ZERO);
+        boolean hasMode3DisassemblyOrigin = tag.contains(TAG_PENDING_MODE3_DISASSEMBLY_RETURN);
+        pendingMode3DisassemblyReturn = pendingDisassembleAfterZero
+                && hasMode3DisassemblyOrigin
+                && tag.getBoolean(TAG_PENDING_MODE3_DISASSEMBLY_RETURN);
+        boolean hasExtendedBinaryDisassemblyOrigin = !clientPacket
+                && tag.contains(TAG_PENDING_EXTENDED_BINARY_DISASSEMBLY_RETURN);
+        if (!clientPacket) {
+            pendingExtendedBinaryDisassemblyReturn = pendingDisassembleAfterZero
+                    && !pendingMode3DisassemblyReturn
+                    && hasExtendedBinaryDisassemblyOrigin
+                    && tag.getBoolean(TAG_PENDING_EXTENDED_BINARY_DISASSEMBLY_RETURN);
+        }
+        clearLaterGuiDisassemblyReturnState();
+        boolean hasLaterGuiRotationProfile = tag.contains(TAG_PENDING_LATER_GUI_ROTATION_PROFILE);
+        if (pendingDisassembleAfterZero
+                && !pendingMode3DisassemblyReturn
+                && !pendingExtendedBinaryDisassemblyReturn
+                && isLaterGuiAssemblyOption()
+                && hasLaterGuiRotationProfile
+                && tag.getInt(TAG_PENDING_LATER_GUI_ROTATION_PROFILE)
+                == SableInteractiveContraptionBackend.RotationProfile.FACING_AXIS.storedId()) {
+            pendingLaterGuiRotationProfile =
+                    SableInteractiveContraptionBackend.RotationProfile.FACING_AXIS;
+        }
+        if (!clientPacket
+                && pendingDisassembleAfterZero
+                && !pendingMode3DisassemblyReturn
+                && !pendingExtendedBinaryDisassemblyReturn
+                && hasLaterGuiRotationProfile
+                && pendingLaterGuiRotationProfile == null) {
+            pendingDisassembleAfterZero = false;
+        }
+        if (!clientPacket
+                && pendingDisassembleAfterZero
+                && !hasMode3DisassemblyOrigin
+                && !hasExtendedBinaryDisassemblyOrigin) {
+            pendingDisassembleAfterZero = false;
+            pendingMode3DisassemblyReturn = false;
+            pendingExtendedBinaryDisassemblyReturn = false;
+        }
+        if (!clientPacket
+                && pendingDisassembleAfterZero
+                && isLaterGuiAssemblyOption()
+                && !pendingMode3DisassemblyReturn
+                && !pendingExtendedBinaryDisassemblyReturn
+                && pendingLaterGuiRotationProfile == null) {
+            pendingDisassembleAfterZero = false;
+        }
         pendingDisassembleZeroHoldTicks = 0;
+        resetMode3DisassemblyRuntimeState();
 
         if (tag.contains("LastWestSignal"))
             lastWestSignal = Mth.clamp(tag.getInt("LastWestSignal"), 0, 15);
@@ -1987,6 +3366,21 @@ public class InvServoTwisterBlockEntity extends KineticBlockEntity implements ID
                 : 0;
         if (!internalRedstoneLinkActive)
             internalRedstoneLinkReceivedSignal = 0;
+        secondaryBinaryAngleSignal = tag.contains(TAG_SECONDARY_BINARY_ANGLE_SIGNAL)
+                ? Mth.clamp(tag.getInt(TAG_SECONDARY_BINARY_ANGLE_SIGNAL), 0, 15)
+                : 0;
+        secondaryHasValidBinaryFrame = tag.contains(TAG_SECONDARY_HAS_VALID_BINARY_FRAME)
+                && tag.getBoolean(TAG_SECONDARY_HAS_VALID_BINARY_FRAME);
+        secondaryInternalRedstoneLinkActive = tag.contains(TAG_SECONDARY_INTERNAL_REDSTONE_LINK_ACTIVE)
+                && tag.getBoolean(TAG_SECONDARY_INTERNAL_REDSTONE_LINK_ACTIVE);
+        secondaryInternalRedstoneLinkReceivedSignal =
+                tag.contains(TAG_SECONDARY_INTERNAL_REDSTONE_LINK_RECEIVED_SIGNAL)
+                        ? Mth.clamp(tag.getInt(TAG_SECONDARY_INTERNAL_REDSTONE_LINK_RECEIVED_SIGNAL), 0, 15)
+                        : 0;
+        if (!secondaryInternalRedstoneLinkActive) {
+            secondaryInternalRedstoneLinkReceivedSignal = 0;
+        }
+        secondaryBinaryReceiver.reset(secondaryInternalRedstoneLinkReceivedSignal > 0);
         if (tag.contains(TAG_SPEED_ZERO_MOVEMENT_ENABLED))
             speedZeroMovementEnabled = tag.getBoolean(TAG_SPEED_ZERO_MOVEMENT_ENABLED);
 
@@ -2119,6 +3513,9 @@ public class InvServoTwisterBlockEntity extends KineticBlockEntity implements ID
 
     @Override
     public boolean addToGoggleTooltip(List<Component> tooltip, boolean isPlayerSneaking) {
+        float displayedAngle = isPhysicalBearingAngleTooltipActive()
+                ? physicalBearingMeasuredAngle
+                : angle;
         boolean details = AllKeys.ctrlDown();
         boolean internalLinkMode = isInternalRedstoneLinkMode();
         int liveWestSignal = internalLinkMode ? 0 : getWestSpeedSignal();
@@ -2140,7 +3537,7 @@ public class InvServoTwisterBlockEntity extends KineticBlockEntity implements ID
                 .style(ChatFormatting.GRAY)
                 .forGoggles(tooltip);
 
-        CreateLang.number(Math.abs(angle))
+        CreateLang.number(Math.abs(displayedAngle))
                 .style(ChatFormatting.YELLOW)
                 .add(Component.literal("°"))
                 .forGoggles(tooltip, 1);

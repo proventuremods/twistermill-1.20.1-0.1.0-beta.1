@@ -6,7 +6,6 @@ import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.world.item.BlockItem;
-import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.fml.ModList;
 import net.neoforged.neoforge.event.entity.player.ItemTooltipEvent;
@@ -15,7 +14,6 @@ import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 
 public final class TwisterMillMassTooltip {
 
@@ -24,16 +22,11 @@ public final class TwisterMillMassTooltip {
             DecimalFormatSymbols.getInstance(Locale.ROOT)
     );
 
-    private static final Map<Item, Double> KNOWN_MASSES = Map.of(
-            ModBlocks.TWISTER_SAIL_BLOCK.get().asItem(), 0.25D,
-            ModBlocks.TWISTER_SAIL_FRAME_BLOCK.get().asItem(), 0.25D
-    );
-
     private TwisterMillMassTooltip() {
     }
 
     public static void onItemTooltip(ItemTooltipEvent event) {
-        if (!TwisterMillConfig.isMassTooltipShown() || isAeronauticsTooltipProviderLoaded()) {
+        if (!TwisterMillConfig.isMassTooltipShown()) {
             return;
         }
 
@@ -42,12 +35,38 @@ public final class TwisterMillMassTooltip {
             return;
         }
 
-        Double mass = KNOWN_MASSES.get(stack.getItem());
-        if (mass == null || hasMassTooltip(event.getToolTip())) {
+        Double mass = resolveKnownMass(stack);
+        if (mass == null
+                || (isAeronauticsTooltipProviderLoaded() && !isConfiguredBladeArm(stack))
+                || hasMassTooltip(event.getToolTip())) {
             return;
         }
 
         event.getToolTip().add(buildMassTooltip(mass));
+    }
+
+    private static Double resolveKnownMass(ItemStack stack) {
+        if (stack.getItem() == ModBlocks.TWISTER_SAIL_BLOCK.get().asItem()
+                || stack.getItem() == ModBlocks.TWISTER_SAIL_FRAME_BLOCK.get().asItem()
+                || stack.getItem() == ModBlocks.METAL_TRAVERSE.get().asItem()) {
+            return 0.25D;
+        }
+        if (stack.getItem() == ModBlocks.BLADE_ARM_BLOCK.get().asItem()) {
+            return TwisterMillConfig.getBladeArmBlockMass();
+        }
+        if (stack.getItem() == ModBlocks.BLADE_ARM_EASTFACE_BLOCK.get().asItem()) {
+            return TwisterMillConfig.getBladeArmEastfaceBlockMass();
+        }
+        if (stack.getItem() == ModBlocks.BLADE_ARM_WESTFACE_BLOCK.get().asItem()) {
+            return TwisterMillConfig.getBladeArmWestfaceBlockMass();
+        }
+        return null;
+    }
+
+    private static boolean isConfiguredBladeArm(ItemStack stack) {
+        return stack.getItem() == ModBlocks.BLADE_ARM_BLOCK.get().asItem()
+                || stack.getItem() == ModBlocks.BLADE_ARM_EASTFACE_BLOCK.get().asItem()
+                || stack.getItem() == ModBlocks.BLADE_ARM_WESTFACE_BLOCK.get().asItem();
     }
 
     private static boolean isAeronauticsTooltipProviderLoaded() {

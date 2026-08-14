@@ -67,6 +67,8 @@ public class TwisterMillConfig {
     public static final ModConfigSpec.BooleanValue SHOW_METAL_TRAVERSE;
     public static final ModConfigSpec.BooleanValue SHOW_NOSTALGIC_GRASS_BLOCK;
     public static final ModConfigSpec.BooleanValue ENABLE_NETHERITE_ADVANCEMENT_DROP;
+    public static final ModConfigSpec.ConfigValue<String> ADVANCEMENT_DROP_ITEM;
+    public static final ModConfigSpec.IntValue ADVANCEMENT_DROP_COUNT;
     public static final ModConfigSpec.BooleanValue SHOW_MASS_TOOLTIP;
     public static final ModConfigSpec.DoubleValue WIND_ROTO_VERTICAL_SU_PER_RPM;
     public static final ModConfigSpec.DoubleValue WIND_ROTO_VERTICAL_SERVO_STIFFNESS_PER_INERTIA;
@@ -94,7 +96,12 @@ public class TwisterMillConfig {
     public static final ModConfigSpec.IntValue WIND_ROTO_VERTICAL_SABLE_RELOAD_REATTACH_LOG_INTERVAL_TICKS;
     public static final ModConfigSpec.IntValue SAIL_PLACEMENT_ASSIST_RANGE;
     public static final ModConfigSpec.BooleanValue ENABLE_SAIL_WIND_FORCE;
+    private static final ModConfigSpec.BooleanValue SMOOTH_SAIL_FORCE_UPDATES;
+    private static final ModConfigSpec.DoubleValue SAIL_FORCE_SMOOTHING_STRENGTH;
+    public static final ModConfigSpec.BooleanValue SHOW_SAIL_FORCE_VECTORS;
     public static final ModConfigSpec.BooleanValue ENABLE_SAIL_WIND_DIAGNOSTICS;
+    public static final ModConfigSpec.IntValue PEAK_EFFICIENCY_ROTOR_BLADES;
+    public static final ModConfigSpec.IntValue SAIL_PEAK_EFFICIENCY_PITCH_DEGREES;
     public static final ModConfigSpec.IntValue SAIL_WIND_DIAGNOSTIC_INTERVAL_TICKS;
     public static final ModConfigSpec.DoubleValue SAIL_WIND_FORCE_COEFFICIENT;
     public static final ModConfigSpec.DoubleValue SAIL_WIND_MIN_EXPOSURE;
@@ -104,6 +111,19 @@ public class TwisterMillConfig {
     public static final ModConfigSpec.BooleanValue ENABLE_WIND_ROTO_VERTICAL_CONTRAPTION_MEMORY;
     public static final ModConfigSpec.BooleanValue ENABLE_SERVO_TWISTER_CONTRAPTION_MEMORY;
     public static final ModConfigSpec.BooleanValue ENABLE_INV_SERVO_TWISTER_CONTRAPTION_MEMORY;
+    private static final ModConfigSpec.DoubleValue SERVO_STIFFNESS_PER_INERTIA;
+    private static final ModConfigSpec.DoubleValue SERVO_DAMPING_PER_INERTIA;
+    private static final ModConfigSpec.DoubleValue MODE_7_DISASSEMBLY_RETURN_MOTOR_STRENGTH_MULTIPLIER;
+    private static final ModConfigSpec.DoubleValue SERVO_DISASSEMBLY_RETURN_SPEED_MULTIPLIER;
+    private static final ModConfigSpec.DoubleValue SERVO_DISASSEMBLY_RETURN_SPEED_MULTIPLIER_MODES_1_TO_3;
+    private static final ModConfigSpec.DoubleValue SERVO_DISASSEMBLY_RETURN_SPEED_MULTIPLIER_MODES_4_TO_6;
+    private static final ModConfigSpec.DoubleValue PROPELLER_SLOT_SERVO_STIFFNESS_MULTIPLIER;
+    private static final ModConfigSpec.DoubleValue PROPELLER_SLOT_SERVO_DAMPING_MULTIPLIER;
+    private static final ModConfigSpec.DoubleValue FREE_BEARING_DAMPING_PER_INERTIA;
+    private static final ModConfigSpec.DoubleValue SERVO_MIN_EFFECTIVE_INERTIA;
+    private static final ModConfigSpec.IntValue BLADE_ARM_BLOCK_MASS;
+    private static final ModConfigSpec.IntValue BLADE_ARM_EASTFACE_BLOCK_MASS;
+    private static final ModConfigSpec.IntValue BLADE_ARM_WESTFACE_BLOCK_MASS;
 
     private static boolean isStep10Ticks(Object v) {
         if (!(v instanceof Integer i)) return false;
@@ -166,12 +186,32 @@ public class TwisterMillConfig {
                 .defineInRange("sail_placement_assist_range", 3, 1, 10);
 
         ENABLE_SAIL_WIND_FORCE = b
-                .comment("Enable Weather Sail wind force contribution to Sable physics. Default: false (Phase A diagnose-only).")
-                .define("enable_sail_wind_force", false);
+                .comment("Enable Weather Sail wind force contribution to Sable physics. Default: true.")
+                .define("enable_sail_wind_force", true);
+
+        SMOOTH_SAIL_FORCE_UPDATES = b
+                .comment("Smooth TwisterMill Weather Sail force changes over Sable physics substeps. Default: false.")
+                .define("smooth_sail_force_updates", false);
+
+        SAIL_FORCE_SMOOTHING_STRENGTH = b
+                .comment("Weather Sail force smoothing strength. Lower values react faster; higher values smooth more strongly. Range: 0.1 - 10.0. Default: 1.0.")
+                .defineInRange("sail_force_smoothing_strength", 1.0D, 0.1D, 10.0D);
+
+        SHOW_SAIL_FORCE_VECTORS = b
+                .comment("Show the red incoming-wind force vector and green resulting pitch-force vector for Weather Sails when Sail wind force is enabled. This controls rendering only and does not change physics. Default: false.")
+                .define("enable_sail_wind_force_vectors", false);
 
         ENABLE_SAIL_WIND_DIAGNOSTICS = b
                 .comment("Enable periodic diagnostics for Weather Sail wind sampling and computed force. Default: false.")
                 .define("enable_sail_wind_diagnostics", false);
+
+        PEAK_EFFICIENCY_ROTOR_BLADES = b
+                .comment("Maximum Sail force conversion from incoming wind into tangential rotor-driving force (Peak-Efficiency / Force Redirection). This is the peak green/blue force ratio and is fully configurable. Range: 10–200%. Default: 80%.")
+                .defineInRange("peak_efficiency_rotor_blades", 80, 10, 200);
+
+        SAIL_PEAK_EFFICIENCY_PITCH_DEGREES = b
+                .comment("Pitch angle in degrees at which the maximal Sail peak-efficiency is reached. Range: 1–89. Default: 50.")
+                .defineInRange("sail_peak_efficiency_pitch_degrees", 50, 1, 89);
 
         SAIL_WIND_DIAGNOSTIC_INTERVAL_TICKS = b
                 .comment("Diagnostic log interval for Twister Sail wind diagnostics. Range: 10 - 1200 ticks. Default: 100.")
@@ -212,6 +252,37 @@ public class TwisterMillConfig {
         ENABLE_INV_SERVO_TWISTER_CONTRAPTION_MEMORY = b
                 .comment("Enable remembered contraption memory for Inverted Servo Bearings. Default: true.")
                 .define("enable_inverted_servo_bearing_contraption_memory", true);
+
+        BLADE_ARM_BLOCK_MASS = b
+                .comment("Sable mass of each Blade Arm block. Requires a world/server restart and reassembly. Range: 1 - 200. Default: 33.")
+                .worldRestart()
+                .defineInRange("blade_arm_block_mass", 33, 1, 200);
+
+        BLADE_ARM_EASTFACE_BLOCK_MASS = b
+                .comment("Sable mass of each Blade Arm East Face block. Requires a world/server restart and reassembly. Range: 1 - 200. Default: 33.")
+                .worldRestart()
+                .defineInRange("blade_arm_eastface_block_mass", 33, 1, 200);
+
+        BLADE_ARM_WESTFACE_BLOCK_MASS = b
+                .comment("Sable mass of each Blade Arm West Face block. Requires a world/server restart and reassembly. Range: 1 - 200. Default: 33.")
+                .worldRestart()
+                .defineInRange("blade_arm_westface_block_mass", 33, 1, 200);
+
+        AUTO_RESEAT_WIND_ROTO_VERTICAL_BLOCK_ON_LOAD = b
+                .comment("Automatically reseat loaded Windvane Bearing Sable attachments after server/world load and chunk load. Default: false.")
+                .define("auto_reseat_windvane_bearing_on_load", false);
+
+        AUTO_RESEAT_WIND_ROTO_BLOCK_ON_LOAD = b
+                .comment("Automatically reseat loaded Weather Bearing Sable attachments after server/world load and chunk load. Default: false.")
+                .define("auto_reseat_weather_bearing_on_load", false);
+
+        AUTO_RESEAT_SERVO_ON_LOAD = b
+                .comment("Automatically reseat loaded Servo Bearing Sable attachments after server/world load and chunk load. Default: false.")
+                .define("auto_reseat_servo_on_load", false);
+
+        AUTO_RESEAT_INV_SERVO_ON_LOAD = b
+                .comment("Automatically reseat loaded Inverted Servo Bearing Sable attachments after server/world load and chunk load. Default: false.")
+                .define("auto_reseat_inverted_servo_on_load", false);
 
         b.pop();
 
@@ -256,8 +327,16 @@ public class TwisterMillConfig {
         b.comment("Drop and reward settings").push("drops");
 
         ENABLE_NETHERITE_ADVANCEMENT_DROP = b
-                .comment("Give the Netherite-themed Ancient Debris reward when the Binary Code Transmitter advancement is completed. Default: true")
-                .define("enable_netherite_advancement_drop", true);
+                .comment("Give the configured reward when the Binary Code Transmitter advancement is completed. Default: false")
+                .define("enable_netherite_advancement_drop", false);
+
+        ADVANCEMENT_DROP_ITEM = b
+                .comment("Registered item ID used for the Binary Code Transmitter advancement reward. Default: minecraft:ancient_debris")
+                .define("advancement_drop_item", "minecraft:ancient_debris");
+
+        ADVANCEMENT_DROP_COUNT = b
+                .comment("Item count used for the Binary Code Transmitter advancement reward. Runtime range: 1 - 64. Default: 6")
+                .defineInRange("advancement_drop_count", 6, Integer.MIN_VALUE, Integer.MAX_VALUE);
 
         b.pop();
 
@@ -290,8 +369,58 @@ public class TwisterMillConfig {
                 .define("enable_inv_servo_speed_zero_movement", false);
 
         ENABLE_SERVO_SLOT_DIAGNOSTICS = b
-                .comment("Enable extra diagnostics/logging/troubleshooting for Servo/Inverted Servo Bearing Sable and Option 7 propeller slots. Keep disabled during normal gameplay. Default: false.")
+                .comment("Enable extra diagnostics/logging/troubleshooting for Servo/Inverted Servo Bearing Sable and Mode 7 blade-anchor slots. Keep disabled during normal gameplay. Default: false.")
                 .define("enable_servo_slot_diagnostics", false);
+
+        SERVO_STIFFNESS_PER_INERTIA = b
+                .comment("Sable motor stiffness per effective inertia for Servo and Inverted Servo Bearings. Requires a world/server restart. Range: 0.0 - 10000000.0. Default: 1600.0.")
+                .worldRestart()
+                .defineInRange("servo_stiffness_per_inertia", 1600.0D, 0.0D, 10000000.0D);
+
+        SERVO_DAMPING_PER_INERTIA = b
+                .comment("Sable motor damping per effective inertia for Servo and Inverted Servo Bearings. Requires a world/server restart. Range: 0.0 - 1000000.0. Default: 40.0.")
+                .worldRestart()
+                .defineInRange("servo_damping_per_inertia", 40.0D, 0.0D, 1000000.0D);
+
+        MODE_7_DISASSEMBLY_RETURN_MOTOR_STRENGTH_MULTIPLIER = b
+                .comment("Multiplier for Servo Bearing GUI mode 7 motor stiffness during requested disassembly return-to-zero and physical zero confirmation for all block facings; damping is multiplied by the square root of this value. Requires a world/server restart. Range: 1.0 - 100.0. Default: 4.0.")
+                .worldRestart()
+                .defineInRange("mode_7_disassembly_return_motor_strength_multiplier", 4.0D, 1.0D, 100.0D);
+
+        SERVO_DISASSEMBLY_RETURN_SPEED_MULTIPLIER = b
+                .comment("Multiplier for the commanded Servo Bearing return-to-zero speed during requested disassembly in GUI mode 7. Applies to the full return curve, including its minimum step, and does not change motor or physical safety thresholds. Requires a world/server restart. Range: 0.05 - 10.0. Default: 5.0.")
+                .worldRestart()
+                .defineInRange("disassembly_return_speed_multiplier", 5.0D, 0.05D, 10.0D);
+
+        SERVO_DISASSEMBLY_RETURN_SPEED_MULTIPLIER_MODES_1_TO_3 = b
+                .comment("Multiplier for the commanded Servo and Inverted Servo Bearing return-to-zero speed during requested disassembly in GUI modes 1 to 3. Applies to the full return curve, including its minimum step, and does not change motor or physical safety thresholds. Requires a world/server restart. Range: 0.05 - 10.0. Default: 5.0.")
+                .worldRestart()
+                .defineInRange("disassembly_return_speed_multiplier_modes_1_to_3", 5.0D, 0.05D, 10.0D);
+
+        SERVO_DISASSEMBLY_RETURN_SPEED_MULTIPLIER_MODES_4_TO_6 = b
+                .comment("Multiplier for the commanded Servo and Inverted Servo Bearing return-to-zero speed during requested disassembly in GUI modes 4 to 6. Applies to the full return curve, including its minimum step, and does not change motor or physical safety thresholds. Requires a world/server restart. Range: 0.05 - 10.0. Default: 5.0.")
+                .worldRestart()
+                .defineInRange("disassembly_return_speed_multiplier_modes_4_to_6", 5.0D, 0.05D, 10.0D);
+
+        PROPELLER_SLOT_SERVO_STIFFNESS_MULTIPLIER = b
+                .comment("Multiplier applied to Servo Bearing motor stiffness while mounted on an existing propeller-slot sublevel. Requires a world/server restart. Range: 0.0 - 100.0. Default: 4.0.")
+                .worldRestart()
+                .defineInRange("propeller_slot_servo_stiffness_multiplier", 4.0D, 0.0D, 100.0D);
+
+        PROPELLER_SLOT_SERVO_DAMPING_MULTIPLIER = b
+                .comment("Multiplier applied to Servo Bearing motor damping while mounted on an existing propeller-slot sublevel. Requires a world/server restart. Range: 0.0 - 100.0. Default: 4.0.")
+                .worldRestart()
+                .defineInRange("propeller_slot_servo_damping_multiplier", 4.0D, 0.0D, 100.0D);
+
+        FREE_BEARING_DAMPING_PER_INERTIA = b
+                .comment("Sable motor damping per effective inertia in Free Bearing mode for Servo and Inverted Servo Bearings; stiffness remains 0.0. Requires a world/server restart. Range: 0.0 - 1000.0. Default: 0.03.")
+                .worldRestart()
+                .defineInRange("free_bearing_damping_per_inertia", 0.03D, 0.0D, 1000.0D);
+
+        SERVO_MIN_EFFECTIVE_INERTIA = b
+                .comment("Minimum effective inertia used when scaling Servo and Inverted Servo Bearing Sable motors. Requires a world/server restart. Range: 0.0001 - 1000000.0. Default: 10.0.")
+                .worldRestart()
+                .defineInRange("min_effective_inertia", 10.0D, 0.0001D, 1000000.0D);
 
         b.pop();
 
@@ -312,22 +441,6 @@ public class TwisterMillConfig {
         ENABLE_INV_SERVO_DIAGNOSTICS = b
                 .comment("Enable diagnostics logging for Inverted Servo Bearing. Default: false.")
                 .define("enable_inverted_servo_diagnostics", false);
-
-        AUTO_RESEAT_WIND_ROTO_VERTICAL_BLOCK_ON_LOAD = b
-                .comment("Automatically reseat loaded Windvane Bearing Sable attachments after server/world load and chunk load. Default: true.")
-                .define("auto_reseat_windvane_bearing_on_load", true);
-
-        AUTO_RESEAT_WIND_ROTO_BLOCK_ON_LOAD = b
-                .comment("Automatically reseat loaded Weather Bearing Sable attachments after server/world load and chunk load. Default: true.")
-                .define("auto_reseat_weather_bearing_on_load", true);
-
-        AUTO_RESEAT_SERVO_ON_LOAD = b
-                .comment("Automatically reseat loaded Servo Bearing Sable attachments after server/world load and chunk load. Default: true.")
-                .define("auto_reseat_servo_on_load", true);
-
-        AUTO_RESEAT_INV_SERVO_ON_LOAD = b
-                .comment("Automatically reseat loaded Inverted Servo Bearing Sable attachments after server/world load and chunk load. Default: true.")
-                .define("auto_reseat_inverted_servo_on_load", true);
 
         SHOW_METAL_TRAVERSE_DEBUG_OVERLAY = b
                 .comment("Show detailed Aluminum Truss model, blockstate, and tag lines in the F3 Targeted Block debug overlay. Default: false.")
@@ -443,6 +556,26 @@ public class TwisterMillConfig {
         return Mth.clamp(SAIL_PLACEMENT_ASSIST_RANGE.get(), 1, 10);
     }
 
+    public static double getRotorBladePeakEfficiencyFraction() {
+        return Mth.clamp(PEAK_EFFICIENCY_ROTOR_BLADES.get(), 10, 200) / 100.0D;
+    }
+
+    public static int getSailPeakEfficiencyPitchDegrees() {
+        return Mth.clamp(SAIL_PEAK_EFFICIENCY_PITCH_DEGREES.get(), 1, 89);
+    }
+
+    public static boolean isSailForceVectorsShown() {
+        return SHOW_SAIL_FORCE_VECTORS.get();
+    }
+
+    public static boolean isSailForceSmoothingEnabled() {
+        return SMOOTH_SAIL_FORCE_UPDATES.get();
+    }
+
+    public static double getSailForceSmoothingStrength() {
+        return Mth.clamp(SAIL_FORCE_SMOOTHING_STRENGTH.get(), 0.1D, 10.0D);
+    }
+
     public static int getAllowedBlocksAboveForOutside() {
         return Mth.clamp(ALLOWED_BLOCKS_ABOVE_FOR_OUTSIDE.get(), 0, 10);
     }
@@ -531,6 +664,14 @@ public class TwisterMillConfig {
         return ENABLE_NETHERITE_ADVANCEMENT_DROP.get();
     }
 
+    public static String getAdvancementDropItem() {
+        return ADVANCEMENT_DROP_ITEM.get();
+    }
+
+    public static int getAdvancementDropCount() {
+        return ADVANCEMENT_DROP_COUNT.get();
+    }
+
     public static boolean isContentEnabled(String key) {
         return switch (key) {
             case CONTENT_SHOW_BLADE_ARM_BLOCK -> isBladeArmBlockShown();
@@ -568,6 +709,70 @@ public class TwisterMillConfig {
 
     public static boolean isInvServoTwisterContraptionMemoryEnabled() {
         return ENABLE_INV_SERVO_TWISTER_CONTRAPTION_MEMORY.get();
+    }
+
+    public static double getServoStiffnessPerInertia() {
+        return Mth.clamp(SERVO_STIFFNESS_PER_INERTIA.get(), 0.0D, 10000000.0D);
+    }
+
+    public static double getServoDampingPerInertia() {
+        return Mth.clamp(SERVO_DAMPING_PER_INERTIA.get(), 0.0D, 1000000.0D);
+    }
+
+    public static double getMode7DisassemblyReturnMotorStrengthMultiplier() {
+        return Mth.clamp(
+                MODE_7_DISASSEMBLY_RETURN_MOTOR_STRENGTH_MULTIPLIER.get(),
+                1.0D,
+                100.0D
+        );
+    }
+
+    public static float getServoDisassemblyReturnSpeedMultiplier() {
+        return (float) Mth.clamp(SERVO_DISASSEMBLY_RETURN_SPEED_MULTIPLIER.get(), 0.05D, 10.0D);
+    }
+
+    public static float getServoDisassemblyReturnSpeedMultiplierModes1To3() {
+        return (float) Mth.clamp(
+                SERVO_DISASSEMBLY_RETURN_SPEED_MULTIPLIER_MODES_1_TO_3.get(),
+                0.05D,
+                10.0D
+        );
+    }
+
+    public static float getServoDisassemblyReturnSpeedMultiplierModes4To6() {
+        return (float) Mth.clamp(
+                SERVO_DISASSEMBLY_RETURN_SPEED_MULTIPLIER_MODES_4_TO_6.get(),
+                0.05D,
+                10.0D
+        );
+    }
+
+    public static double getPropellerSlotServoStiffnessMultiplier() {
+        return Mth.clamp(PROPELLER_SLOT_SERVO_STIFFNESS_MULTIPLIER.get(), 0.0D, 100.0D);
+    }
+
+    public static double getPropellerSlotServoDampingMultiplier() {
+        return Mth.clamp(PROPELLER_SLOT_SERVO_DAMPING_MULTIPLIER.get(), 0.0D, 100.0D);
+    }
+
+    public static double getFreeBearingDampingPerInertia() {
+        return Mth.clamp(FREE_BEARING_DAMPING_PER_INERTIA.get(), 0.0D, 1000.0D);
+    }
+
+    public static double getServoMinEffectiveInertia() {
+        return Mth.clamp(SERVO_MIN_EFFECTIVE_INERTIA.get(), 0.0001D, 1000000.0D);
+    }
+
+    public static double getBladeArmBlockMass() {
+        return Mth.clamp(BLADE_ARM_BLOCK_MASS.get(), 1, 200);
+    }
+
+    public static double getBladeArmEastfaceBlockMass() {
+        return Mth.clamp(BLADE_ARM_EASTFACE_BLOCK_MASS.get(), 1, 200);
+    }
+
+    public static double getBladeArmWestfaceBlockMass() {
+        return Mth.clamp(BLADE_ARM_WESTFACE_BLOCK_MASS.get(), 1, 200);
     }
 
     public static float getWindRotoVerticalSuPerRpm() {

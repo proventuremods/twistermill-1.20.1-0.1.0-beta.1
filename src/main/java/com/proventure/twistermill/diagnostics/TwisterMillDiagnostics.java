@@ -51,6 +51,7 @@ public final class TwisterMillDiagnostics {
         return isLoggingEnabled(Target.WRB);
     }
 
+    @SuppressWarnings("BooleanMethodIsAlwaysInverted")
     public static boolean isWrvbLoggingEnabled() {
         return isLoggingEnabled(Target.WRVB);
     }

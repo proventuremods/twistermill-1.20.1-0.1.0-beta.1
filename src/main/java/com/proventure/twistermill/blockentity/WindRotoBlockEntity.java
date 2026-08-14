@@ -813,19 +813,14 @@ public class WindRotoBlockEntity extends MechanicalBearingBlockEntity {
         return true;
     }
 
-    private boolean resetSyncedSailLikeBlockCount() {
-        boolean changed = false;
+    private void resetSyncedSailLikeBlockCount() {
         if (syncedSailLikeBlockCount != 0) {
             syncedSailLikeBlockCount = 0;
-            changed = true;
         }
 
         if (syncedContraptionBlockCount != 0) {
             syncedContraptionBlockCount = 0;
-            changed = true;
         }
-
-        return changed;
     }
 
     private int getCurrentMeasuredContraptionBlockCount() {
@@ -2147,10 +2142,6 @@ public class WindRotoBlockEntity extends MechanicalBearingBlockEntity {
         if (state.hasProperty(WindRotoBlock.RUNNING) && state.getValue(WindRotoBlock.RUNNING) != runningVisual) {
             level.setBlock(worldPosition, state.setValue(WindRotoBlock.RUNNING, runningVisual), 3);
         }
-    }
-
-    private void recomputeNow(long time) {
-        recomputeNow(time, true);
     }
 
     private void recomputeNow(long time, boolean snapGeneratedRpm) {

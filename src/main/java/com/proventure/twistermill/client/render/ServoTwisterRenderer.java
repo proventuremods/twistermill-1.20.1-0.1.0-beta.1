@@ -1,16 +1,17 @@
 package com.proventure.twistermill.client.render;
 
 import com.mojang.blaze3d.vertex.PoseStack;
+import com.mojang.math.Axis;
 import com.proventure.twistermill.block.ModBlocks;
 import com.proventure.twistermill.blockentity.ServoPropellerSlotManager;
 import com.proventure.twistermill.blockentity.ServoTwisterBlockEntity;
 import com.proventure.twistermill.client.TwisterMillPartialModels;
 import com.proventure.twistermill.util.SableLevelWrapper;
+import com.proventure.twistermill.util.ServoTwoAxisRotationMath;
 import com.simibubi.create.content.kinetics.base.KineticBlockEntityRenderer;
 import dev.ryanhcode.sable.Sable;
 import dev.ryanhcode.sable.api.sublevel.SubLevelContainer;
 import dev.ryanhcode.sable.companion.ClientSubLevelAccess;
-import dev.ryanhcode.sable.companion.SubLevelAccess;
 import dev.ryanhcode.sable.companion.math.Pose3d;
 import dev.ryanhcode.sable.companion.math.Pose3dc;
 import dev.ryanhcode.sable.sublevel.SubLevel;
@@ -28,7 +29,7 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.phys.AABB;
-import net.neoforged.neoforge.client.model.data.ModelData;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Quaterniond;
 import org.joml.Quaternionf;
@@ -40,6 +41,7 @@ public class ServoTwisterRenderer extends KineticBlockEntityRenderer<ServoTwiste
     private static final double OPTION7_BEAM_RENDER_BOUNDS = 4.0D;
     private static final double SERVO_RENDER_SPACE_EPSILON = 1.0E-6D;
     private static final double ANTENNA_DOWN_OFFSET = 14.0D / 16.0D;
+    private final Quaternionf twoAxisRotation = new Quaternionf();
 
     public ServoTwisterRenderer(BlockEntityRendererProvider.Context context) {
         super(context);
@@ -59,9 +61,10 @@ public class ServoTwisterRenderer extends KineticBlockEntityRenderer<ServoTwiste
 
         rotateTopToFacing(top, facing);
 
-        float angle = be.getInterpolatedAngle(partialTicks);
+        float rawAngle = be.getInterpolatedAngle(partialTicks);
+        float secondRawAngle = be.getInterpolatedSecondAngle(partialTicks);
         float sign = facing.getAxisDirection() == Direction.AxisDirection.POSITIVE ? 1f : -1f;
-        angle *= -sign;
+        float facingAxisAngle = rawAngle * -sign;
 
         int packedLight = be.getLevel() != null
                 ? LevelRenderer.getLightColor(be.getLevel(), be.getBlockPos())
@@ -75,18 +78,38 @@ public class ServoTwisterRenderer extends KineticBlockEntityRenderer<ServoTwiste
                 ms,
                 () -> top.light(packedLight).renderInto(ms, buffer.getBuffer(RenderType.cutout()))
         )) {
-            top.rotateCentered((float) Math.toRadians(angle), Direction.Axis.Z);
-            top.light(packedLight)
-                    .renderInto(ms, buffer.getBuffer(RenderType.cutout()));
+            if (be.usesTwoAxisTiltRotationForRender()) {
+                ms.pushPose();
+                ms.translate(0.5D, 0.5D, 0.5D);
+                ms.mulPose(ServoTwoAxisRotationMath.setBlockMovementQuaternion(
+                        facing, rawAngle, secondRawAngle, twoAxisRotation));
+                ms.translate(-0.5D, -0.5D, -0.5D);
+                top.light(packedLight)
+                        .renderInto(ms, buffer.getBuffer(RenderType.cutout()));
+                ms.popPose();
+            } else if (be.usesUpPitchRotationForRender()) {
+                ms.pushPose();
+                ms.translate(0.5D, 0.5D, 0.5D);
+                ms.mulPose(Axis.XP.rotationDegrees(rawAngle));
+                ms.translate(-0.5D, -0.5D, -0.5D);
+                top.light(packedLight)
+                        .renderInto(ms, buffer.getBuffer(RenderType.cutout()));
+                ms.popPose();
+            } else {
+                top.rotateCentered((float) Math.toRadians(facingAxisAngle), Direction.Axis.Z);
+                top.light(packedLight)
+                        .renderInto(ms, buffer.getBuffer(RenderType.cutout()));
+            }
         }
 
-        if (be.isInternalRedstoneLinkReceiverActive()) {
+        if (be.isAnyInternalRedstoneLinkReceiverActive()) {
             SuperByteBuffer antenna = CachedBuffers.partial(TwisterMillPartialModels.SERVO_TWISTER_ANTENNA, state);
             rotateHousingFixedPartialToBlockstateFacing(antenna, facing);
             renderHousingFixedAntenna(antenna, facing, packedLight, ms, buffer);
         }
 
-        if (be.shouldRenderInternalRedstoneLinkSlots()) {
+        if (be.shouldRenderInternalRedstoneLinkSlots()
+                || be.shouldRenderSecondaryInternalRedstoneLinkSlots()) {
             InternalServoRedstoneLinkRenderer.renderOnBlockEntity(be, false, ms, buffer, light, overlay);
         }
 
@@ -97,7 +120,7 @@ public class ServoTwisterRenderer extends KineticBlockEntityRenderer<ServoTwiste
                 buffer
         );
 
-        renderOption7BladeArmClones(be, facing, angle, partialTicks, ms, buffer, packedLight, overlay);
+        renderOption7BladeArmClones(be, facing, facingAxisAngle, partialTicks, ms, buffer, packedLight, overlay);
     }
 
     private static void rotateHousingFixedPartialToBlockstateFacing(SuperByteBuffer buf, Direction facing) {
@@ -125,9 +148,6 @@ public class ServoTwisterRenderer extends KineticBlockEntityRenderer<ServoTwiste
         if (facing == Direction.DOWN) {
             renderTranslatedHousingFixedAntenna(
                     antenna,
-                    0.0D,
-                    ANTENNA_DOWN_OFFSET,
-                    0.0D,
                     packedLight,
                     ms,
                     buffer
@@ -141,22 +161,19 @@ public class ServoTwisterRenderer extends KineticBlockEntityRenderer<ServoTwiste
 
     private static void renderTranslatedHousingFixedAntenna(
             SuperByteBuffer antenna,
-            double x,
-            double y,
-            double z,
             int packedLight,
             PoseStack ms,
             MultiBufferSource buffer
     ) {
         ms.pushPose();
-        ms.translate(x, y, z);
+        ms.translate(0.0D, ANTENNA_DOWN_OFFSET, 0.0D);
         antenna.light(packedLight)
                 .renderInto(ms, buffer.getBuffer(RenderType.cutout()));
         ms.popPose();
     }
 
     @Override
-    public AABB getRenderBoundingBox(ServoTwisterBlockEntity be) {
+    public @NotNull AABB getRenderBoundingBox(@NotNull ServoTwisterBlockEntity be) {
         if (be != null && be.isPropellerSlotMode()) {
             return new AABB(be.getBlockPos()).inflate(OPTION7_BEAM_RENDER_BOUNDS);
         }
@@ -276,6 +293,7 @@ public class ServoTwisterRenderer extends KineticBlockEntityRenderer<ServoTwiste
         return new BladeArmRenderState(state, packedLight, null, null);
     }
 
+    @SuppressWarnings("BooleanMethodIsAlwaysInverted")
     private static boolean isBladeArmState(BlockState state) {
         return state.is(ModBlocks.BLADE_ARM_BLOCK.get())
                 || state.is(ModBlocks.BLADE_ARM_EASTFACE_BLOCK.get())
@@ -305,14 +323,13 @@ public class ServoTwisterRenderer extends KineticBlockEntityRenderer<ServoTwiste
         rotateAroundFacing(ms, facing, slotAngle);
         ms.translate(-0.5D, -0.5D, -0.5D);
 
+        //noinspection deprecation
         Minecraft.getInstance().getBlockRenderer().renderSingleBlock(
                 armState.state(),
                 ms,
                 buffer,
                 armState.packedLight(),
-                overlay,
-                ModelData.EMPTY,
-                null
+                overlay
         );
         ms.popPose();
     }
@@ -378,14 +395,13 @@ public class ServoTwisterRenderer extends KineticBlockEntityRenderer<ServoTwiste
         ms.mulPose(toQuaternionf(renderOrientation));
         ms.translate(-0.5D, -0.5D, -0.5D);
 
+        //noinspection deprecation
         Minecraft.getInstance().getBlockRenderer().renderSingleBlock(
                 armState.state(),
                 ms,
                 buffer,
                 armState.packedLight(),
-                overlay,
-                ModelData.EMPTY,
-                null
+                overlay
         );
         ms.popPose();
         return true;
@@ -500,10 +516,6 @@ public class ServoTwisterRenderer extends KineticBlockEntityRenderer<ServoTwiste
             return directContaining;
         }
 
-        if (servoLevel instanceof SubLevelAccess access && access instanceof SubLevel subLevel && !subLevel.isRemoved()) {
-            return subLevel;
-        }
-
         Vector3d servoWorldCenter = computeWorldCenter(servoLevel, servo.getBlockPos());
         if (!isFinite(servoWorldCenter)) {
             return null;
@@ -523,10 +535,6 @@ public class ServoTwisterRenderer extends KineticBlockEntityRenderer<ServoTwiste
             ServoTwisterBlockEntity servo
     ) {
         if (resolveDirectContainingSubLevel(servo) != null) {
-            return true;
-        }
-
-        if (servoLevel instanceof SubLevelAccess access && access instanceof SubLevel) {
             return true;
         }
 
@@ -633,6 +641,7 @@ public class ServoTwisterRenderer extends KineticBlockEntityRenderer<ServoTwiste
         }
     }
 
+    @SuppressWarnings("BooleanMethodIsAlwaysInverted")
     private static boolean isLoaded(Level level, BlockPos pos) {
         try {
             return level.isLoaded(pos);

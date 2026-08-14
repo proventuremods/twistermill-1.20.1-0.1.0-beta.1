@@ -6,12 +6,18 @@
   "compatibilityLevel": "JAVA_21",
   "mixins": [
     "create.ClickToLinkBlockItemMixin",
+    "create.GirderBlockMixin",
     "create.RedstoneLinkNetworkHandlerMixin",
     "create.LinkBehaviourSyncMixin",
+    "neoforge.CommonHooksLadderMixin",
     "weather2.PacketNBTFromServerMixin",
-    "weather2.WeatherNetworkingv2Mixin"
+    "weather2.WeatherNetworkingv2Mixin",
+    "sable.PhysicsBlockPropertyHelperMixin"
   ],
   "client": [
+    "neoforge.ModListScreenMixin",
+    "neoforge.ModListScreenInfoPanelMixin",
+    "create.GirderCTBehaviourMixin",
     "create.LinkRendererMixin",
     "create.PlacementClientMixin",
     "create.IPlacementHelperMixin",

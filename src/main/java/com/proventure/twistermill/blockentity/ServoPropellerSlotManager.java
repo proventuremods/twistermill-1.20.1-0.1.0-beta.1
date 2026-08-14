@@ -1,15 +1,17 @@
 package com.proventure.twistermill.blockentity;
 
 import com.mojang.logging.LogUtils;
+import com.proventure.twistermill.block.ModBlocks;
+import com.proventure.twistermill.block.custom.MetalTraverseBlock;
 import com.proventure.twistermill.diagnostics.TwisterMillDiagnostics;
 import com.proventure.twistermill.util.SableLevelWrapper;
 import dev.ryanhcode.sable.Sable;
 import dev.ryanhcode.sable.api.SubLevelAssemblyHelper;
 import dev.ryanhcode.sable.api.physics.PhysicsPipeline;
+import dev.ryanhcode.sable.api.physics.PhysicsPipelineBody;
 import dev.ryanhcode.sable.api.physics.constraint.ConstraintJointAxis;
 import dev.ryanhcode.sable.api.physics.constraint.GenericConstraintConfiguration;
 import dev.ryanhcode.sable.api.physics.constraint.GenericConstraintHandle;
-import dev.ryanhcode.sable.api.physics.mass.MassData;
 import dev.ryanhcode.sable.api.sublevel.ServerSubLevelContainer;
 import dev.ryanhcode.sable.api.sublevel.SubLevelContainer;
 import dev.ryanhcode.sable.companion.math.BoundingBox3i;
@@ -30,7 +32,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.LevelAccessor;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.EntityBlock;
 import net.minecraft.world.level.block.FallingBlock;
@@ -40,10 +42,12 @@ import net.neoforged.neoforge.event.level.BlockEvent;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix3dc;
 import org.joml.Quaterniond;
+import org.joml.Quaterniondc;
 import org.joml.Vector3d;
 import org.joml.Vector3dc;
 import org.slf4j.Logger;
 
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.EnumSet;
@@ -76,15 +80,10 @@ public final class ServoPropellerSlotManager {
     private static final double SLOT_LOCK_MULTIPLIER = 4.0D;
     private static final double MIN_EFFECTIVE_SLOT_LOAD = 10.0D;
     private static final double MAX_EFFECTIVE_SLOT_LOAD = 250.0D;
-    private static final double LOAD_CHANGE_EPSILON = 1.0E-4D;
-    private static final int DIAGNOSTIC_REJOIN_TICKS = 40;
-    private static final double DIAGNOSTIC_ANCHOR_ERROR_THRESHOLD = 0.125D;
-    private static final double DIAGNOSTIC_NORMAL_ERROR_THRESHOLD = 0.01D;
+    private static final int DIAGNOSTIC_UNKNOWN_RUNTIME_ID = Integer.MIN_VALUE;
     private static final String SLOT_SUBLEVEL_NAME_PREFIX = "twistermill_servo_propeller_slot_";
     private static final Set<ServoPropellerSlotManager> ACTIVE_MANAGERS =
             Collections.synchronizedSet(Collections.newSetFromMap(new WeakHashMap<>()));
-    private static final Set<UUID> SLOT_FRAME_DIAG_LOGGED_SUBLEVELS =
-            Collections.synchronizedSet(new HashSet<>());
 
     private static final String TAG_PROPELLER_SLOTS = "PropellerSlots";
     private static final String TAG_VIRTUAL_TOP_OCCUPIED = "VirtualTopOccupied";
@@ -102,30 +101,93 @@ public final class ServoPropellerSlotManager {
 
     private final UUID[] slotSubLevelIds = new UUID[SLOT_COUNT];
     private final Vector3d[] slotAnchorLocalCenters = new Vector3d[SLOT_COUNT];
-    private final Vector3d[] lastLockedWorldCenters = new Vector3d[SLOT_COUNT];
-    private final Quaterniond[] lastLockedOrientations = new Quaterniond[SLOT_COUNT];
     private final GenericConstraintHandle[] slotConstraintHandles = new GenericConstraintHandle[SLOT_COUNT];
+    private final ConstraintParentKind[] slotConstraintParentKinds = new ConstraintParentKind[SLOT_COUNT];
+    private final UUID[] slotConstraintParentSubLevelIds = new UUID[SLOT_COUNT];
+    private final Vector3d[] slotConstraintFrame1Positions = new Vector3d[SLOT_COUNT];
+    private final Quaterniond[] slotConstraintFrame1Orientations = new Quaterniond[SLOT_COUNT];
+    private final UUID[] slotLastSnapTopSubLevelIds = new UUID[SLOT_COUNT];
+    private final int[] slotLastSnapTopRuntimeIds = new int[SLOT_COUNT];
+    private final int[] slotLastSnapTopObjectIdentities = new int[SLOT_COUNT];
     private final UUID[] slotConstraintTopSubLevelIds = new UUID[SLOT_COUNT];
     private final boolean[] slotConstraintAttachedToTop = new boolean[SLOT_COUNT];
-    private final double[] lastTunedMasses = new double[SLOT_COUNT];
-    private final double[] lastTunedAngularLoads = new double[SLOT_COUNT];
-    private final boolean[] pendingDiagnosticLogs = new boolean[SLOT_COUNT];
-    private final String[] pendingDiagnosticEvents = new String[SLOT_COUNT];
-    private final BlockPos[] pendingDiagnosticPositions = new BlockPos[SLOT_COUNT];
+    private final int[] slotConstraintParentRuntimeIds = new int[SLOT_COUNT];
+    private final int[] slotConstraintChildRuntimeIds = new int[SLOT_COUNT];
+    private final int[] slotConstraintParentObjectIdentities = new int[SLOT_COUNT];
+    private final int[] slotConstraintChildObjectIdentities = new int[SLOT_COUNT];
     private UUID activeTopSubLevelId;
     private Vector3d activeTopAnchorLocalCenter;
     private Direction slotFacing = Direction.UP;
     private boolean topFollowActive;
     private boolean activeManagerRegistered;
-    private int diagnosticRejoinTicksRemaining;
-    private boolean diagnosticReadPending;
-    private final Set<CarriedServoTopKey> loggedCarriedServoTopKeys = new HashSet<>();
-    private boolean carriedServoTopDiagnosticsWasEnabled;
+    private transient SubLevelPhysicsSystem activePhysicsSystem;
+    private BlockPos supportAssemblyAnchorPos;
+    private boolean supportBindingInitialized;
+    private boolean supportBindingRootWorld;
+    private UUID supportSubLevelId;
+    private BlockPos diagnosticServoWorldPos;
+    private transient boolean freeBearingFailClosedTopFollow;
+    private transient boolean freeBearingAllowTopRebind;
+    @Nullable
+    private transient UUID freeBearingExpectedTopSubLevelId;
 
     ServoPropellerSlotManager() {
+        Arrays.fill(slotConstraintParentKinds, ConstraintParentKind.NONE);
+        Arrays.fill(slotConstraintParentRuntimeIds, DIAGNOSTIC_UNKNOWN_RUNTIME_ID);
+        Arrays.fill(slotConstraintChildRuntimeIds, DIAGNOSTIC_UNKNOWN_RUNTIME_ID);
+        Arrays.fill(slotConstraintParentObjectIdentities, DIAGNOSTIC_UNKNOWN_RUNTIME_ID);
+        Arrays.fill(slotConstraintChildObjectIdentities, DIAGNOSTIC_UNKNOWN_RUNTIME_ID);
+        Arrays.fill(slotLastSnapTopRuntimeIds, DIAGNOSTIC_UNKNOWN_RUNTIME_ID);
+        Arrays.fill(slotLastSnapTopObjectIdentities, DIAGNOSTIC_UNKNOWN_RUNTIME_ID);
     }
 
-    private record CarriedServoTopKey(UUID parentSubLevelId, BlockPos servoPos, @Nullable UUID childTopId) {
+    private record ConstraintFrameDiagnostics(
+            Vector3d frame1WorldPosition,
+            Quaterniond frame1WorldOrientation,
+            Vector3d frame2WorldPosition,
+            Quaterniond frame2WorldOrientation,
+            double positionError,
+            double orientationErrorDegrees
+    ) {
+    }
+
+    private enum ConstraintParentKind {
+        NONE,
+        ROOT_WORLD,
+        SUPPORT_BODY,
+        TOP_BODY
+    }
+
+    private enum ConstraintEnsureResult {
+        TARGET_ACTIVE,
+        PREVIOUS_RETAINED,
+        UNSECURED
+    }
+
+    enum TopFollowReadiness {
+        READY,
+        RETRYABLE_UNRESOLVED,
+        RETRYABLE_REBIND,
+        INVALID
+    }
+
+    private record ConstraintTarget(
+            ConstraintParentKind kind,
+            @Nullable ServerSubLevel body,
+            Vector3d framePosition,
+            Quaterniond frameOrientation
+    ) {
+    }
+
+    private record SupportBinding(boolean available, @Nullable ServerSubLevel body) {
+    }
+
+    private record MotorTuning(
+            double linearStiffness,
+            double linearDamping,
+            double angularStiffness,
+            double angularDamping
+    ) {
     }
 
     static boolean isPropellerSlotSubLevel(@Nullable SubLevel subLevel) {
@@ -137,6 +199,39 @@ public final class ServoPropellerSlotManager {
         return name != null && name.startsWith(SLOT_SUBLEVEL_NAME_PREFIX);
     }
 
+    @Nullable
+    public static Direction getMode7SlotPlacementHelperOutward(
+            Level level,
+            BlockPos pos,
+            BlockState state
+    ) {
+        if (!state.is(ModBlocks.METAL_TRAVERSE.get())) {
+            return null;
+        }
+
+        SubLevel containingSubLevel = Sable.HELPER.getContaining(level, pos);
+        if (getExactPropellerSlotIndex(containingSubLevel) < 0
+                || !(level.getBlockEntity(pos) instanceof WrenchSideCycleBlockEntity sideCycle)) {
+            return null;
+        }
+
+        return sideCycle.getServoMode7SlotOutward();
+    }
+
+    private static int getExactPropellerSlotIndex(@Nullable SubLevel subLevel) {
+        if (subLevel == null || subLevel.isRemoved()) {
+            return -1;
+        }
+
+        String name = subLevel.getName();
+        for (int slot = 0; slot < SLOT_COUNT; slot++) {
+            if ((SLOT_SUBLEVEL_NAME_PREFIX + slot).equals(name)) {
+                return slot;
+            }
+        }
+        return -1;
+    }
+
     public static void onPrePhysicsTick(ForgeSablePrePhysicsTickEvent event) {
         stabilizeActiveManagers(event.getPhysicsSystem(), false);
     }
@@ -146,17 +241,9 @@ public final class ServoPropellerSlotManager {
     }
 
     public static void onBlockPlace(BlockEvent.EntityPlaceEvent event) {
-        if (!TwisterMillDiagnostics.isServoLoggingEnabled()) {
-            return;
-        }
-        markChangedSlotForDiagnostics(event.getLevel(), event.getPos(), "place");
     }
 
     public static void onBlockBreak(BlockEvent.BreakEvent event) {
-        if (!TwisterMillDiagnostics.isServoLoggingEnabled()) {
-            return;
-        }
-        markChangedSlotForDiagnostics(event.getLevel(), event.getPos(), "break");
     }
 
     private static void stabilizeActiveManagers(SubLevelPhysicsSystem physicsSystem, boolean recomputeFromTopPose) {
@@ -168,58 +255,37 @@ public final class ServoPropellerSlotManager {
         }
 
         for (ServoPropellerSlotManager manager : managers) {
+            if (!manager.isBoundTo(physicsSystem)) {
+                continue;
+            }
             if (!manager.hasAnySlot()) {
                 manager.unregisterActiveManager();
                 continue;
             }
-            if (!recomputeFromTopPose && TwisterMillDiagnostics.isServoLoggingEnabled()) {
-                manager.logPendingDiagnostics(rootLevel, pipeline, "pre-before-follow", false);
-                manager.logRejoinDiagnostics(rootLevel, pipeline, "pre-before-follow", false);
-            }
             manager.stabilizeTopFollowingSlots(rootLevel, pipeline, recomputeFromTopPose);
-            if (recomputeFromTopPose && TwisterMillDiagnostics.isServoLoggingEnabled()) {
-                manager.logRejoinDiagnostics(rootLevel, pipeline, "post-after-follow", true);
-                manager.logPendingDiagnostics(rootLevel, pipeline, "post-after-follow", true);
-            }
         }
     }
 
-    private static void markChangedSlotForDiagnostics(LevelAccessor level, BlockPos pos, String eventType) {
-        if (!TwisterMillDiagnostics.isServoLoggingEnabled()) {
-            return;
+    private boolean registerActiveManager(ServerLevel rootLevel) {
+        ServerSubLevelContainer container = SubLevelContainer.getContainer(rootLevel);
+        if (container == null) {
+            return false;
         }
-        if (!(level instanceof ServerLevel rootLevel)) {
-            return;
-        }
-
-        List<ServoPropellerSlotManager> managers;
-        synchronized (ACTIVE_MANAGERS) {
-            managers = List.copyOf(ACTIVE_MANAGERS);
+        SubLevelPhysicsSystem physicsSystem = container.physicsSystem();
+        if (physicsSystem == null) {
+            return false;
         }
 
-        for (ServoPropellerSlotManager manager : managers) {
-            if (!manager.hasAnySlot()) {
-                continue;
-            }
-            manager.markChangedSlot(rootLevel, pos, eventType);
-        }
-    }
+        restoreMissingSlotPlacementHelperMetadata(rootLevel);
 
-    private void registerActiveManager() {
+        activePhysicsSystem = physicsSystem;
         if (activeManagerRegistered) {
-            return;
+            return true;
         }
 
         ACTIVE_MANAGERS.add(this);
         activeManagerRegistered = true;
-        if (TwisterMillDiagnostics.isServoLoggingEnabled()) {
-            diagnosticRejoinTicksRemaining = Math.max(diagnosticRejoinTicksRemaining, DIAGNOSTIC_REJOIN_TICKS);
-            LOGGER.info("[PropellerSlotRejoinDiag] event=manager-registered managerRegistered={} hasAnySlot={} topFollowActive={} activeTopSubLevelId={}",
-                    activeManagerRegistered,
-                    hasAnySlot(),
-                    topFollowActive,
-                    activeTopSubLevelId);
-        }
+        return true;
     }
 
     void unregisterActiveManager() {
@@ -229,9 +295,11 @@ public final class ServoPropellerSlotManager {
 
         ACTIVE_MANAGERS.remove(this);
         activeManagerRegistered = false;
-        diagnosticRejoinTicksRemaining = 0;
-        diagnosticReadPending = false;
-        resetCarriedServoTopDiagnostics();
+        activePhysicsSystem = null;
+    }
+
+    private boolean isBoundTo(SubLevelPhysicsSystem physicsSystem) {
+        return activeManagerRegistered && activePhysicsSystem == physicsSystem;
     }
 
     boolean tryPlaceNextSlot(
@@ -242,16 +310,18 @@ public final class ServoPropellerSlotManager {
             BlockItem blockItem,
             Direction servoFacing
     ) {
-        if (!setSlotFacing(servoFacing)) {
+        if (!isSupportedSlotFacing(servoFacing)) {
             return false;
         }
+        slotFacing = servoFacing;
+        updateDiagnosticServoWorldPos(owner.getLevel(), owner.getBlockPos(), "place-slot");
 
         int slot = findNextAvailableSlot(rootLevel);
         if (slot < 0) {
             return false;
         }
 
-        BlockState blockState = blockItem.getBlock().defaultBlockState();
+        BlockState blockState = resolveSlotPlacementState(blockItem, servoFacing);
         if (!isPhaseASupportedBlock(blockState)) {
             return false;
         }
@@ -262,7 +332,7 @@ public final class ServoPropellerSlotManager {
         }
 
         slotSubLevelIds[slot] = subLevel.getUniqueId();
-        registerActiveManager();
+        registerActiveManager(rootLevel);
         if (!player.isCreative()) {
             stack.shrink(1);
         }
@@ -285,6 +355,119 @@ public final class ServoPropellerSlotManager {
             }
         }
         return true;
+    }
+
+    boolean hasCompleteDistinctSlotSet() {
+        if (!hasCompleteSlotSet()) {
+            return false;
+        }
+        Set<UUID> uniqueSlotIds = new HashSet<>();
+        Collections.addAll(uniqueSlotIds, slotSubLevelIds);
+        return uniqueSlotIds.size() == SLOT_COUNT;
+    }
+
+    void setFreeBearingTopFollowPolicy(
+            boolean failClosed,
+            @Nullable UUID expectedTopSubLevelId,
+            boolean allowTopRebind
+    ) {
+        freeBearingFailClosedTopFollow = failClosed;
+        freeBearingExpectedTopSubLevelId = expectedTopSubLevelId;
+        freeBearingAllowTopRebind = failClosed && allowTopRebind;
+    }
+
+    TopFollowReadiness inspectTopFollowReadiness(ServerLevel rootLevel, @Nullable UUID expectedTopSubLevelId) {
+        if (expectedTopSubLevelId == null || !hasCompleteSlotSet()) {
+            return TopFollowReadiness.INVALID;
+        }
+
+        Set<UUID> uniqueBodyIds = new HashSet<>();
+        uniqueBodyIds.add(expectedTopSubLevelId);
+        for (UUID slotSubLevelId : slotSubLevelIds) {
+            if (slotSubLevelId == null || !uniqueBodyIds.add(slotSubLevelId)) {
+                return TopFollowReadiness.INVALID;
+            }
+        }
+        if (activeTopSubLevelId != null && !expectedTopSubLevelId.equals(activeTopSubLevelId)) {
+            return TopFollowReadiness.INVALID;
+        }
+
+        ServerSubLevelContainer container = SubLevelContainer.getContainer(rootLevel);
+        if (container == null) {
+            return TopFollowReadiness.RETRYABLE_UNRESOLVED;
+        }
+
+        SubLevel rawTopSubLevel = container.getSubLevel(expectedTopSubLevelId);
+        if (rawTopSubLevel == null) {
+            return TopFollowReadiness.RETRYABLE_UNRESOLVED;
+        }
+        if (!(rawTopSubLevel instanceof ServerSubLevel topSubLevel) || topSubLevel.isRemoved()) {
+            return TopFollowReadiness.INVALID;
+        }
+        if (isPropellerSlotSubLevel(topSubLevel)) {
+            return TopFollowReadiness.INVALID;
+        }
+
+        ServerSubLevel[] resolvedSlots = new ServerSubLevel[SLOT_COUNT];
+        for (int slot = 0; slot < SLOT_COUNT; slot++) {
+            SubLevel rawSlotSubLevel = container.getSubLevel(slotSubLevelIds[slot]);
+            if (rawSlotSubLevel == null) {
+                return TopFollowReadiness.RETRYABLE_UNRESOLVED;
+            }
+            if (!(rawSlotSubLevel instanceof ServerSubLevel slotSubLevel) || slotSubLevel.isRemoved()) {
+                return TopFollowReadiness.INVALID;
+            }
+            if (!slotSubLevelIds[slot].equals(slotSubLevel.getUniqueId())) {
+                return TopFollowReadiness.INVALID;
+            }
+            if (!(SLOT_SUBLEVEL_NAME_PREFIX + slot).equals(slotSubLevel.getName())) {
+                return TopFollowReadiness.INVALID;
+            }
+            resolvedSlots[slot] = slotSubLevel;
+        }
+
+        if (!topFollowActive
+                || activeTopSubLevelId == null
+                || activeTopAnchorLocalCenter == null) {
+            return TopFollowReadiness.RETRYABLE_REBIND;
+        }
+
+        for (int slot = 0; slot < SLOT_COUNT; slot++) {
+            if (!hasValidConstraint(slot)) {
+                return TopFollowReadiness.RETRYABLE_REBIND;
+            }
+
+            UUID storedParentId = slotConstraintParentSubLevelIds[slot];
+            UUID storedTopId = slotConstraintTopSubLevelIds[slot];
+            if (slotConstraintParentKinds[slot] != ConstraintParentKind.TOP_BODY
+                    || !slotConstraintAttachedToTop[slot]) {
+                return TopFollowReadiness.RETRYABLE_REBIND;
+            }
+            if (storedParentId == null || storedTopId == null) {
+                return TopFollowReadiness.RETRYABLE_REBIND;
+            }
+            if (!expectedTopSubLevelId.equals(storedParentId)
+                    || !expectedTopSubLevelId.equals(storedTopId)) {
+                return TopFollowReadiness.INVALID;
+            }
+
+            int expectedParentRuntimeId = getRuntimeIdForDiagnostics(topSubLevel);
+            int expectedParentObjectIdentity = getObjectIdentityForDiagnostics(topSubLevel);
+            int expectedChildRuntimeId = getRuntimeIdForDiagnostics(resolvedSlots[slot]);
+            int expectedChildObjectIdentity = getObjectIdentityForDiagnostics(resolvedSlots[slot]);
+            if ((slotConstraintParentRuntimeIds[slot] != DIAGNOSTIC_UNKNOWN_RUNTIME_ID
+                    && slotConstraintParentRuntimeIds[slot] != expectedParentRuntimeId)
+                    || (slotConstraintParentObjectIdentities[slot] != DIAGNOSTIC_UNKNOWN_RUNTIME_ID
+                    && slotConstraintParentObjectIdentities[slot] != expectedParentObjectIdentity)
+                    || (slotConstraintChildRuntimeIds[slot] != DIAGNOSTIC_UNKNOWN_RUNTIME_ID
+                    && slotConstraintChildRuntimeIds[slot] != expectedChildRuntimeId)
+                    || (slotConstraintChildObjectIdentities[slot] != DIAGNOSTIC_UNKNOWN_RUNTIME_ID
+                    && slotConstraintChildObjectIdentities[slot] != expectedChildObjectIdentity)) {
+                return TopFollowReadiness.INVALID;
+            }
+        }
+
+        return TopFollowReadiness.READY;
     }
 
     boolean hasActiveTopFollowForPreview() {
@@ -386,10 +569,10 @@ public final class ServoPropellerSlotManager {
 
     void read(CompoundTag tag) {
         for (int i = 0; i < SLOT_COUNT; i++) {
-            clearSlot(i);
+            clearSlot(i, "nbt-read-reset");
         }
         clearTopFollowState();
-        resetCarriedServoTopDiagnostics();
+        clearSupportBinding();
         slotFacing = Direction.UP;
 
         if (!tag.contains(TAG_PROPELLER_SLOTS)) {
@@ -427,18 +610,6 @@ public final class ServoPropellerSlotManager {
                     slotsTag.getDouble(TAG_ACTIVE_TOP_ANCHOR_Z)
             );
         }
-        if (TwisterMillDiagnostics.isServoLoggingEnabled() && hasAnySlot()) {
-            diagnosticReadPending = true;
-            diagnosticRejoinTicksRemaining = Math.max(diagnosticRejoinTicksRemaining, DIAGNOSTIC_REJOIN_TICKS);
-        }
-    }
-
-    private boolean setSlotFacing(Direction facing) {
-        if (!isSupportedSlotFacing(facing)) {
-            return false;
-        }
-        slotFacing = facing;
-        return true;
     }
 
     private static Direction readSlotFacing(CompoundTag slotsTag) {
@@ -454,15 +625,17 @@ public final class ServoPropellerSlotManager {
     private static SlotFrame computeSlotFrame(int slot, Direction facing) {
         double theta = Math.toRadians(SLOT_ANGLES_DEGREES[slot]);
         Vector3d axis = axisFromFacing(facing);
-        Vector3d basisCos = facing.getAxis() == Direction.Axis.Y
-                ? new Vector3d(0.0D, 0.0D, 1.0D)
-                : new Vector3d(0.0D, 1.0D, 0.0D);
+        Vector3d basisCos = axisFromFacing(computeSlotLocalOutward(facing));
         Vector3d basisSin = new Vector3d(axis).cross(basisCos).normalize();
         double radius = getSlotRadius(facing);
         Vector3d offset = new Vector3d(basisSin).mul(Math.sin(theta) * radius)
                 .add(new Vector3d(basisCos).mul(Math.cos(theta) * radius));
         Quaterniond rotation = new Quaterniond().rotationAxis(theta, axis.x, axis.y, axis.z);
         return new SlotFrame(offset, rotation);
+    }
+
+    private static Direction computeSlotLocalOutward(Direction facing) {
+        return facing.getAxis() == Direction.Axis.Y ? Direction.SOUTH : Direction.UP;
     }
 
     private static double getSlotRadius(Direction facing) {
@@ -480,7 +653,7 @@ public final class ServoPropellerSlotManager {
                 return i;
             }
             if (resolveSubLevel(rootLevel, subLevelId) == null) {
-                clearSlot(i);
+                clearSlot(i, "available-slot-sublevel-missing");
                 return i;
             }
         }
@@ -500,9 +673,17 @@ public final class ServoPropellerSlotManager {
             return null;
         }
 
+        BlockPos assemblyAnchorPos = owner.getBlockPos().relative(servoFacing);
+        if (!refreshSupportBinding(rootLevel, assemblyAnchorPos, "create-slot")) {
+            return null;
+        }
         SlotFrame slotFrame = computeSlotFrame(slot, servoFacing);
-        Vector3d slotCenter = computeSlotCenter(owner, slotFrame.offset(), servoFacing);
-        Quaterniond orientation = new Quaterniond(slotFrame.rotation());
+        ConstraintTarget supportTarget = createCanonicalSupportTarget(rootLevel, slotFrame, assemblyAnchorPos);
+        if (supportTarget == null) {
+            return null;
+        }
+        Vector3d slotCenter = targetWorldPosition(supportTarget);
+        Quaterniond orientation = targetWorldOrientation(supportTarget);
 
         BlockPos sourceWorldPos = SableLevelWrapper.toWorldPos(owner.getLevel(), owner.getBlockPos().relative(servoFacing));
         if (!rootLevel.getBlockState(sourceWorldPos).isAir()) {
@@ -513,31 +694,42 @@ public final class ServoPropellerSlotManager {
             return null;
         }
 
-        if (!rootLevel.setBlock(sourceWorldPos, blockState, Block.UPDATE_ALL | Block.UPDATE_KNOWN_SHAPE)) {
+        int temporaryBlockUpdateFlags = getTemporaryBlockUpdateFlags(blockState);
+        if (!rootLevel.setBlock(sourceWorldPos, blockState, temporaryBlockUpdateFlags)) {
             return null;
         }
 
         if (!rootLevel.getBlockState(sourceWorldPos).equals(blockState)) {
-            clearTemporaryBlock(rootLevel, sourceWorldPos);
+            clearTemporaryBlock(rootLevel, sourceWorldPos, blockState);
             return null;
         }
 
         List<BlockPos> capturedBlocks = List.of(sourceWorldPos);
         BoundingBox3i bounds = BoundingBox3i.from(capturedBlocks);
         if (bounds == null) {
-            clearTemporaryBlock(rootLevel, sourceWorldPos);
+            clearTemporaryBlock(rootLevel, sourceWorldPos, blockState);
             return null;
         }
         bounds.expand(1, 1, 1);
 
         ServerSubLevel serverSubLevel = null;
         try {
-            serverSubLevel = SubLevelAssemblyHelper.assembleBlocks(rootLevel, sourceWorldPos, capturedBlocks, bounds);
-        } catch (Exception ignored) {
+            if (isTemporaryMetalTraverse(blockState)) {
+                serverSubLevel = MetalTraverseBlock.runWithoutTraverseHideCornerBreakHistory(
+                        rootLevel,
+                        sourceWorldPos,
+                        () -> SubLevelAssemblyHelper.assembleBlocks(rootLevel, sourceWorldPos, capturedBlocks, bounds)
+                );
+            } else {
+                serverSubLevel = SubLevelAssemblyHelper.assembleBlocks(
+                        rootLevel, sourceWorldPos, capturedBlocks, bounds);
+            }
+        } catch (Exception exception) {
+            LOGGER.warn("Failed to assemble servo propeller slot {} at {}", slot, sourceWorldPos, exception);
         }
 
         if (serverSubLevel == null || serverSubLevel.isRemoved() || serverSubLevel.getMassTracker().isInvalid()) {
-            clearTemporaryBlock(rootLevel, sourceWorldPos);
+            clearTemporaryBlock(rootLevel, sourceWorldPos, blockState);
             if (serverSubLevel != null && !serverSubLevel.isRemoved()) {
                 container.removeSubLevel(serverSubLevel, SubLevelRemovalReason.REMOVED);
             }
@@ -547,14 +739,25 @@ public final class ServoPropellerSlotManager {
         Vector3d anchorLocalCenter = SableInteractiveContraptionBackend.computeAnchorLocalCenter(serverSubLevel, sourceWorldPos);
 
         serverSubLevel.setName(SLOT_SUBLEVEL_NAME_PREFIX + slot);
+        if (isTemporaryMetalTraverse(blockState)
+                && !ensureSlotPlacementHelperMetadata(
+                rootLevel, serverSubLevel, slot, anchorLocalCenter, servoFacing)) {
+            container.removeSubLevel(serverSubLevel, SubLevelRemovalReason.REMOVED);
+            return null;
+        }
         slotAnchorLocalCenters[slot] = new Vector3d(anchorLocalCenter);
-        lastLockedWorldCenters[slot] = new Vector3d(slotCenter);
-        lastLockedOrientations[slot] = new Quaterniond(orientation);
         PhysicsPipeline pipeline = container.physicsSystem().getPipeline();
         snapSlotPose(serverSubLevel, anchorLocalCenter, slotCenter, orientation, pipeline);
-        if (!ensureRootSlotConstraint(pipeline, serverSubLevel, slot, anchorLocalCenter, slotCenter, orientation)) {
+        if (ensureSlotConstraint(
+                pipeline,
+                supportTarget,
+                serverSubLevel,
+                slot,
+                anchorLocalCenter,
+                "create-root"
+        ) != ConstraintEnsureResult.TARGET_ACTIVE) {
             container.removeSubLevel(serverSubLevel, SubLevelRemovalReason.REMOVED);
-            clearSlot(slot);
+            clearSlot(slot, "create-root-constraint-failed");
             return null;
         }
 
@@ -567,13 +770,23 @@ public final class ServoPropellerSlotManager {
             return false;
         }
 
-        registerActiveManager();
+        if (!registerActiveManager(rootLevel)) {
+            return false;
+        }
         ServerSubLevelContainer container = SubLevelContainer.getContainer(rootLevel);
         if (container == null) {
             return false;
         }
 
+        if (container.physicsSystem() != activePhysicsSystem) {
+            return false;
+        }
         PhysicsPipeline pipeline = container.physicsSystem().getPipeline();
+        SupportBinding supportBinding = resolveRememberedSupport(rootLevel);
+        if (!supportBinding.available()) {
+            logSupportUnavailable("lock-support-unavailable", rootLevel);
+            return false;
+        }
         boolean changed = false;
         for (int i = 0; i < SLOT_COUNT; i++) {
             UUID subLevelId = slotSubLevelIds[i];
@@ -583,34 +796,24 @@ public final class ServoPropellerSlotManager {
 
             ServerSubLevel subLevel = resolveSubLevel(rootLevel, subLevelId);
             if (subLevel == null) {
-                clearSlot(i);
+                clearSlot(i, "lock-root-slot-sublevel-missing");
                 changed = true;
                 continue;
             }
 
             Vector3d anchorLocalCenter = getOrCreateAnchorLocalCenter(subLevel, i);
-            Pose3d pose = subLevel.logicalPose();
-
-            Vector3d worldCenter = lastLockedWorldCenters[i];
-            if (worldCenter == null) {
-                worldCenter = pose.transformPosition(anchorLocalCenter, new Vector3d());
-                lastLockedWorldCenters[i] = new Vector3d(worldCenter);
+            ConstraintTarget supportTarget = createSupportTargetAtCurrentPose(supportBinding, subLevel, i, anchorLocalCenter);
+            ConstraintEnsureResult result = ensureSlotConstraint(
+                    pipeline,
+                    supportTarget,
+                    subLevel,
+                    i,
+                    anchorLocalCenter,
+                    "lock-support"
+            );
+            if (result == ConstraintEnsureResult.UNSECURED) {
+                logSupportUnavailable("lock-support-constraint-failed", rootLevel);
             }
-
-            Quaterniond orientation = lastLockedOrientations[i];
-            if (orientation == null) {
-                orientation = new Quaterniond(pose.orientation());
-                lastLockedOrientations[i] = new Quaterniond(orientation);
-            }
-
-            if (slotConstraintAttachedToTop[i]) {
-                worldCenter = pose.transformPosition(anchorLocalCenter, new Vector3d());
-                orientation = new Quaterniond(pose.orientation());
-                lastLockedWorldCenters[i] = new Vector3d(worldCenter);
-                lastLockedOrientations[i] = new Quaterniond(orientation);
-            }
-
-            ensureRootSlotConstraint(pipeline, subLevel, i, anchorLocalCenter, worldCenter, orientation);
         }
         return changed;
     }
@@ -625,11 +828,22 @@ public final class ServoPropellerSlotManager {
             unregisterActiveManager();
             return false;
         }
-        if (!setSlotFacing(servoFacing)) {
+        if (!isSupportedSlotFacing(servoFacing)) {
             return false;
         }
+        slotFacing = servoFacing;
+        if (!refreshSupportBinding(rootLevel, assemblyAnchorPos, "update-slot-motion")) {
+            logSupportUnavailable("update-support-unavailable", rootLevel);
+        }
+        updateDiagnosticServoWorldPos(
+                rootLevel,
+                assemblyAnchorPos.relative(servoFacing.getOpposite()),
+                "update-slot-motion"
+        );
 
-        registerActiveManager();
+        if (!registerActiveManager(rootLevel)) {
+            return false;
+        }
         if (topSubLevel == null || topSubLevel.isRemoved()) {
             clearTopFollowState();
             return lockRootSlotPoses(rootLevel);
@@ -648,12 +862,8 @@ public final class ServoPropellerSlotManager {
         activeTopSubLevelId = topSubLevel.getUniqueId();
         activeTopAnchorLocalCenter = new Vector3d(topAnchorLocal);
         boolean topFollowChanged = previousTopSubLevelId == null || !previousTopSubLevelId.equals(activeTopSubLevelId);
-        if (topFollowChanged) {
-            loggedCarriedServoTopKeys.clear();
-        }
         if (TwisterMillDiagnostics.isServoLoggingEnabled() && topFollowChanged) {
-            diagnosticRejoinTicksRemaining = Math.max(diagnosticRejoinTicksRemaining, DIAGNOSTIC_REJOIN_TICKS);
-            LOGGER.info("[PropellerSlotRejoinDiag] event=top-follow-start managerRegistered={} previousTopSubLevelId={} activeTopSubLevelId={} slotFacing={} activeTopAnchorLocalCenter={}",
+            LOGGER.info("[PropellerSlotConstraintDiag] event=top-follow-start managerRegistered={} previousTopSubLevelId={} activeTopSubLevelId={} slotFacing={} activeTopAnchorLocalCenter={}",
                     activeManagerRegistered,
                     previousTopSubLevelId,
                     activeTopSubLevelId,
@@ -670,111 +880,603 @@ public final class ServoPropellerSlotManager {
 
             ServerSubLevel slotSubLevel = resolveSubLevel(rootLevel, subLevelId);
             if (slotSubLevel == null) {
-                clearSlot(i);
+                clearSlot(i, "top-follow-slot-sublevel-missing");
                 changed = true;
                 continue;
             }
 
             Vector3d anchorLocalCenter = getOrCreateAnchorLocalCenter(slotSubLevel, i);
-            removeSlotConstraint(i);
-            applyTopPoseToSlot(pipeline, topSubLevel, slotSubLevel, i, anchorLocalCenter, topAnchorLocal);
+            ConstraintEnsureResult result = ensureTopSlotConstraint(
+                    pipeline,
+                    topSubLevel,
+                    slotSubLevel,
+                    i,
+                    anchorLocalCenter,
+                    topAnchorLocal,
+                    "update-slot-motion-top"
+            );
+            if (result == ConstraintEnsureResult.UNSECURED) {
+                secureSupportSlotAtCurrentPose(rootLevel, pipeline, slotSubLevel, i, anchorLocalCenter,
+                        "update-slot-motion-top-fallback");
+            }
         }
 
         return changed;
     }
 
+    boolean updateFreeBearingSlotMotionFailClosed(
+            ServerLevel rootLevel,
+            UUID expectedTopSubLevelId,
+            BlockPos assemblyAnchorPos,
+            Direction servoFacing,
+            boolean allowTopRebind
+    ) {
+        TopFollowReadiness readiness = inspectTopFollowReadiness(rootLevel, expectedTopSubLevelId);
+        if (readiness == TopFollowReadiness.RETRYABLE_UNRESOLVED
+                || readiness == TopFollowReadiness.INVALID
+                || (readiness == TopFollowReadiness.RETRYABLE_REBIND && !allowTopRebind)) {
+            return false;
+        }
+
+        ServerSubLevel topSubLevel = resolveSubLevel(rootLevel, expectedTopSubLevelId);
+        if (topSubLevel == null) {
+            return false;
+        }
+        return updateSlotMotion(rootLevel, topSubLevel, assemblyAnchorPos, servoFacing);
+    }
+
     void clearRuntimeConstraints() {
         for (int i = 0; i < SLOT_COUNT; i++) {
-            removeSlotConstraint(i);
+            removeSlotConstraint(i, "runtime-cleanup");
         }
     }
 
-    private boolean ensureRootSlotConstraint(
+    private ConstraintEnsureResult ensureTopSlotConstraint(
             PhysicsPipeline pipeline,
+            ServerSubLevel topSubLevel,
             ServerSubLevel slotSubLevel,
             int slot,
             Vector3d anchorLocalCenter,
-            Vector3d worldCenter,
-            Quaterniond orientation
+            Vector3d topAnchorLocalCenter,
+            String reason
     ) {
-        if (slotConstraintHandles[slot] != null
-                && slotConstraintHandles[slot].isValid()
-                && !slotConstraintAttachedToTop[slot]) {
-            return updateRootSlotConstraint(pipeline, slotSubLevel, slot, anchorLocalCenter, worldCenter, orientation);
+        SlotFrame slotFrame = computeSlotFrame(slot, slotFacing);
+        Vector3d topFramePosition = new Vector3d(topAnchorLocalCenter).add(slotFrame.offset());
+        Quaterniond topFrameOrientation = new Quaterniond(slotFrame.rotation());
+        ConstraintTarget target = new ConstraintTarget(
+                ConstraintParentKind.TOP_BODY,
+                topSubLevel,
+                topFramePosition,
+                topFrameOrientation
+        );
+
+        if (!slotConstraintMatchesParent(slot, target, slotSubLevel)
+                && shouldSnapToTop(slot, topSubLevel)) {
+            applyTopPoseToSlot(
+                    pipeline,
+                    topSubLevel,
+                    slotSubLevel,
+                    slot,
+                    anchorLocalCenter,
+                    topAnchorLocalCenter
+            );
+            rememberTopSnap(slot, topSubLevel);
         }
 
-        removeSlotConstraint(slot);
-        GenericConstraintConfiguration configuration = new GenericConstraintConfiguration(
-                worldCenter,
+        return ensureSlotConstraint(
+                pipeline,
+                target,
+                slotSubLevel,
+                slot,
                 anchorLocalCenter,
-                orientation,
+                reason
+        );
+    }
+
+    private ConstraintEnsureResult ensureSlotConstraint(
+            PhysicsPipeline pipeline,
+            ConstraintTarget target,
+            ServerSubLevel slotSubLevel,
+            int slot,
+            Vector3d anchorLocalCenter,
+            String reason
+    ) {
+        if (slotConstraintMatchesParent(slot, target, slotSubLevel)) {
+            return updateSlotConstraint(
+                    pipeline,
+                    target,
+                    slotSubLevel,
+                    slot,
+                    anchorLocalCenter,
+                    reason + ":existing-handle"
+            ) ? ConstraintEnsureResult.TARGET_ACTIVE : constraintFailureResult(slot);
+        }
+
+        logConstraintState(
+                "ensure-parent-mismatch",
+                reason,
+                slot,
+                target.body(),
+                slotSubLevel,
+                target.framePosition(),
+                target.frameOrientation(),
+                anchorLocalCenter,
+                new Quaterniond(),
+                "targetKind=" + target.kind() + ", previous handle state is included in handle fields"
+        );
+        GenericConstraintConfiguration configuration = new GenericConstraintConfiguration(
+                target.framePosition(),
+                anchorLocalCenter,
+                target.frameOrientation(),
                 new Quaterniond(),
                 LOCKED_AXES
         );
+        if (!validateConstraintConfiguration(
+                configuration,
+                target.body(),
+                slotSubLevel,
+                slot,
+                reason
+        )) {
+            return constraintFailureResult(slot);
+        }
+
+        GenericConstraintHandle previousHandle = slotConstraintHandles[slot];
+        GenericConstraintHandle candidate;
         try {
-            slotConstraintHandles[slot] = pipeline.addConstraint(null, slotSubLevel, configuration);
-        } catch (Exception ignored) {
-            slotConstraintHandles[slot] = null;
+            candidate = pipeline.addConstraint(target.body(), slotSubLevel, configuration);
+            logConstraintState(
+                    "candidate-add-result",
+                    reason,
+                    slot,
+                    target.body(),
+                    slotSubLevel,
+                    target.framePosition(),
+                    target.frameOrientation(),
+                    anchorLocalCenter,
+                    new Quaterniond(),
+                    "targetKind=" + target.kind() + ", candidate=" + describeConstraintHandle(candidate)
+            );
+        } catch (Exception exception) {
+            logConstraintException("addConstraint(candidate)", reason, slot, target.body(), slotSubLevel, exception);
+            return constraintFailureResult(slot);
         }
-        slotConstraintAttachedToTop[slot] = false;
-        slotConstraintTopSubLevelIds[slot] = null;
-        if (slotConstraintHandles[slot] != null && slotConstraintHandles[slot].isValid()) {
-            return updateRootSlotConstraint(pipeline, slotSubLevel, slot, anchorLocalCenter, worldCenter, orientation);
+
+        if (!isConstraintHandleValid(candidate)) {
+            removeConstraintHandle(candidate, slot, reason + ":candidate-add-invalid");
+            return constraintFailureResult(slot);
         }
-        return false;
+
+        MotorTuning tuning = configureConstraintHandle(
+                pipeline,
+                candidate,
+                target,
+                slotSubLevel,
+                slot,
+                anchorLocalCenter,
+                reason + ":candidate"
+        );
+        if (tuning == null || !isConstraintHandleValid(candidate)) {
+            removeConstraintHandle(candidate, slot, reason + ":candidate-configuration-failed");
+            return constraintFailureResult(slot);
+        }
+
+        if (isConstraintHandleValid(previousHandle)
+                && !removeConstraintHandle(previousHandle, slot, reason + ":previous-remove-before-commit")) {
+            removeConstraintHandle(candidate, slot, reason + ":candidate-rollback-previous-still-valid");
+            logConstraintTransition("candidate-rollback", reason, slot, target, slotSubLevel, previousHandle, candidate);
+            return ConstraintEnsureResult.PREVIOUS_RETAINED;
+        }
+
+        commitConstraint(slot, target, slotSubLevel, candidate);
+        logConstraintState(
+                "candidate-commit",
+                reason,
+                slot,
+                target.body(),
+                slotSubLevel,
+                target.framePosition(),
+                target.frameOrientation(),
+                anchorLocalCenter,
+                new Quaterniond(),
+                "targetKind=" + target.kind() + ", previous=" + describeConstraintHandle(previousHandle)
+                        + ", candidate=" + describeConstraintHandle(candidate)
+        );
+        return ConstraintEnsureResult.TARGET_ACTIVE;
     }
 
-    private boolean updateRootSlotConstraint(
+    private boolean updateSlotConstraint(
+            PhysicsPipeline pipeline,
+            ConstraintTarget target,
+            ServerSubLevel slotSubLevel,
+            int slot,
+            Vector3d anchorLocalCenter,
+            String reason
+    ) {
+        GenericConstraintHandle handle = slotConstraintHandles[slot];
+        if (!isConstraintHandleValid(handle)) {
+            logConstraintState(
+                    "update-skipped-invalid-handle",
+                    reason,
+                    slot,
+                    target.body(),
+                    slotSubLevel,
+                    target.framePosition(),
+                    target.frameOrientation(),
+                    anchorLocalCenter,
+                    new Quaterniond(),
+                    "handle failed validity check"
+            );
+            return false;
+        }
+
+        MotorTuning tuning = configureConstraintHandle(
+                pipeline,
+                handle,
+                target,
+                slotSubLevel,
+                slot,
+                anchorLocalCenter,
+                reason
+        );
+        if (tuning == null || !isConstraintHandleValid(handle)) {
+            return false;
+        }
+        commitConstraint(slot, target, slotSubLevel, handle);
+        return true;
+    }
+
+    private boolean slotConstraintMatchesParent(int slot, ConstraintTarget target, ServerSubLevel slotSubLevel) {
+        return hasValidConstraint(slot) && storedConstraintParentMatches(slot, target, slotSubLevel);
+    }
+
+    private boolean storedConstraintParentMatches(int slot, ConstraintTarget target, ServerSubLevel slotSubLevel) {
+        UUID expectedParentId = target.body() == null ? null : target.body().getUniqueId();
+        return slotConstraintParentKinds[slot] == target.kind()
+                && java.util.Objects.equals(slotConstraintParentSubLevelIds[slot], expectedParentId)
+                && slotConstraintParentRuntimeIds[slot] == getRuntimeIdForDiagnostics(target.body())
+                && slotConstraintParentObjectIdentities[slot] == getObjectIdentityForDiagnostics(target.body())
+                && slotConstraintChildRuntimeIds[slot] == getRuntimeIdForDiagnostics(slotSubLevel)
+                && slotConstraintChildObjectIdentities[slot] == getObjectIdentityForDiagnostics(slotSubLevel)
+                && slotSubLevel.getUniqueId().equals(slotSubLevelIds[slot]);
+    }
+
+    private ConstraintEnsureResult constraintFailureResult(int slot) {
+        return hasValidConstraint(slot) ? ConstraintEnsureResult.PREVIOUS_RETAINED : ConstraintEnsureResult.UNSECURED;
+    }
+
+    private void secureSupportSlotAtCurrentPose(
+            ServerLevel rootLevel,
             PhysicsPipeline pipeline,
             ServerSubLevel slotSubLevel,
             int slot,
             Vector3d anchorLocalCenter,
-            Vector3d worldCenter,
-            Quaterniond orientation
+            String reason
     ) {
-        GenericConstraintHandle handle = slotConstraintHandles[slot];
-        if (handle == null || !handle.isValid()) {
-            return false;
+        SupportBinding supportBinding = resolveRememberedSupport(rootLevel);
+        if (!supportBinding.available()) {
+            logSupportUnavailable(reason + ":support-unavailable", rootLevel);
+            return;
         }
+        ConstraintTarget target = createSupportTargetAtCurrentPose(supportBinding, slotSubLevel, slot, anchorLocalCenter);
+        ensureSlotConstraint(
+                pipeline,
+                target,
+                slotSubLevel,
+                slot,
+                anchorLocalCenter,
+                reason
+        );
+    }
 
+    @Nullable
+    private MotorTuning configureConstraintHandle(
+            PhysicsPipeline pipeline,
+            GenericConstraintHandle handle,
+            ConstraintTarget target,
+            ServerSubLevel slotSubLevel,
+            int slot,
+            Vector3d anchorLocalCenter,
+            String reason
+    ) {
+        MotorTuning tuning = computeMotorTuning(slotSubLevel);
+        String operation = "setFrame1";
         try {
-            handle.setFrame1(worldCenter, orientation);
+            handle.setFrame1(target.framePosition(), target.frameOrientation());
+            operation = "setFrame2";
             handle.setFrame2(anchorLocalCenter, new Quaterniond());
+            operation = "setContactsEnabled(false)";
             handle.setContactsEnabled(false);
-            boolean massChanged = configureSlotConstraintMotors(handle, slotSubLevel, slot);
-            if (massChanged) {
-                pipeline.resetVelocity(slotSubLevel);
+            operation = "configure-motors";
+            applySlotConstraintMotors(handle, tuning);
+            if (target.body() != null) {
+                operation = "wakeUp(parent)";
+                pipeline.wakeUp(target.body());
             }
+            operation = "wakeUp(child)";
             pipeline.wakeUp(slotSubLevel);
-            return true;
-        } catch (Exception ignored) {
-            return false;
+            return tuning;
+        } catch (Exception exception) {
+            logConstraintHandleException(operation, reason, slot, target.body(), slotSubLevel, handle, exception);
+            return null;
         }
     }
 
-    private boolean configureSlotConstraintMotors(GenericConstraintHandle handle, ServerSubLevel slotSubLevel, int slot) {
+    private MotorTuning computeMotorTuning(ServerSubLevel slotSubLevel) {
         double mass = sanitizedPositive(slotSubLevel.getMassTracker().getMass(), MIN_EFFECTIVE_SLOT_LOAD);
         double angularLoadRaw = computeAngularLoad(slotSubLevel, mass);
-        double linearLoad = clamp(mass, MIN_EFFECTIVE_SLOT_LOAD, MAX_EFFECTIVE_SLOT_LOAD);
-        double angularLoad = clamp(angularLoadRaw, MIN_EFFECTIVE_SLOT_LOAD, MAX_EFFECTIVE_SLOT_LOAD);
+        double linearLoad = clampEffectiveSlotLoad(mass);
+        double angularLoad = clampEffectiveSlotLoad(angularLoadRaw);
 
         double linearStiffness = BASE_STIFFNESS_PER_INERTIA * SLOT_LOCK_MULTIPLIER * linearLoad;
         double linearDamping = BASE_DAMPING_PER_INERTIA * SLOT_LOCK_MULTIPLIER * linearLoad;
         double angularStiffness = BASE_STIFFNESS_PER_INERTIA * SLOT_LOCK_MULTIPLIER * angularLoad;
         double angularDamping = BASE_DAMPING_PER_INERTIA * SLOT_LOCK_MULTIPLIER * angularLoad;
 
+        return new MotorTuning(
+                linearStiffness,
+                linearDamping,
+                angularStiffness,
+                angularDamping
+        );
+    }
+
+    private void applySlotConstraintMotors(
+            GenericConstraintHandle handle,
+            MotorTuning tuning
+    ) {
         for (ConstraintJointAxis axis : LINEAR_MOTOR_AXES) {
-            handle.setMotor(axis, 0.0D, linearStiffness, linearDamping, false, 0.0D);
+            handle.setMotor(axis, 0.0D, tuning.linearStiffness(), tuning.linearDamping(), false, 0.0D);
         }
         for (ConstraintJointAxis axis : ANGULAR_MOTOR_AXES) {
-            handle.setMotor(axis, 0.0D, angularStiffness, angularDamping, false, 0.0D);
+            handle.setMotor(axis, 0.0D, tuning.angularStiffness(), tuning.angularDamping(), false, 0.0D);
+        }
+    }
+
+    private void commitConstraint(
+            int slot,
+            ConstraintTarget target,
+            ServerSubLevel slotSubLevel,
+            GenericConstraintHandle handle
+    ) {
+        slotConstraintHandles[slot] = handle;
+        slotConstraintParentKinds[slot] = target.kind();
+        slotConstraintParentSubLevelIds[slot] = target.body() == null ? null : target.body().getUniqueId();
+        slotConstraintFrame1Positions[slot] = new Vector3d(target.framePosition());
+        slotConstraintFrame1Orientations[slot] = new Quaterniond(target.frameOrientation());
+        slotConstraintAttachedToTop[slot] = target.kind() == ConstraintParentKind.TOP_BODY;
+        slotConstraintTopSubLevelIds[slot] = slotConstraintAttachedToTop[slot]
+                ? target.body().getUniqueId()
+                : null;
+        recordConstraintRuntimeIdentities(slot, target.body(), slotSubLevel);
+        if (!slotConstraintAttachedToTop[slot]) {
+            clearTopSnap(slot);
+        }
+    }
+
+    private boolean shouldSnapToTop(int slot, ServerSubLevel topSubLevel) {
+        return !topSubLevel.getUniqueId().equals(slotLastSnapTopSubLevelIds[slot])
+                || getRuntimeIdForDiagnostics(topSubLevel) != slotLastSnapTopRuntimeIds[slot]
+                || getObjectIdentityForDiagnostics(topSubLevel) != slotLastSnapTopObjectIdentities[slot];
+    }
+
+    private void rememberTopSnap(int slot, ServerSubLevel topSubLevel) {
+        slotLastSnapTopSubLevelIds[slot] = topSubLevel.getUniqueId();
+        slotLastSnapTopRuntimeIds[slot] = getRuntimeIdForDiagnostics(topSubLevel);
+        slotLastSnapTopObjectIdentities[slot] = getObjectIdentityForDiagnostics(topSubLevel);
+    }
+
+    private void clearTopSnap(int slot) {
+        slotLastSnapTopSubLevelIds[slot] = null;
+        slotLastSnapTopRuntimeIds[slot] = DIAGNOSTIC_UNKNOWN_RUNTIME_ID;
+        slotLastSnapTopObjectIdentities[slot] = DIAGNOSTIC_UNKNOWN_RUNTIME_ID;
+    }
+
+    private boolean refreshSupportBinding(ServerLevel rootLevel, BlockPos assemblyAnchorPos, String reason) {
+        BlockPos previousAnchor = supportAssemblyAnchorPos;
+        supportAssemblyAnchorPos = assemblyAnchorPos.immutable();
+        try {
+            SubLevel containing = Sable.HELPER.getContaining(rootLevel, assemblyAnchorPos);
+            if (containing instanceof ServerSubLevel supportSubLevel && !supportSubLevel.isRemoved()) {
+                supportBindingInitialized = true;
+                supportBindingRootWorld = false;
+                supportSubLevelId = supportSubLevel.getUniqueId();
+                logSupportBinding("support-body-resolved", reason, rootLevel, supportSubLevel);
+                return true;
+            }
+            if (containing == null) {
+                supportBindingInitialized = true;
+                supportBindingRootWorld = true;
+                supportSubLevelId = null;
+                logSupportBinding("root-world-resolved", reason, rootLevel, null);
+                return true;
+            }
+            LOGGER.warn("[PropellerSlotConstraintDiag] event=support-resolution-failed reason={} dimension={} assemblyAnchorPos={} containingType={}",
+                    reason,
+                    rootLevel.dimension().location(),
+                    assemblyAnchorPos,
+                    containing.getClass().getName());
+            supportAssemblyAnchorPos = previousAnchor;
+            return false;
+        } catch (Exception exception) {
+            LOGGER.warn("[PropellerSlotConstraintDiag] event=support-resolution-failed reason={} dimension={} assemblyAnchorPos={}",
+                    reason,
+                    rootLevel.dimension().location(),
+                    assemblyAnchorPos,
+                    exception);
+            supportAssemblyAnchorPos = previousAnchor;
+            return false;
+        }
+    }
+
+    private SupportBinding resolveRememberedSupport(ServerLevel rootLevel) {
+        if (!supportBindingInitialized || supportAssemblyAnchorPos == null) {
+            return new SupportBinding(false, null);
+        }
+        if (supportBindingRootWorld) {
+            try {
+                SubLevel containing = Sable.HELPER.getContaining(rootLevel, supportAssemblyAnchorPos);
+                if (containing instanceof ServerSubLevel supportSubLevel && !supportSubLevel.isRemoved()) {
+                    supportBindingRootWorld = false;
+                    supportSubLevelId = supportSubLevel.getUniqueId();
+                    return new SupportBinding(true, supportSubLevel);
+                }
+                return new SupportBinding(containing == null, null);
+            } catch (Exception exception) {
+                LOGGER.warn("[PropellerSlotConstraintDiag] event=support-reresolution-failed dimension={} assemblyAnchorPos={}",
+                        rootLevel.dimension().location(),
+                        supportAssemblyAnchorPos,
+                        exception);
+                return new SupportBinding(false, null);
+            }
+        }
+        if (supportSubLevelId == null) {
+            return new SupportBinding(false, null);
+        }
+        ServerSubLevel supportSubLevel = resolveSubLevel(rootLevel, supportSubLevelId);
+        return new SupportBinding(supportSubLevel != null, supportSubLevel);
+    }
+
+    @Nullable
+    private ConstraintTarget createCanonicalSupportTarget(
+            ServerLevel rootLevel,
+            SlotFrame slotFrame,
+            BlockPos assemblyAnchorPos
+    ) {
+        SupportBinding supportBinding = resolveRememberedSupport(rootLevel);
+        if (!supportBinding.available()) {
+            return null;
+        }
+        Vector3d framePosition = JOMLConversion.atCenterOf(assemblyAnchorPos).add(slotFrame.offset());
+        return new ConstraintTarget(
+                supportBinding.body() == null ? ConstraintParentKind.ROOT_WORLD : ConstraintParentKind.SUPPORT_BODY,
+                supportBinding.body(),
+                framePosition,
+                new Quaterniond(slotFrame.rotation())
+        );
+    }
+
+    private ConstraintTarget createSupportTargetAtCurrentPose(
+            SupportBinding supportBinding,
+            ServerSubLevel slotSubLevel,
+            int slot,
+            Vector3d anchorLocalCenter
+    ) {
+        ConstraintParentKind kind = supportBinding.body() == null
+                ? ConstraintParentKind.ROOT_WORLD
+                : ConstraintParentKind.SUPPORT_BODY;
+        ConstraintTarget identityTarget = new ConstraintTarget(kind, supportBinding.body(), new Vector3d(), new Quaterniond());
+        if (storedConstraintParentMatches(slot, identityTarget, slotSubLevel)
+                && slotConstraintFrame1Positions[slot] != null
+                && slotConstraintFrame1Orientations[slot] != null) {
+            return new ConstraintTarget(
+                    kind,
+                    supportBinding.body(),
+                    new Vector3d(slotConstraintFrame1Positions[slot]),
+                    new Quaterniond(slotConstraintFrame1Orientations[slot])
+            );
         }
 
-        boolean changed = Math.abs(lastTunedMasses[slot] - mass) > LOAD_CHANGE_EPSILON
-                || Math.abs(lastTunedAngularLoads[slot] - angularLoadRaw) > LOAD_CHANGE_EPSILON;
-        lastTunedMasses[slot] = mass;
-        lastTunedAngularLoads[slot] = angularLoadRaw;
-        return changed;
+        Pose3dc slotPose = slotSubLevel.logicalPose();
+        Vector3d worldPosition = slotPose.transformPosition(anchorLocalCenter, new Vector3d());
+        Quaterniond worldOrientation = new Quaterniond(slotPose.orientation());
+        if (supportBinding.body() == null) {
+            return new ConstraintTarget(kind, null, worldPosition, worldOrientation);
+        }
+
+        Pose3dc supportPose = supportBinding.body().logicalPose();
+        Vector3d localPosition = supportPose.transformPositionInverse(worldPosition, new Vector3d());
+        Quaterniond localOrientation = new Quaterniond(supportPose.orientation())
+                .conjugate()
+                .mul(worldOrientation)
+                .normalize();
+        return new ConstraintTarget(kind, supportBinding.body(), localPosition, localOrientation);
+    }
+
+    private Vector3d targetWorldPosition(ConstraintTarget target) {
+        return target.body() == null
+                ? new Vector3d(target.framePosition())
+                : target.body().logicalPose().transformPosition(target.framePosition(), new Vector3d());
+    }
+
+    private Quaterniond targetWorldOrientation(ConstraintTarget target) {
+        return target.body() == null
+                ? new Quaterniond(target.frameOrientation())
+                : new Quaterniond(target.body().logicalPose().orientation()).mul(target.frameOrientation()).normalize();
+    }
+
+    private boolean removeConstraintHandle(@Nullable GenericConstraintHandle handle, int slot, String reason) {
+        logConstraintRemoval("transaction-remove-attempt", reason, slot, handle, null);
+        if (handle == null) {
+            return true;
+        }
+        try {
+            if (handle.isValid()) {
+                handle.remove();
+            }
+            boolean removed = !handle.isValid();
+            logConstraintRemoval(removed ? "transaction-remove-confirmed" : "transaction-remove-still-valid",
+                    reason,
+                    slot,
+                    handle,
+                    null);
+            return removed;
+        } catch (Exception exception) {
+            logConstraintRemoval("transaction-remove-failed", reason, slot, handle, exception);
+            return false;
+        }
+    }
+
+    private void logConstraintTransition(
+            String event,
+            String reason,
+            int slot,
+            ConstraintTarget target,
+            ServerSubLevel child,
+            @Nullable GenericConstraintHandle previous,
+            @Nullable GenericConstraintHandle candidate
+    ) {
+        if (!TwisterMillDiagnostics.isServoLoggingEnabled()) {
+            return;
+        }
+        LOGGER.info("[PropellerSlotConstraintDiag] event={} reason={} slot={} targetKind={} parent={} child={} previousHandle={} candidateHandle={}",
+                event,
+                reason,
+                slot,
+                target.kind(),
+                describeBody(target.body()),
+                describeBody(child),
+                describeConstraintHandle(previous),
+                describeConstraintHandle(candidate));
+    }
+
+    private void logSupportBinding(
+            String event,
+            String reason,
+            ServerLevel rootLevel,
+            @Nullable ServerSubLevel supportSubLevel
+    ) {
+        if (!TwisterMillDiagnostics.isServoLoggingEnabled()) {
+            return;
+        }
+        LOGGER.info("[PropellerSlotConstraintDiag] event={} reason={} dimension={} assemblyAnchorPos={} support={}",
+                event,
+                reason,
+                rootLevel.dimension().location(),
+                supportAssemblyAnchorPos,
+                describeBody(supportSubLevel));
+    }
+
+    private void logSupportUnavailable(String reason, ServerLevel rootLevel) {
+        if (!TwisterMillDiagnostics.isServoLoggingEnabled()) {
+            return;
+        }
+        LOGGER.info("[PropellerSlotConstraintDiag] event=support-unavailable reason={} dimension={} assemblyAnchorPos={} rememberedRoot={} rememberedSupportId={}",
+                reason,
+                rootLevel.dimension().location(),
+                supportAssemblyAnchorPos,
+                supportBindingRootWorld,
+                supportSubLevelId);
     }
 
     private double computeAngularLoad(ServerSubLevel slotSubLevel, double fallback) {
@@ -790,8 +1492,8 @@ public final class ServoPropellerSlotManager {
         return Double.isFinite(value) && value > 0.0D ? value : fallback;
     }
 
-    private double clamp(double value, double min, double max) {
-        return Math.max(min, Math.min(max, value));
+    private static double clampEffectiveSlotLoad(double value) {
+        return Math.max(MIN_EFFECTIVE_SLOT_LOAD, Math.min(MAX_EFFECTIVE_SLOT_LOAD, value));
     }
 
     private void snapSlotPose(ServerSubLevel subLevel, Vector3d anchorLocalCenter, Vector3d desiredAnchorWorld, Quaterniond orientation, PhysicsPipeline pipeline) {
@@ -814,72 +1516,6 @@ public final class ServoPropellerSlotManager {
         pipeline.resetVelocity(subLevel);
         subLevel.updateLastPose();
         carryMountedServoTopsWithParentDelta(subLevel, oldParentPose, subLevel.logicalPose(), pipeline);
-        logSlotFrameDiagnosticsIfServoParent(
-                pipeline,
-                subLevel,
-                anchorLocalCenter,
-                desiredAnchorWorld,
-                orientation,
-                posePosition,
-                rotationPoint,
-                centerOfMass
-        );
-    }
-
-    private void logSlotFrameDiagnosticsIfServoParent(
-            PhysicsPipeline pipeline,
-            ServerSubLevel subLevel,
-            Vector3d anchorLocalCenter,
-            Vector3d desiredAnchorWorld,
-            Quaterniond orientation,
-            Vector3d posePosition,
-            Vector3d rotationPoint,
-            Vector3dc centerOfMass
-    ) {
-        if (!TwisterMillDiagnostics.isServoLoggingEnabled()) {
-            return;
-        }
-        if (!isPropellerSlotSubLevel(subLevel)) {
-            return;
-        }
-
-        UUID subLevelId = subLevel.getUniqueId();
-        if (SLOT_FRAME_DIAG_LOGGED_SUBLEVELS.contains(subLevelId) || !containsServoBlockEntity(subLevel)) {
-            return;
-        }
-        if (!SLOT_FRAME_DIAG_LOGGED_SUBLEVELS.add(subLevelId)) {
-            return;
-        }
-
-        Vector3d logicalAnchorWorld = subLevel.logicalPose().transformPosition(anchorLocalCenter, new Vector3d());
-        LOGGER.info(
-                "[PropellerSlotFrameDiag] subLevelName={} subLevelId={} desiredAnchorWorld={} anchorLocalCenter={} centerOfMass={} posePosition={} rotationPoint={} orientation={} logicalPose={} lastPose={} logicalAnchorWorld={} logicalAnchorError={} linearVelocity={} angularVelocity={} velocityResetDuringSnap=true updateLastPoseDuringSnap=true",
-                subLevel.getName(),
-                subLevelId,
-                formatVector(desiredAnchorWorld),
-                formatVector(anchorLocalCenter),
-                formatVector(centerOfMass),
-                formatVector(posePosition),
-                formatVector(rotationPoint),
-                orientation,
-                formatPose(subLevel.logicalPose()),
-                formatPose(subLevel.lastPose()),
-                formatVector(logicalAnchorWorld),
-                formatDouble(distance(desiredAnchorWorld, logicalAnchorWorld)),
-                formatVector(readLinearVelocity(pipeline, subLevel)),
-                formatVector(readAngularVelocity(pipeline, subLevel))
-        );
-    }
-
-    private boolean containsServoBlockEntity(ServerSubLevel subLevel) {
-        ServerLevel rootLevel = subLevel.getLevel();
-        BoundingBox3ic bounds = subLevel.getPlot().getBoundingBox();
-        for (BlockPos pos : BlockPos.betweenClosedStream(bounds.toMojang()).map(BlockPos::immutable).toList()) {
-            if (rootLevel.getBlockEntity(pos) instanceof ServoTwisterBlockEntity && isBlockInSubLevel(rootLevel, subLevel, pos)) {
-                return true;
-            }
-        }
-        return false;
     }
 
     private void carryMountedServoTopsWithParentDelta(ServerSubLevel parentSubLevel, Pose3dc oldParentPose, Pose3dc newParentPose, PhysicsPipeline pipeline) {
@@ -889,27 +1525,9 @@ public final class ServoPropellerSlotManager {
 
         ServerLevel rootLevel = parentSubLevel.getLevel();
         BoundingBox3ic bounds = parentSubLevel.getPlot().getBoundingBox();
-        boolean diagnosticsEnabled = TwisterMillDiagnostics.isServoLoggingEnabled();
-        UUID parentSubLevelId = null;
-        if (diagnosticsEnabled) {
-            updateCarriedServoTopDiagnosticsWindow();
-            parentSubLevelId = parentSubLevel.getUniqueId();
-        } else {
-            clearCarriedServoTopDiagnosticsWindowIfNeeded();
-        }
         for (BlockPos pos : BlockPos.betweenClosedStream(bounds.toMojang()).map(BlockPos::immutable).toList()) {
             if (rootLevel.getBlockEntity(pos) instanceof ServoTwisterBlockEntity servo
                     && isBlockInSubLevel(rootLevel, parentSubLevel, pos)) {
-                if (diagnosticsEnabled) {
-                    UUID childTopId = servo.getActiveServoTopSubLevelIdForPreview();
-                    CarriedServoTopKey key = new CarriedServoTopKey(parentSubLevelId, pos.immutable(), childTopId);
-                    if (loggedCarriedServoTopKeys.add(key)) {
-                        LOGGER.info("[PropellerSlotRejoinDiag] event=carry-mounted-servo-top parentSubLevelId={} servoPos={} childTopId={}",
-                                parentSubLevelId,
-                                pos,
-                                childTopId);
-                    }
-                }
                 servo.carryActiveSableTopWithParentDelta(rootLevel, pipeline, oldParentPose, newParentPose);
             }
         }
@@ -926,12 +1544,27 @@ public final class ServoPropellerSlotManager {
     }
 
     private void stabilizeTopFollowingSlots(ServerLevel rootLevel, PhysicsPipeline pipeline, boolean recomputeFromTopPose) {
+        if (freeBearingFailClosedTopFollow) {
+            TopFollowReadiness readiness = inspectTopFollowReadiness(rootLevel, freeBearingExpectedTopSubLevelId);
+            if (readiness == TopFollowReadiness.RETRYABLE_UNRESOLVED
+                    || readiness == TopFollowReadiness.INVALID
+                    || (readiness == TopFollowReadiness.RETRYABLE_REBIND && !freeBearingAllowTopRebind)) {
+                return;
+            }
+        }
+
         if (!topFollowActive || activeTopSubLevelId == null || activeTopAnchorLocalCenter == null) {
             return;
         }
 
         ServerSubLevel topSubLevel = resolveSubLevel(rootLevel, activeTopSubLevelId);
         if (topSubLevel == null) {
+            if (freeBearingFailClosedTopFollow) {
+                return;
+            }
+            logTopFollowState("stabilize-top-missing", recomputeFromTopPose);
+            clearTopFollowState();
+            lockRootSlotPoses(rootLevel);
             return;
         }
 
@@ -943,19 +1576,32 @@ public final class ServoPropellerSlotManager {
 
             ServerSubLevel slotSubLevel = resolveSubLevel(rootLevel, subLevelId);
             if (slotSubLevel == null) {
+                if (freeBearingFailClosedTopFollow) {
+                    return;
+                }
+                clearSlot(i, "stabilize-slot-sublevel-missing");
                 continue;
             }
 
             Vector3d anchorLocalCenter = getOrCreateAnchorLocalCenter(slotSubLevel, i);
-            if (recomputeFromTopPose) {
-                applyTopPoseToSlot(pipeline, topSubLevel, slotSubLevel, i, anchorLocalCenter, activeTopAnchorLocalCenter);
-                continue;
-            }
-
-            Vector3d worldCenter = lastLockedWorldCenters[i];
-            Quaterniond orientation = lastLockedOrientations[i];
-            if (worldCenter != null && orientation != null) {
-                snapSlotPose(slotSubLevel, anchorLocalCenter, worldCenter, orientation, pipeline);
+            ConstraintEnsureResult result = ensureTopSlotConstraint(
+                    pipeline,
+                    topSubLevel,
+                    slotSubLevel,
+                    i,
+                    anchorLocalCenter,
+                    activeTopAnchorLocalCenter,
+                    recomputeFromTopPose ? "post-physics-top-ensure" : "pre-physics-top-ensure"
+            );
+            if (result == ConstraintEnsureResult.UNSECURED) {
+                secureSupportSlotAtCurrentPose(
+                        rootLevel,
+                        pipeline,
+                        slotSubLevel,
+                        i,
+                        anchorLocalCenter,
+                        recomputeFromTopPose ? "post-physics-top-fallback" : "pre-physics-top-fallback"
+                );
             }
         }
     }
@@ -975,8 +1621,6 @@ public final class ServoPropellerSlotManager {
         Vector3d worldCenter = topPose.transformPosition(localCenter, new Vector3d());
         Quaterniond orientation = new Quaterniond(topPose.orientation()).mul(slotFrame.rotation());
 
-        lastLockedWorldCenters[slot] = new Vector3d(worldCenter);
-        lastLockedOrientations[slot] = new Quaterniond(orientation);
         snapSlotPose(slotSubLevel, anchorLocalCenter, worldCenter, orientation, pipeline);
     }
 
@@ -984,41 +1628,13 @@ public final class ServoPropellerSlotManager {
         topFollowActive = false;
         activeTopSubLevelId = null;
         activeTopAnchorLocalCenter = null;
-        resetCarriedServoTopDiagnostics();
     }
 
-    private void clearSlot(int slot) {
-        removeSlotConstraint(slot);
+    private void clearSlot(int slot, String reason) {
+        removeSlotConstraint(slot, reason + ":constraint-cleanup");
         slotSubLevelIds[slot] = null;
         slotAnchorLocalCenters[slot] = null;
-        lastLockedWorldCenters[slot] = null;
-        lastLockedOrientations[slot] = null;
-        lastTunedMasses[slot] = 0.0D;
-        lastTunedAngularLoads[slot] = 0.0D;
-        pendingDiagnosticLogs[slot] = false;
-        pendingDiagnosticEvents[slot] = null;
-        pendingDiagnosticPositions[slot] = null;
-        resetCarriedServoTopDiagnostics();
         clearTopFollowStateIfEmpty();
-    }
-
-    private void updateCarriedServoTopDiagnosticsWindow() {
-        if (!carriedServoTopDiagnosticsWasEnabled) {
-            loggedCarriedServoTopKeys.clear();
-            carriedServoTopDiagnosticsWasEnabled = true;
-        }
-    }
-
-    private void clearCarriedServoTopDiagnosticsWindowIfNeeded() {
-        if (carriedServoTopDiagnosticsWasEnabled) {
-            loggedCarriedServoTopKeys.clear();
-            carriedServoTopDiagnosticsWasEnabled = false;
-        }
-    }
-
-    private void resetCarriedServoTopDiagnostics() {
-        loggedCarriedServoTopKeys.clear();
-        carriedServoTopDiagnosticsWasEnabled = false;
     }
 
     private void clearTopFollowStateIfEmpty() {
@@ -1031,20 +1647,421 @@ public final class ServoPropellerSlotManager {
         unregisterActiveManager();
     }
 
-    private void removeSlotConstraint(int slot) {
+    private void removeSlotConstraint(int slot, String reason) {
         GenericConstraintHandle handle = slotConstraintHandles[slot];
+        logConstraintRemoval("remove-attempt", reason, slot, handle, null);
         if (handle != null) {
             try {
                 if (handle.isValid()) {
                     handle.remove();
                 }
-            } catch (Exception ignored) {
+                logConstraintRemoval("remove-result", reason, slot, handle, null);
+            } catch (Exception exception) {
+                logConstraintRemoval("remove-failed", reason, slot, handle, exception);
             }
         }
 
         slotConstraintHandles[slot] = null;
+        slotConstraintParentKinds[slot] = ConstraintParentKind.NONE;
+        slotConstraintParentSubLevelIds[slot] = null;
+        slotConstraintFrame1Positions[slot] = null;
+        slotConstraintFrame1Orientations[slot] = null;
+        clearTopSnap(slot);
         slotConstraintAttachedToTop[slot] = false;
         slotConstraintTopSubLevelIds[slot] = null;
+        slotConstraintParentRuntimeIds[slot] = DIAGNOSTIC_UNKNOWN_RUNTIME_ID;
+        slotConstraintChildRuntimeIds[slot] = DIAGNOSTIC_UNKNOWN_RUNTIME_ID;
+        slotConstraintParentObjectIdentities[slot] = DIAGNOSTIC_UNKNOWN_RUNTIME_ID;
+        slotConstraintChildObjectIdentities[slot] = DIAGNOSTIC_UNKNOWN_RUNTIME_ID;
+    }
+
+    private void clearSupportBinding() {
+        supportAssemblyAnchorPos = null;
+        supportBindingInitialized = false;
+        supportBindingRootWorld = false;
+        supportSubLevelId = null;
+    }
+
+    private void updateDiagnosticServoWorldPos(@Nullable Level level, BlockPos servoPos, String reason) {
+        if (!TwisterMillDiagnostics.isServoLoggingEnabled()) {
+            return;
+        }
+        if (level == null) {
+            LOGGER.info("[PropellerSlotConstraintDiag] event=servo-world-pos-unavailable reason={} servoPos={}",
+                    reason,
+                    servoPos);
+            return;
+        }
+
+        try {
+            diagnosticServoWorldPos = SableLevelWrapper.toWorldPos(level, servoPos);
+            LOGGER.info("[PropellerSlotConstraintDiag] event=servo-world-pos reason={} localPos={} worldPos={}",
+                    reason,
+                    servoPos,
+                    diagnosticServoWorldPos);
+        } catch (Exception exception) {
+            LOGGER.warn("[PropellerSlotConstraintDiag] event=servo-world-pos-failed reason={} servoPos={}",
+                    reason,
+                    servoPos,
+                    exception);
+        }
+    }
+
+    private void recordConstraintRuntimeIdentities(
+            int slot,
+            @Nullable ServerSubLevel parentSubLevel,
+            ServerSubLevel slotSubLevel
+    ) {
+        slotConstraintParentRuntimeIds[slot] = getRuntimeIdForDiagnostics(parentSubLevel);
+        slotConstraintChildRuntimeIds[slot] = getRuntimeIdForDiagnostics(slotSubLevel);
+        slotConstraintParentObjectIdentities[slot] = getObjectIdentityForDiagnostics(parentSubLevel);
+        slotConstraintChildObjectIdentities[slot] = getObjectIdentityForDiagnostics(slotSubLevel);
+    }
+
+    private boolean validateConstraintConfiguration(
+            GenericConstraintConfiguration configuration,
+            @Nullable ServerSubLevel parentSubLevel,
+            ServerSubLevel slotSubLevel,
+            int slot,
+            String reason
+    ) {
+        ServerSubLevelContainer container = SubLevelContainer.getContainer(slotSubLevel.getLevel());
+        if (container == null) {
+            logConstraintState(
+                    "configuration-validate-skipped",
+                    reason,
+                    slot,
+                    parentSubLevel,
+                    slotSubLevel,
+                    configuration.pos1(),
+                    configuration.orientation1(),
+                    configuration.pos2(),
+                    configuration.orientation2(),
+                    "result=container-null"
+            );
+            LOGGER.warn("[PropellerSlotConstraintDiag] event=configuration-validation-failed reason={} slot={} cause=container-null",
+                    reason,
+                    slot);
+            return false;
+        }
+
+        try {
+            configuration.validate(container, parentSubLevel, slotSubLevel);
+            logConstraintState(
+                    "configuration-validate-result",
+                    reason,
+                    slot,
+                    parentSubLevel,
+                    slotSubLevel,
+                    configuration.pos1(),
+                    configuration.orientation1(),
+                    configuration.pos2(),
+                    configuration.orientation2(),
+                    "result=success"
+            );
+            return true;
+        } catch (Exception exception) {
+            logConstraintException(
+                    "GenericConstraintConfiguration.validate",
+                    reason,
+                    slot,
+                    parentSubLevel,
+                    slotSubLevel,
+                    exception
+            );
+            return false;
+        }
+    }
+
+    private void logConstraintState(
+            String event,
+            String reason,
+            int slot,
+            @Nullable ServerSubLevel parentSubLevel,
+            ServerSubLevel slotSubLevel,
+            Vector3dc frame1Position,
+            Quaterniondc frame1Orientation,
+            Vector3dc frame2Position,
+            Quaterniondc frame2Orientation,
+            String detail
+    ) {
+        if (!TwisterMillDiagnostics.isServoLoggingEnabled()) {
+            return;
+        }
+
+        try {
+            ConstraintFrameDiagnostics frames = computeConstraintFrameDiagnostics(
+                    parentSubLevel,
+                    slotSubLevel,
+                    frame1Position,
+                    frame1Orientation,
+                    frame2Position,
+                    frame2Orientation
+            );
+            LOGGER.info(
+                    "[PropellerSlotConstraintDiag] event={} reason={} slot={} target={} servoWorldPos={} actualSupport={} parent={} child={} handle={} storedParentUuid={} storedParentRuntimeId={} storedChildRuntimeId={} lockedAxes={} frame1LocalPos={} frame1LocalRot={} frame2LocalPos={} frame2LocalRot={} frame1WorldPos={} frame1WorldRot={} frame2WorldPos={} frame2WorldRot={} framePositionError={} frameOrientationErrorDeg={} detail={}",
+                    event,
+                    reason,
+                    slot,
+                    constraintTargetKindForDiagnostics(parentSubLevel),
+                    diagnosticServoWorldPos,
+                    describeActualSupport(slotSubLevel.getLevel()),
+                    describeBody(parentSubLevel),
+                    describeBody(slotSubLevel),
+                    describeConstraintHandle(slot),
+                    slotConstraintParentSubLevelIds[slot],
+                    slotConstraintParentRuntimeIds[slot],
+                    slotConstraintChildRuntimeIds[slot],
+                    LOCKED_AXES,
+                    formatVector(frame1Position),
+                    formatQuaternion(frame1Orientation),
+                    formatVector(frame2Position),
+                    formatQuaternion(frame2Orientation),
+                    formatVector(frames.frame1WorldPosition()),
+                    formatQuaternion(frames.frame1WorldOrientation()),
+                    formatVector(frames.frame2WorldPosition()),
+                    formatQuaternion(frames.frame2WorldOrientation()),
+                    formatDouble(frames.positionError()),
+                    formatDouble(frames.orientationErrorDegrees()),
+                    detail
+            );
+        } catch (Exception exception) {
+            LOGGER.warn("[PropellerSlotConstraintDiag] event=state-log-failed originalEvent={} reason={} slot={}",
+                    event,
+                    reason,
+                    slot,
+                    exception);
+        }
+    }
+
+    private void logConstraintException(
+            String operation,
+            String reason,
+            int slot,
+            @Nullable ServerSubLevel parentSubLevel,
+            @Nullable ServerSubLevel slotSubLevel,
+            Exception exception
+    ) {
+        logConstraintHandleException(
+                operation,
+                reason,
+                slot,
+                parentSubLevel,
+                slotSubLevel,
+                slotConstraintHandles[slot],
+                exception
+        );
+    }
+
+    private void logConstraintHandleException(
+            String operation,
+            String reason,
+            int slot,
+            @Nullable ServerSubLevel parentSubLevel,
+            @Nullable ServerSubLevel slotSubLevel,
+            @Nullable GenericConstraintHandle handle,
+            Exception exception
+    ) {
+        LOGGER.warn(
+                "[PropellerSlotConstraintDiag] event=operation-failed operation={} reason={} slot={} servoWorldPos={} actualSupport={} parent={} child={} handle={} storedParentUuid={} storedParentRuntimeId={} storedChildRuntimeId={}",
+                operation,
+                reason,
+                slot,
+                diagnosticServoWorldPos,
+                slotSubLevel == null ? "unknown" : describeActualSupport(slotSubLevel.getLevel()),
+                describeBody(parentSubLevel),
+                describeBody(slotSubLevel),
+                describeConstraintHandle(handle),
+                slotConstraintParentSubLevelIds[slot],
+                slotConstraintParentRuntimeIds[slot],
+                slotConstraintChildRuntimeIds[slot],
+                exception
+        );
+    }
+
+    private void logConstraintRemoval(
+            String event,
+            String reason,
+            int slot,
+            @Nullable GenericConstraintHandle handle,
+            @Nullable Exception exception
+    ) {
+        if (!TwisterMillDiagnostics.isServoLoggingEnabled()) {
+            if (exception != null) {
+                LOGGER.warn("[PropellerSlotConstraintDiag] event={} reason={} slot={} handle={}",
+                        event,
+                        reason,
+                        slot,
+                        describeConstraintHandle(handle),
+                        exception);
+            }
+            return;
+        }
+
+        String message = "[PropellerSlotConstraintDiag] event={} reason={} slot={} servoWorldPos={} handle={} attachedToTop={} storedParentUuid={} storedParentRuntimeId={} storedChildRuntimeId={}";
+        if (exception == null) {
+            LOGGER.info(
+                    message,
+                    event,
+                    reason,
+                    slot,
+                    diagnosticServoWorldPos,
+                    describeConstraintHandle(handle),
+                    slotConstraintAttachedToTop[slot],
+                    slotConstraintParentSubLevelIds[slot],
+                    slotConstraintParentRuntimeIds[slot],
+                    slotConstraintChildRuntimeIds[slot]
+            );
+        } else {
+            LOGGER.warn(
+                    message,
+                    event,
+                    reason,
+                    slot,
+                    diagnosticServoWorldPos,
+                    describeConstraintHandle(handle),
+                    slotConstraintAttachedToTop[slot],
+                    slotConstraintParentSubLevelIds[slot],
+                    slotConstraintParentRuntimeIds[slot],
+                    slotConstraintChildRuntimeIds[slot],
+                    exception
+            );
+        }
+    }
+
+    private void logTopFollowState(String event, boolean recomputeFromTopPose) {
+        if (!TwisterMillDiagnostics.isServoLoggingEnabled()) {
+            return;
+        }
+        LOGGER.info(
+                "[PropellerSlotConstraintDiag] event={} physicsPhase={} servoWorldPos={} topFollowActive={} activeTopSubLevelId={} activeTopAnchorLocalCenter={}",
+                event,
+                recomputeFromTopPose ? "post" : "pre",
+                diagnosticServoWorldPos,
+                topFollowActive,
+                activeTopSubLevelId,
+                formatVector(activeTopAnchorLocalCenter)
+        );
+    }
+
+    private ConstraintFrameDiagnostics computeConstraintFrameDiagnostics(
+            @Nullable ServerSubLevel parentSubLevel,
+            ServerSubLevel slotSubLevel,
+            Vector3dc frame1Position,
+            Quaterniondc frame1Orientation,
+            Vector3dc frame2Position,
+            Quaterniondc frame2Orientation
+    ) {
+        Vector3d frame1WorldPosition = parentSubLevel == null
+                ? new Vector3d(frame1Position)
+                : parentSubLevel.logicalPose().transformPosition(frame1Position, new Vector3d());
+        Quaterniond frame1WorldOrientation = parentSubLevel == null
+                ? new Quaterniond(frame1Orientation)
+                : new Quaterniond(parentSubLevel.logicalPose().orientation()).mul(frame1Orientation);
+        Vector3d frame2WorldPosition = slotSubLevel.logicalPose().transformPosition(frame2Position, new Vector3d());
+        Quaterniond frame2WorldOrientation = new Quaterniond(slotSubLevel.logicalPose().orientation()).mul(frame2Orientation);
+        double positionError = frame1WorldPosition.distance(frame2WorldPosition);
+        double orientationErrorDegrees = quaternionDifferenceDegrees(frame1WorldOrientation, frame2WorldOrientation);
+        return new ConstraintFrameDiagnostics(
+                frame1WorldPosition,
+                frame1WorldOrientation,
+                frame2WorldPosition,
+                frame2WorldOrientation,
+                positionError,
+                orientationErrorDegrees
+        );
+    }
+
+    private String describeActualSupport(ServerLevel rootLevel) {
+        if (supportAssemblyAnchorPos == null) {
+            return "{kind=unknown,reason=support-pivot-unavailable}";
+        }
+
+        try {
+            SubLevel containing = Sable.HELPER.getContaining(rootLevel, supportAssemblyAnchorPos);
+            if (containing instanceof ServerSubLevel supportSubLevel) {
+                return describeBody(supportSubLevel);
+            }
+            if (containing == null) {
+                return "{kind=root-world,runtimeId=" + PhysicsPipelineBody.NULL_RUNTIME_ID + "}";
+            }
+            return "{kind=" + containing.getClass().getName()
+                    + ",uuid=" + containing.getUniqueId() + "}";
+        } catch (Exception exception) {
+            return "{kind=error,type=" + exception.getClass().getName()
+                    + ",message=" + exception.getMessage() + "}";
+        }
+    }
+
+    private String constraintTargetKindForDiagnostics(@Nullable ServerSubLevel parentSubLevel) {
+        if (parentSubLevel == null) {
+            return ConstraintParentKind.ROOT_WORLD.name().toLowerCase(Locale.ROOT);
+        }
+        if (activeTopSubLevelId != null && activeTopSubLevelId.equals(parentSubLevel.getUniqueId())) {
+            return ConstraintParentKind.TOP_BODY.name().toLowerCase(Locale.ROOT);
+        }
+        return ConstraintParentKind.SUPPORT_BODY.name().toLowerCase(Locale.ROOT);
+    }
+
+    private String describeBody(@Nullable PhysicsPipelineBody body) {
+        if (body == null) {
+            return "{kind=root-world,runtimeId=" + PhysicsPipelineBody.NULL_RUNTIME_ID + ",removed=false}";
+        }
+
+        UUID uniqueId = body instanceof ServerSubLevel subLevel ? subLevel.getUniqueId() : null;
+        return "{kind=" + body.getClass().getName()
+                + ",uuid=" + uniqueId
+                + ",runtimeId=" + getRuntimeIdForDiagnostics(body)
+                + ",removed=" + isRemovedForDiagnostics(body) + "}";
+    }
+
+    private String describeConstraintHandle(int slot) {
+        return describeConstraintHandle(slotConstraintHandles[slot]);
+    }
+
+    private String describeConstraintHandle(@Nullable GenericConstraintHandle handle) {
+        if (handle == null) {
+            return "{valid=false}";
+        }
+
+        String valid;
+        try {
+            valid = Boolean.toString(handle.isValid());
+        } catch (Exception exception) {
+            valid = "error:" + exception.getClass().getName() + ":" + exception.getMessage();
+        }
+        return "{valid=" + valid + "}";
+    }
+
+    private int getRuntimeIdForDiagnostics(@Nullable PhysicsPipelineBody body) {
+        if (body == null) {
+            return PhysicsPipelineBody.NULL_RUNTIME_ID;
+        }
+        try {
+            return body.getRuntimeId();
+        } catch (Exception ignored) {
+            return DIAGNOSTIC_UNKNOWN_RUNTIME_ID;
+        }
+    }
+
+    private int getObjectIdentityForDiagnostics(@Nullable Object object) {
+        return object == null ? 0 : System.identityHashCode(object);
+    }
+
+    private String isRemovedForDiagnostics(PhysicsPipelineBody body) {
+        try {
+            return Boolean.toString(body.isRemoved());
+        } catch (Exception exception) {
+            return "error:" + exception.getClass().getName() + ":" + exception.getMessage();
+        }
+    }
+
+    private double quaternionDifferenceDegrees(Quaterniondc first, Quaterniondc second) {
+        Quaterniond difference = new Quaterniond(first).normalize().conjugate()
+                .mul(new Quaterniond(second).normalize())
+                .normalize();
+        double absoluteW = Math.min(1.0D, Math.abs(difference.w));
+        return Math.toDegrees(2.0D * Math.acos(absoluteW));
     }
 
     private Vector3d getOrCreateAnchorLocalCenter(ServerSubLevel subLevel, int slot) {
@@ -1058,288 +2075,58 @@ public final class ServoPropellerSlotManager {
         return fallback;
     }
 
-    private Vector3d computeSlotCenter(ServoTwisterBlockEntity owner, Vector3d slotOffset, Direction servoFacing) {
-        BlockPos topPos = owner.getBlockPos().relative(servoFacing);
-        Vector3d topCenter = SableLevelWrapper.toWorldCenter(owner.getLevel(), topPos);
-        return topCenter.add(slotOffset, new Vector3d());
-    }
-
-    private void markChangedSlot(ServerLevel rootLevel, BlockPos changedPos, String eventType) {
-        if (!TwisterMillDiagnostics.isServoLoggingEnabled()) {
-            return;
-        }
-        for (int i = 0; i < SLOT_COUNT; i++) {
-            UUID subLevelId = slotSubLevelIds[i];
-            if (subLevelId == null) {
+    private void restoreMissingSlotPlacementHelperMetadata(ServerLevel rootLevel) {
+        for (int slot = 0; slot < SLOT_COUNT; slot++) {
+            UUID slotSubLevelId = slotSubLevelIds[slot];
+            if (slotSubLevelId == null) {
                 continue;
             }
 
-            ServerSubLevel slotSubLevel = resolveSubLevel(rootLevel, subLevelId);
-            if (slotSubLevel == null || !isPosInSlotSubLevel(rootLevel, slotSubLevel, changedPos)) {
+            ServerSubLevel slotSubLevel = resolveSubLevel(rootLevel, slotSubLevelId);
+            if (slotSubLevel == null || !(SLOT_SUBLEVEL_NAME_PREFIX + slot).equals(slotSubLevel.getName())) {
                 continue;
             }
 
-            pendingDiagnosticLogs[i] = true;
-            pendingDiagnosticEvents[i] = eventType;
-            pendingDiagnosticPositions[i] = changedPos.immutable();
+            Vector3d anchorLocalCenter = getOrCreateAnchorLocalCenter(slotSubLevel, slot);
+            ensureSlotPlacementHelperMetadata(
+                    rootLevel, slotSubLevel, slot, anchorLocalCenter, slotFacing);
         }
     }
 
-    private boolean isPosInSlotSubLevel(ServerLevel rootLevel, ServerSubLevel slotSubLevel, BlockPos pos) {
-        try {
-            SubLevel containing = Sable.HELPER.getContaining(rootLevel, pos);
-            if (containing != null && slotSubLevel.getUniqueId().equals(containing.getUniqueId())) {
-                return true;
-            }
-        } catch (Exception ignored) {
+    private boolean ensureSlotPlacementHelperMetadata(
+            ServerLevel rootLevel,
+            ServerSubLevel slotSubLevel,
+            int slot,
+            Vector3d anchorLocalCenter,
+            Direction facing
+    ) {
+        if (slot < 0 || slot >= SLOT_COUNT
+                || slotSubLevel.isRemoved()
+                || !(SLOT_SUBLEVEL_NAME_PREFIX + slot).equals(slotSubLevel.getName())
+                || !isSupportedSlotFacing(facing)) {
+            return false;
         }
 
-        BoundingBox3ic bounds = slotSubLevel.getPlot().getBoundingBox();
-        return pos.getX() >= bounds.minX() && pos.getX() <= bounds.maxX()
-                && pos.getY() >= bounds.minY() && pos.getY() <= bounds.maxY()
-                && pos.getZ() >= bounds.minZ() && pos.getZ() <= bounds.maxZ();
-    }
-
-    private void logPendingDiagnostics(ServerLevel rootLevel, PhysicsPipeline pipeline, String phase, boolean clearAfterLog) {
-        if (!TwisterMillDiagnostics.isServoLoggingEnabled()) {
-            return;
-        }
-        for (int i = 0; i < SLOT_COUNT; i++) {
-            if (!pendingDiagnosticLogs[i]) {
-                continue;
-            }
-
-            UUID subLevelId = slotSubLevelIds[i];
-            ServerSubLevel slotSubLevel = subLevelId == null ? null : resolveSubLevel(rootLevel, subLevelId);
-            if (slotSubLevel != null) {
-                logSlotDiagnostics(rootLevel, pipeline, slotSubLevel, i, phase);
-            }
-
-            if (clearAfterLog) {
-                pendingDiagnosticLogs[i] = false;
-                pendingDiagnosticEvents[i] = null;
-                pendingDiagnosticPositions[i] = null;
-            }
-        }
-    }
-
-    private void logRejoinDiagnostics(ServerLevel rootLevel, PhysicsPipeline pipeline, String phase, boolean decrementWindow) {
-        if (!TwisterMillDiagnostics.isServoLoggingEnabled()) {
-            return;
+        BlockPos anchorPos = BlockPos.containing(
+                anchorLocalCenter.x, anchorLocalCenter.y, anchorLocalCenter.z);
+        BlockState anchorState = rootLevel.getBlockState(anchorPos);
+        if (!anchorState.is(ModBlocks.METAL_TRAVERSE.get())
+                || anchorState.getValue(MetalTraverseBlock.AXIS) != facing.getAxis()
+                || !(rootLevel.getBlockEntity(anchorPos) instanceof WrenchSideCycleBlockEntity sideCycle)) {
+            return false;
         }
 
-        boolean windowActive = diagnosticReadPending || diagnosticRejoinTicksRemaining > 0;
-        for (int i = 0; i < SLOT_COUNT; i++) {
-            UUID subLevelId = slotSubLevelIds[i];
-            if (subLevelId == null) {
-                continue;
-            }
-
-            ServerSubLevel slotSubLevel = resolveSubLevel(rootLevel, subLevelId);
-            if (slotSubLevel == null) {
-                if (windowActive) {
-                    LOGGER.info("[PropellerSlotRejoinDiag] phase={} event=slot-sublevel-missing slot={} managerRegistered={} topFollowActive={} activeTopSubLevelId={} slotSubLevelId={}",
-                            phase,
-                            i,
-                            activeManagerRegistered,
-                            topFollowActive,
-                            activeTopSubLevelId,
-                            subLevelId);
-                }
-                continue;
-            }
-
-            Vector3d anchorLocalCenter = getOrCreateAnchorLocalCenter(slotSubLevel, i);
-            Pose3d logicalPose = slotSubLevel.logicalPose();
-            Pose3d rapierPose = readRapierPose(pipeline, slotSubLevel);
-            Vector3d desiredAnchorWorld = computeDesiredAnchorWorld(rootLevel, i, anchorLocalCenter);
-            Vector3d logicalAnchorWorld = logicalPose.transformPosition(anchorLocalCenter, new Vector3d());
-            Vector3d rapierAnchorWorld = rapierPose.transformPosition(anchorLocalCenter, new Vector3d());
-            double logicalAnchorError = distance(desiredAnchorWorld, logicalAnchorWorld);
-            double rapierAnchorError = distance(desiredAnchorWorld, rapierAnchorWorld);
-            double normalWorldError = computeNormalWorldError(logicalPose, i);
-            boolean thresholdBreach = logicalAnchorError > DIAGNOSTIC_ANCHOR_ERROR_THRESHOLD
-                    || rapierAnchorError > DIAGNOSTIC_ANCHOR_ERROR_THRESHOLD
-                    || normalWorldError > DIAGNOSTIC_NORMAL_ERROR_THRESHOLD;
-            if (!windowActive && !thresholdBreach) {
-                continue;
-            }
-
-            MassData massData = slotSubLevel.getMassTracker();
-            LOGGER.info(
-                    "[PropellerSlotRejoinDiag] phase={} event=slot-frame managerRegistered={} readPending={} windowTicks={} topFollowActive={} activeTopSubLevelId={} slot={} slotSubLevelId={} desiredSlotAnchorWorld={} logicalAnchorWorld={} rapierAnchorWorld={} logicalAnchorError={} rapierAnchorError={} normalWorldError={} remainingConstraint={} attachedToTop={} slotConstraintTopSubLevelId={} centerOfMass={} rotationPoint={} linearVelocity={} angularVelocity={}",
-                    phase,
-                    activeManagerRegistered,
-                    diagnosticReadPending,
-                    diagnosticRejoinTicksRemaining,
-                    topFollowActive,
-                    activeTopSubLevelId,
-                    i,
-                    subLevelId,
-                    formatVector(desiredAnchorWorld),
-                    formatVector(logicalAnchorWorld),
-                    formatVector(rapierAnchorWorld),
-                    formatDouble(logicalAnchorError),
-                    formatDouble(rapierAnchorError),
-                    formatDouble(normalWorldError),
-                    hasValidConstraint(i),
-                    slotConstraintAttachedToTop[i],
-                    slotConstraintTopSubLevelIds[i],
-                    formatVector(massData.getCenterOfMass()),
-                    formatVector(logicalPose.rotationPoint()),
-                    formatVector(readLinearVelocity(pipeline, slotSubLevel)),
-                    formatVector(readAngularVelocity(pipeline, slotSubLevel))
-            );
+        if (sideCycle.setServoMode7SlotOutward(computeSlotLocalOutward(facing))) {
+            sideCycle.markChangedAndSync();
         }
-
-        if (decrementWindow && diagnosticRejoinTicksRemaining > 0) {
-            diagnosticRejoinTicksRemaining--;
-            if (diagnosticRejoinTicksRemaining <= 0) {
-                diagnosticReadPending = false;
-            }
-        }
-    }
-
-    private void logSlotDiagnostics(ServerLevel rootLevel, PhysicsPipeline pipeline, ServerSubLevel slotSubLevel, int slot, String phase) {
-        if (!TwisterMillDiagnostics.isServoLoggingEnabled()) {
-            return;
-        }
-        Vector3d anchorLocalCenter = getOrCreateAnchorLocalCenter(slotSubLevel, slot);
-        Pose3d logicalPose = slotSubLevel.logicalPose();
-        Pose3d rapierPose = readRapierPose(pipeline, slotSubLevel);
-        MassData massData = slotSubLevel.getMassTracker();
-        Matrix3dc inertia = massData.getInertiaTensor();
-        BoundingBox3ic bounds = slotSubLevel.getPlot().getBoundingBox();
-        SlotGeometry geometry = measureSlotGeometry(rootLevel, bounds, anchorLocalCenter);
-        Vector3d linearVelocity = readLinearVelocity(pipeline, slotSubLevel);
-        Vector3d angularVelocity = readAngularVelocity(pipeline, slotSubLevel);
-        Vector3d desiredAnchorWorld = computeDesiredAnchorWorld(rootLevel, slot, anchorLocalCenter);
-        Vector3d logicalAnchorWorld = logicalPose.transformPosition(anchorLocalCenter, new Vector3d());
-        Vector3d rapierAnchorWorld = rapierPose.transformPosition(anchorLocalCenter, new Vector3d());
-        double logicalAnchorError = distance(desiredAnchorWorld, logicalAnchorWorld);
-        double rapierAnchorError = distance(desiredAnchorWorld, rapierAnchorWorld);
-        double normalWorldError = computeNormalWorldError(logicalPose, slot);
-        boolean remainingConstraint = hasValidConstraint(slot);
-        Vector3dc centerOfMass = massData.getCenterOfMass();
-        Vector3d anchorMinusCom = centerOfMass == null
-                ? new Vector3d(Double.NaN, Double.NaN, Double.NaN)
-                : new Vector3d(anchorLocalCenter).sub(centerOfMass);
-
-        LOGGER.info(
-                "[ServoPropellerSlotDiag] phase={} event={} eventPos={} slot={} blocks={} bounds={} lengthMaxAxis={} lengthMaxDistance={} mass={} centerOfMass={} inertiaDiag={} anchorLocalCenter={} rotationPoint={} anchorMinusCom={} logicalPose={} rapierPose={} linearVelocity={} angularVelocity={} managerRegistered={} rejoinWindowTicks={} topFollowActive={} activeTop={} activeTopSubLevelId={} remainingConstraint={} attachedToTop={} slotConstraintTopSubLevelId={} desiredAnchor={} logicalAnchor={} rapierAnchor={} logicalAnchorError={} rapierAnchorError={} normalWorldError={}",
-                phase,
-                pendingDiagnosticEvents[slot],
-                pendingDiagnosticPositions[slot],
-                slot,
-                geometry.blockCount(),
-                formatBounds(bounds),
-                formatDouble(geometry.maxAxisOffset()),
-                formatDouble(geometry.maxDistance()),
-                formatDouble(massData.getMass()),
-                formatVector(centerOfMass),
-                formatInertiaDiagonal(inertia),
-                formatVector(anchorLocalCenter),
-                formatVector(logicalPose.rotationPoint()),
-                formatVector(anchorMinusCom),
-                formatPose(logicalPose),
-                formatPose(rapierPose),
-                formatVector(linearVelocity),
-                formatVector(angularVelocity),
-                activeManagerRegistered,
-                diagnosticRejoinTicksRemaining,
-                topFollowActive,
-                activeTopSubLevelId != null,
-                activeTopSubLevelId,
-                remainingConstraint,
-                slotConstraintAttachedToTop[slot],
-                slotConstraintTopSubLevelIds[slot],
-                formatVector(desiredAnchorWorld),
-                formatVector(logicalAnchorWorld),
-                formatVector(rapierAnchorWorld),
-                formatDouble(logicalAnchorError),
-                formatDouble(rapierAnchorError),
-                formatDouble(normalWorldError)
-        );
-    }
-
-    private double computeNormalWorldError(Pose3dc slotPose, int slot) {
-        Quaterniond desiredOrientation = lastLockedOrientations[slot];
-        if (desiredOrientation == null) {
-            return Double.NaN;
-        }
-
-        Vector3d desiredNormal = new Vector3d(0.0D, 0.0D, 1.0D);
-        desiredOrientation.transform(desiredNormal);
-        Vector3d logicalNormal = slotPose.transformNormal(new Vector3d(0.0D, 0.0D, 1.0D), new Vector3d());
-        if (desiredNormal.lengthSquared() <= 1.0E-12 || logicalNormal.lengthSquared() <= 1.0E-12) {
-            return Double.NaN;
-        }
-        desiredNormal.normalize();
-        logicalNormal.normalize();
-        return distance(desiredNormal, logicalNormal);
-    }
-
-    private Pose3d readRapierPose(PhysicsPipeline pipeline, ServerSubLevel slotSubLevel) {
-        Pose3d rapierPose = new Pose3d(slotSubLevel.logicalPose());
-        try {
-            pipeline.readPose(slotSubLevel, rapierPose);
-        } catch (Exception ignored) {
-        }
-        return rapierPose;
-    }
-
-    private Vector3d readLinearVelocity(PhysicsPipeline pipeline, ServerSubLevel slotSubLevel) {
-        try {
-            return pipeline.getLinearVelocity(slotSubLevel, new Vector3d());
-        } catch (Exception ignored) {
-            return new Vector3d(slotSubLevel.latestLinearVelocity);
-        }
-    }
-
-    private Vector3d readAngularVelocity(PhysicsPipeline pipeline, ServerSubLevel slotSubLevel) {
-        try {
-            return pipeline.getAngularVelocity(slotSubLevel, new Vector3d());
-        } catch (Exception ignored) {
-            return new Vector3d(slotSubLevel.latestAngularVelocity);
-        }
-    }
-
-    private Vector3d computeDesiredAnchorWorld(ServerLevel rootLevel, int slot, Vector3d anchorLocalCenter) {
-        if (topFollowActive && activeTopSubLevelId != null && activeTopAnchorLocalCenter != null) {
-            ServerSubLevel topSubLevel = resolveSubLevel(rootLevel, activeTopSubLevelId);
-            if (topSubLevel != null) {
-                SlotFrame slotFrame = computeSlotFrame(slot, slotFacing);
-                Vector3d localCenter = new Vector3d(activeTopAnchorLocalCenter)
-                        .add(slotFrame.offset());
-                return topSubLevel.logicalPose().transformPosition(localCenter, new Vector3d());
-            }
-        }
-
-        Vector3d lockedWorldCenter = lastLockedWorldCenters[slot];
-        return lockedWorldCenter == null ? new Vector3d(Double.NaN, Double.NaN, Double.NaN) : new Vector3d(lockedWorldCenter);
-    }
-
-    private SlotGeometry measureSlotGeometry(ServerLevel rootLevel, BoundingBox3ic bounds, Vector3d anchorLocalCenter) {
-        int blockCount = 0;
-        double maxAxisOffset = 0.0D;
-        double maxDistance = 0.0D;
-
-        for (BlockPos pos : BlockPos.betweenClosedStream(bounds.toMojang()).map(BlockPos::immutable).toList()) {
-            if (rootLevel.getBlockState(pos).isAir()) {
-                continue;
-            }
-
-            blockCount++;
-            Vector3d delta = JOMLConversion.atCenterOf(pos).sub(anchorLocalCenter);
-            maxAxisOffset = Math.max(maxAxisOffset, Math.max(Math.max(Math.abs(delta.x), Math.abs(delta.y)), Math.abs(delta.z)));
-            maxDistance = Math.max(maxDistance, delta.length());
-        }
-
-        return new SlotGeometry(blockCount, maxAxisOffset, maxDistance);
+        return true;
     }
 
     private boolean hasValidConstraint(int slot) {
-        GenericConstraintHandle handle = slotConstraintHandles[slot];
+        return isConstraintHandleValid(slotConstraintHandles[slot]);
+    }
+
+    private boolean isConstraintHandleValid(@Nullable GenericConstraintHandle handle) {
         if (handle == null) {
             return false;
         }
@@ -1351,31 +2138,11 @@ public final class ServoPropellerSlotManager {
         }
     }
 
-    private double distance(Vector3dc a, Vector3dc b) {
-        if (a == null || b == null) {
-            return Double.NaN;
-        }
-        return new Vector3d(a).sub(b).length();
-    }
-
     private boolean isFinite(@Nullable Vector3dc vector) {
         return vector != null
                 && Double.isFinite(vector.x())
                 && Double.isFinite(vector.y())
                 && Double.isFinite(vector.z());
-    }
-
-    private String formatBounds(BoundingBox3ic bounds) {
-        return "min(" + bounds.minX() + "," + bounds.minY() + "," + bounds.minZ() + ")"
-                + " max(" + bounds.maxX() + "," + bounds.maxY() + "," + bounds.maxZ() + ")";
-    }
-
-    private String formatInertiaDiagonal(Matrix3dc inertia) {
-        return "(" + formatDouble(inertia.m00()) + "," + formatDouble(inertia.m11()) + "," + formatDouble(inertia.m22()) + ")";
-    }
-
-    private String formatPose(Pose3dc pose) {
-        return "{pos=" + formatVector(pose.position()) + ",rot=" + pose.orientation() + "}";
     }
 
     private String formatVector(@Nullable Vector3dc vector) {
@@ -1385,6 +2152,16 @@ public final class ServoPropellerSlotManager {
         return "(" + formatDouble(vector.x()) + "," + formatDouble(vector.y()) + "," + formatDouble(vector.z()) + ")";
     }
 
+    private String formatQuaternion(@Nullable Quaterniondc quaternion) {
+        if (quaternion == null) {
+            return "null";
+        }
+        return "(" + formatDouble(quaternion.x())
+                + "," + formatDouble(quaternion.y())
+                + "," + formatDouble(quaternion.z())
+                + "," + formatDouble(quaternion.w()) + ")";
+    }
+
     private String formatDouble(double value) {
         if (!Double.isFinite(value)) {
             return Double.toString(value);
@@ -1392,14 +2169,51 @@ public final class ServoPropellerSlotManager {
         return String.format(Locale.ROOT, "%.6f", value);
     }
 
+    private BlockState resolveSlotPlacementState(BlockItem blockItem, Direction servoFacing) {
+        Block block = blockItem.getBlock();
+        return block == ModBlocks.METAL_TRAVERSE.get()
+                ? MetalTraverseBlock.getStateForIsolatedPlacement(servoFacing)
+                : block.defaultBlockState();
+    }
+
     private boolean isPhaseASupportedBlock(BlockState blockState) {
         Block block = blockState.getBlock();
+        if (block == ModBlocks.METAL_TRAVERSE.get()) {
+            return true;
+        }
         return !(block instanceof EntityBlock) && !(block instanceof FallingBlock);
     }
 
-    private void clearTemporaryBlock(ServerLevel rootLevel, BlockPos sourceWorldPos) {
-        if (!rootLevel.getBlockState(sourceWorldPos).isAir()) {
-            rootLevel.setBlock(sourceWorldPos, Blocks.AIR.defaultBlockState(), Block.UPDATE_ALL | Block.UPDATE_KNOWN_SHAPE);
+    private int getTemporaryBlockUpdateFlags(BlockState blockState) {
+        return isTemporaryMetalTraverse(blockState)
+                ? Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE
+                : Block.UPDATE_ALL | Block.UPDATE_KNOWN_SHAPE;
+    }
+
+    private boolean isTemporaryMetalTraverse(BlockState blockState) {
+        return blockState.is(ModBlocks.METAL_TRAVERSE.get());
+    }
+
+    private void clearTemporaryBlock(
+            ServerLevel rootLevel,
+            BlockPos sourceWorldPos,
+            BlockState temporaryBlockState
+    ) {
+        BlockState currentState = rootLevel.getBlockState(sourceWorldPos);
+        if (currentState.isAir()) {
+            return;
+        }
+
+        int updateFlags = getTemporaryBlockUpdateFlags(temporaryBlockState);
+        if (isTemporaryMetalTraverse(temporaryBlockState)
+                && currentState.is(ModBlocks.METAL_TRAVERSE.get())) {
+            MetalTraverseBlock.runWithoutTraverseHideCornerBreakHistory(
+                    rootLevel,
+                    sourceWorldPos,
+                    () -> rootLevel.setBlock(sourceWorldPos, Blocks.AIR.defaultBlockState(), updateFlags)
+            );
+        } else {
+            rootLevel.setBlock(sourceWorldPos, Blocks.AIR.defaultBlockState(), updateFlags);
         }
     }
 
@@ -1420,6 +2234,4 @@ public final class ServoPropellerSlotManager {
     private record SlotFrame(Vector3d offset, Quaterniond rotation) {
     }
 
-    private record SlotGeometry(int blockCount, double maxAxisOffset, double maxDistance) {
-    }
 }

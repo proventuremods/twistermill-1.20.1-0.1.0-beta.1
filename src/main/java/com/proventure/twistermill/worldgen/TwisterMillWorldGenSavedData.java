@@ -4,6 +4,7 @@ import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.level.saveddata.SavedData;
+import org.jetbrains.annotations.NotNull;
 
 public class TwisterMillWorldGenSavedData extends SavedData {
 
@@ -32,7 +33,7 @@ public class TwisterMillWorldGenSavedData extends SavedData {
     }
 
     @Override
-    public CompoundTag save(CompoundTag tag, HolderLookup.Provider registries) {
+    public @NotNull CompoundTag save(@NotNull CompoundTag tag, @NotNull HolderLookup.Provider registries) {
         tag.putBoolean(TAG_GENERATE_ORES_ENABLED, this.generateOresEnabled);
         return tag;
     }

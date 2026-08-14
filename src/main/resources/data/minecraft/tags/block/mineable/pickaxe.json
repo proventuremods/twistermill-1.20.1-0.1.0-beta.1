@@ -8,6 +8,7 @@
     "twistermill:redstone_in_bit_out_block",
     "twistermill:digital_signal_tx_block",
     "twistermill:metal_traverse",
+    "twistermill:metal_traverse_with_girder",
     "twistermill:signal_quartz_ore_block",
     "twistermill:signal_steel_block",
     "twistermill:blade_arm_block",

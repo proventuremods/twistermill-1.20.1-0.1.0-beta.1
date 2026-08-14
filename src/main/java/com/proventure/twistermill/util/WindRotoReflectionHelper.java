@@ -8,7 +8,7 @@ public final class WindRotoReflectionHelper {
     private WindRotoReflectionHelper() {
     }
 
-    public static BlockPos getWorldBlockPos(Level level, BlockPos worldPosition) {
+    public static BlockPos getWorldBlockPos(@SuppressWarnings("unused") Level level, BlockPos worldPosition) {
         return worldPosition;
     }
 }

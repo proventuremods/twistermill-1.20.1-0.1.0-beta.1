@@ -11,6 +11,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Player;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
+import org.jetbrains.annotations.NotNull;
 
 public record ControlTableActionMessage(
         BlockPos blockPos,
@@ -29,10 +30,11 @@ public record ControlTableActionMessage(
     );
 
     @Override
-    public Type<? extends CustomPacketPayload> type() {
+    public @NotNull Type<? extends CustomPacketPayload> type() {
         return TYPE;
     }
 
+    @SuppressWarnings("resource")
     public static void handle(ControlTableActionMessage packet, IPayloadContext context) {
         context.enqueueWork(() -> {
             Player contextPlayer = context.player();

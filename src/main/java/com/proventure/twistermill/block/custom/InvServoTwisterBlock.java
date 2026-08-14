@@ -16,6 +16,7 @@ import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.RenderShape;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
@@ -23,8 +24,12 @@ import net.minecraft.world.level.block.state.StateDefinition;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.state.properties.BooleanProperty;
 import net.minecraft.world.level.block.state.properties.EnumProperty;
+import net.minecraft.world.level.pathfinder.PathComputationType;
 import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.shapes.CollisionContext;
+import net.minecraft.world.phys.shapes.Shapes;
+import net.minecraft.world.phys.shapes.VoxelShape;
 import org.jetbrains.annotations.NotNull;
 
 import javax.annotation.ParametersAreNonnullByDefault;
@@ -33,20 +38,71 @@ import javax.annotation.ParametersAreNonnullByDefault;
 public class InvServoTwisterBlock extends BearingBlock implements IBE<InvServoTwisterBlockEntity> {
 
     public static final BooleanProperty RUNNING = BooleanProperty.create("running");
+    public static final BooleanProperty PITCH_CLEARANCE = ServoTwisterBlock.PITCH_CLEARANCE;
     public static final EnumProperty<PowerVisualState> POWER_VISUAL =
             EnumProperty.create("power_visual", PowerVisualState.class);
+    private static final VoxelShape FULL_SHAPE = Shapes.block();
+    private static final VoxelShape PITCH_CLEARANCE_COLLISION_SHAPE =
+            Block.box(5.0D, 5.0D, 5.0D, 11.0D, 11.0D, 11.0D);
 
     public InvServoTwisterBlock(Properties properties) {
-        super(properties);
+        super(properties
+                .forceSolidOn()
+                .isRedstoneConductor((state, level, pos) -> true)
+                .isSuffocating((state, level, pos) -> true)
+                .isViewBlocking((state, level, pos) -> true));
         registerDefaultState(defaultBlockState()
                 .setValue(RUNNING, false)
+                .setValue(PITCH_CLEARANCE, false)
                 .setValue(POWER_VISUAL, PowerVisualState.UNPOWERED));
     }
 
     @Override
     protected void createBlockStateDefinition(StateDefinition.Builder<net.minecraft.world.level.block.Block, BlockState> builder) {
         super.createBlockStateDefinition(builder);
-        builder.add(RUNNING, POWER_VISUAL);
+        builder.add(RUNNING, PITCH_CLEARANCE, POWER_VISUAL);
+    }
+
+    @Override
+    public VoxelShape getCollisionShape(
+            BlockState state,
+            BlockGetter level,
+            BlockPos pos,
+            CollisionContext context
+    ) {
+        return state.getValue(PITCH_CLEARANCE)
+                ? PITCH_CLEARANCE_COLLISION_SHAPE
+                : FULL_SHAPE;
+    }
+
+    @Override
+    public VoxelShape getShape(BlockState state, BlockGetter level, BlockPos pos, CollisionContext context) {
+        return FULL_SHAPE;
+    }
+
+    @Override
+    public VoxelShape getBlockSupportShape(BlockState state, BlockGetter level, BlockPos pos) {
+        return FULL_SHAPE;
+    }
+
+    @Override
+    public VoxelShape getVisualShape(
+            BlockState state,
+            BlockGetter level,
+            BlockPos pos,
+            CollisionContext context
+    ) {
+        return FULL_SHAPE;
+    }
+
+    @Override
+    public VoxelShape getOcclusionShape(BlockState state, BlockGetter level, BlockPos pos) {
+        return FULL_SHAPE;
+    }
+
+    @Override
+    protected boolean isPathfindable(BlockState state, PathComputationType pathComputationType) {
+        return false;
     }
 
     @Override
@@ -112,7 +168,7 @@ public class InvServoTwisterBlock extends BearingBlock implements IBE<InvServoTw
     }
 
     @Override
-    public InteractionResult onWrenched(BlockState state, UseOnContext context) {
+    public @NotNull InteractionResult onWrenched(BlockState state, UseOnContext context) {
         Level level = context.getLevel();
         BlockPos pos = context.getClickedPos();
 
@@ -128,8 +184,11 @@ public class InvServoTwisterBlock extends BearingBlock implements IBE<InvServoTw
         if (!rotated.canSurvive(level, pos))
             return InteractionResult.PASS;
 
-        if (!level.isClientSide)
-            withBlockEntityDo(level, pos, InvServoTwisterBlockEntity::disassemble);
+        if (!level.isClientSide && level.getBlockEntity(pos) instanceof InvServoTwisterBlockEntity be) {
+            if (!be.preparePitchClearanceForDisassembly())
+                return InteractionResult.FAIL;
+            be.disassemble();
+        }
 
         rotated = getRotatedBlockState(level.getBlockState(pos), context.getClickedFace());
         KineticBlockEntity.switchToBlockState(level, pos, updateAfterWrenched(rotated, context));

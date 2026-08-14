@@ -1,81 +1,94 @@
+
 # Create: TwisterMill
 
 <p align="center">
-  <img src="src/main/resources/icon.png" alt="Create: TwisterMill Icon" width="225" />
+  <img src="src/main/resources/icon.png" alt="Create: TwisterMill Icon" width="512" />
 </p>
 
 <p align="center">
   <strong>Minecraft NeoForge 1.21.1 • Java 21 • Create 6.0.10 • Sable 2.0.3</strong>
 </p>
 
----
 
 ## Overview
 
-**Create: TwisterMill** is an unofficial addon for the Create mod for **Minecraft NeoForge 1.21.1**.
-
+**Create: TwisterMill** is an unofficial Create addon for: 
+ - **Minecraft NeoForge 1.21.1**
+ - **Minecraft Forge 1.20.1**
 Build wind turbines that power Create machinery using Sable's ship-on-ship sublevel physics.
 
-TwisterMill adds wind-powered Create machinery, redstone-controlled servo bearings, Sable/Create contraption support, weather-based wind input, Ponder scenes, custom resources, FramedBlocks compatibility for selected materials, and a small progression path around Signal Quartz.
+- TwisterMill adds wind-powered Create machinery
+- redstone-controlled servo bearings
+- Sable/Create contraption support
+- weather-based wind input
+- Ponder scenes
+- custom resources
+- FramedBlocks compatibility for selected materials
+- and a small progression path around Signal Quartz
 
----
 
-## Requirements
 
-| Requirement                   |         Version |
-|-------------------------------|----------------:|
-| Minecraft                     | NeoForge 1.21.1 |
-| Java                          |              21 |
-| NeoForge                      |        21.1.228 |
-| Create                        |          6.0.10 |
-| Tested Create Gradle artifact |      6.0.10-280 |
-| Sable                         |           2.0.3 |
-| Supported Sable range         |  [2.0.3, 3.0.0) |
-| ProtoManly's Weather          |    0.16.4-alpha |
-| Weather2                      |           2.8.6 |
-| CoroUtil                      |           1.3.9 |
+-------------------------------------------------------
 
-For source builds, use the versions defined in `gradle.properties`, `build.gradle`, and `neoforge.mods.toml`.
+### NeoForge 1.21.1 Loader 21.1.229 - ProtoManly's Weather
 
----
 
-## Optional Compatibility
+#### mandatory Dependencies:
 
-### ProtoManly's Weather Mod
+- twistermill-1.21.1-0.2.0-beta.2
+- create-1.21.1-6.0.10
+- sable-neoforge-1.21.1-2.0.3
+- pmweather-0.16.4-1.21.1-alpha
 
-ProtoManly's Weather Mod support is available through `pmweather`.
 
-Supported range:
+#### optional Dependencies:
 
-```text
-pmweather [0.16.4,)
-```
+- Create Aeronautics 1.3.0
+- Sodium NeoForge 0.8.12-alpha.2+mc1.21.1
+- FluxNetworks-1.21.1-8.0.0
+- createendertransmission-2.1.1-1.21.1
+- FramedBlocks-10.6.1
 
-### [ProtoManly's Weather Mod on Modrinth](https://modrinth.com/mod/protomanlys-weather)
+-------------------------------------------------------
 
----
+### NeoForge 1.21.1 Loader 21.1.229 - Weather Storms & Tornadoes
 
-### Create: Aeronautics
+#### mandatory Dependencies:
 
-If you use **Create: Aeronautics**, use version **1.3.0**.
+- twistermill-1.21.1-0.2.0-beta.2
+- create-1.21.1-6.0.10
+- sable-neoforge-1.21.1-2.0.3
+- weather2-neoforge-1.21.0-2.8.7
+- coroutil-neoforge-1.21.0-1.3.9
 
-### [Create: Aeronautics 1.3.0 on Modrinth](https://modrinth.com/mod/create-aeronautics/version/w7zlLnea)
 
----
+#### optional Dependencies:
 
-### FramedBlocks
+- Create Aeronautics 1.3.0
+- Sodium NeoForge 0.8.12-alpha.2+mc1.21.1
+- FluxNetworks-1.21.1-8.0.0
+- createendertransmission-2.1.1-1.21.1
+- FramedBlocks-10.6.1
+-------------------------------------------------------
 
-TwisterMill includes optional FramedBlocks camo compatibility for selected materials.
+### Forge 1.20.1 - Weather Storms & Tornadoes
 
-Supported TwisterMill materials include:
+#### mandatory Dependencies:
 
-* Twister Sail
-* Signal Quartz Ore
-* Nostalgic Grass Block
+- createtwistermill-1.20.1-0.1.0-beta.2
+- create-1.20.1-6.0.7
+- weather2-1.20.1-2.8.3
+- coroutil-forge-1.20.1-1.3.7
 
-These materials can be used as FramedBlocks camo sources where supported by FramedBlocks.
 
----
+#### optional Dependencies:
+
+- create_interactive-1.2.1_1.20.1-forge
+- valkyrienskies-120-2.4.10
+- kotlinforforge-4.12.0-all
+
+------------------------------------------------------
+
 
 ## Blocks
 

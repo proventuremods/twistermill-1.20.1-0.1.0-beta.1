@@ -18,6 +18,8 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.BlockHitResult;
+import org.jetbrains.annotations.Contract;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -31,6 +33,7 @@ public final class TwisterSailPatternPlacementUtil {
     private TwisterSailPatternPlacementUtil() {
     }
 
+    @SuppressWarnings("BooleanMethodIsAlwaysInverted")
     public static boolean isPatternSetup(Player player) {
         return isTwisterSailItem(player.getMainHandItem()) && AllItems.EXTENDO_GRIP.isIn(player.getOffhandItem());
     }
@@ -200,7 +203,8 @@ public final class TwisterSailPatternPlacementUtil {
         return Direction.NORTH;
     }
 
-    private static CompoundTag getRootTag(Player player, boolean createIfMissing) {
+    @Contract("_, true -> !null")
+    private static @Nullable CompoundTag getRootTag(Player player, boolean createIfMissing) {
         CompoundTag persistent = player.getPersistentData();
         if (!persistent.contains(Player.PERSISTED_NBT_TAG)) {
             if (!createIfMissing) {

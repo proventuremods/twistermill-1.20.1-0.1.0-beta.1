@@ -39,14 +39,17 @@ public final class ServoRedstoneMappings {
         return Mth.clamp(redstoneSignal, 0, 15);
     }
 
+    @SuppressWarnings("unused")
     public static float speedDegreesPerTickFromSignal(int redstoneSignal) {
         return SPEED_DEGREES_PER_TICK[clampSignal(redstoneSignal)];
     }
 
+    @SuppressWarnings("unused")
     public static float effectiveServoSpeedDegreesPerTickFromSignal(int redstoneSignal) {
         return effectiveSpeedDegreesPerTickFromSignal(redstoneSignal, TwisterMillConfig.isServoSpeedZeroMovementEnabled());
     }
 
+    @SuppressWarnings("unused")
     public static float effectiveInvServoSpeedDegreesPerTickFromSignal(int redstoneSignal) {
         return effectiveSpeedDegreesPerTickFromSignal(redstoneSignal, TwisterMillConfig.isInvServoSpeedZeroMovementEnabled());
     }

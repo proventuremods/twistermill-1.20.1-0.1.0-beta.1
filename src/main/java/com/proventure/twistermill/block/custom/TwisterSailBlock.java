@@ -4,6 +4,9 @@ import com.mojang.logging.LogUtils;
 import com.proventure.twistermill.block.ModBlocks;
 import com.proventure.twistermill.config.TwisterMillConfig;
 import com.proventure.twistermill.weather.TwisterWeatherService;
+import com.proventure.twistermill.weather.WeatherSailForceMath;
+import com.proventure.twistermill.weather.WeatherSailForceSmoother;
+import com.proventure.twistermill.weather.WeatherSailForceSnapshotServer;
 import com.proventure.twistermill.weather.WindSample;
 import com.proventure.twistermill.util.SablePlacementHitHelper;
 import com.proventure.twistermill.util.TwisterSailPatternPlacementUtil;
@@ -59,6 +62,10 @@ public class TwisterSailBlock extends SailBlock implements BlockSubLevelLiftProv
 
     private static final int placementHelperId = PlacementHelpers.register(new PlacementHelper());
     private static final Map<UUID, WindObjectDiagnosticsAccumulator> WIND_OBJECT_DIAGNOSTICS = new HashMap<>();
+    private static final ThreadLocal<WeatherSailForceMath.Result> WIND_FORCE_RESULT =
+            ThreadLocal.withInitial(WeatherSailForceMath.Result::new);
+    private static final ThreadLocal<Vector3d> SMOOTHED_WIND_FORCE =
+            ThreadLocal.withInitial(Vector3d::new);
     private static long lastDiagnosticsCleanupTick = Long.MIN_VALUE;
 
     public TwisterSailBlock(Properties properties, boolean frame) {
@@ -83,13 +90,12 @@ public class TwisterSailBlock extends SailBlock implements BlockSubLevelLiftProv
     }
 
     @Override
-    public BlockState getStateForPlacement(BlockPlaceContext context) {
-        BlockState state = super.getStateForPlacement(context);
-        return state;
+    public @Nullable BlockState getStateForPlacement(BlockPlaceContext context) {
+        return super.getStateForPlacement(context);
     }
 
     @Override
-    protected ItemInteractionResult useItemOn(
+    protected @NotNull ItemInteractionResult useItemOn(
             ItemStack stack,
             BlockState state,
             Level level,
@@ -223,6 +229,11 @@ public class TwisterSailBlock extends SailBlock implements BlockSubLevelLiftProv
             return;
         }
 
+        boolean windForceEnabled = TwisterMillConfig.ENABLE_SAIL_WIND_FORCE.get();
+        boolean smoothingEnabled = windForceEnabled && TwisterMillConfig.isSailForceSmoothingEnabled();
+        boolean kinematicContraption = localPose != null;
+        WeatherSailForceSmoother.updateEnabledState(subLevel, smoothingEnabled);
+
         Vector3d localCenter = new Vector3d(ctx.pos().getX() + 0.5D, ctx.pos().getY() + 0.5D, ctx.pos().getZ() + 0.5D);
         Vector3d localNormal = new Vector3d(ctx.dir().x, ctx.dir().y, ctx.dir().z);
 
@@ -237,6 +248,9 @@ public class TwisterSailBlock extends SailBlock implements BlockSubLevelLiftProv
         Vec3 worldCenterVec = new Vec3(worldCenter.x, worldCenter.y, worldCenter.z);
         WindSample windSample = TwisterWeatherService.sampleAtWorldPosition(subLevel.getLevel(), worldCenterVec);
         if (!windSample.valid()) {
+            if (smoothingEnabled) {
+                WeatherSailForceSmoother.discardContribution(ctx, subLevel, kinematicContraption);
+            }
             return;
         }
 
@@ -246,46 +260,124 @@ public class TwisterSailBlock extends SailBlock implements BlockSubLevelLiftProv
 
         double rad = Math.toRadians(windAngle);
         Vector3d windDir = new Vector3d(-Math.sin(rad), 0.0D, Math.cos(rad));
-        if (windDir.lengthSquared() <= 1.0E-9D || worldNormal.lengthSquared() <= 1.0E-9D || !Double.isFinite(windSpeed)) {
+        if (windDir.lengthSquared() <= 1.0E-9D
+                || worldNormal.lengthSquared() <= 1.0E-9D
+                || !Double.isFinite(windSpeed)) {
+            if (smoothingEnabled) {
+                WeatherSailForceSmoother.discardContribution(ctx, subLevel, kinematicContraption);
+            }
             return;
         }
         windDir.normalize();
         worldNormal.normalize();
 
-        double exposure = Math.abs(windDir.dot(worldNormal));
         double minExposure = Math.max(0.0D, Math.min(1.0D, TwisterMillConfig.SAIL_WIND_MIN_EXPOSURE.get()));
-        if (exposure < minExposure) {
-            collectAndMaybeLogObjectDiagnostics(subLevel, samplePos, windSpeed, windAngle, windDir, worldNormal, exposure, 0.0D,
-                    0.0D, 0.0D, 0.0D, 0.0D);
+        double coeff = Math.max(0.0D, TwisterMillConfig.SAIL_WIND_FORCE_COEFFICIENT.get());
+        double maxPerBlock = Math.max(0.0D, TwisterMillConfig.SAIL_WIND_MAX_FORCE_PER_BLOCK.get());
+        double peakPitchEfficiency = TwisterMillConfig.getRotorBladePeakEfficiencyFraction();
+        int peakEfficiencyPitchDegrees = TwisterMillConfig.getSailPeakEfficiencyPitchDegrees();
+
+        WeatherSailForceMath.Result forceResult = WIND_FORCE_RESULT.get();
+        boolean hasForce = WeatherSailForceMath.compute(
+                windDir,
+                worldNormal,
+                windSpeed,
+                coeff,
+                minExposure,
+                maxPerBlock,
+                peakPitchEfficiency,
+                peakEfficiencyPitchDegrees,
+                forceResult
+        );
+        double exposure = forceResult.effectiveExposure();
+        double forceMagnitude = forceResult.forceMagnitude();
+        double forceWorldMagnitude = forceMagnitude;
+        if (!hasForce && !smoothingEnabled) {
+            collectAndMaybeLogObjectDiagnostics(
+                    subLevel,
+                    samplePos,
+                    windSpeed,
+                    windAngle,
+                    windDir,
+                    worldNormal,
+                    exposure,
+                    0.0D,
+                    0.0D,
+                    0.0D,
+                    0.0D,
+                    0.0D
+            );
             return;
         }
 
-        double coeff = Math.max(0.0D, TwisterMillConfig.SAIL_WIND_FORCE_COEFFICIENT.get());
-        double maxPerBlock = Math.max(0.0D, TwisterMillConfig.SAIL_WIND_MAX_FORCE_PER_BLOCK.get());
-
-        double forceMagnitude = windSpeed * windSpeed * coeff * exposure;
-        if (maxPerBlock > 0.0D) {
-            forceMagnitude = Math.min(forceMagnitude, maxPerBlock);
-        }
-
-        Vector3d forceWorld = new Vector3d(windDir).mul(forceMagnitude);
-        double forceWorldMagnitude = forceWorld.length();
-
-        if (!TwisterMillConfig.ENABLE_SAIL_WIND_FORCE.get()) {
+        if (!windForceEnabled) {
             collectAndMaybeLogObjectDiagnostics(subLevel, samplePos, windSpeed, windAngle, windDir, worldNormal, exposure, forceMagnitude,
                     forceWorldMagnitude, 0.0D, 0.0D, 0.0D);
             return;
         }
 
-        Vector3d forceLocal = subLevelPose.transformNormalInverse(new Vector3d(forceWorld), new Vector3d());
+        Vector3dc forceWorld;
+        if (smoothingEnabled) {
+            Vector3d smoothedForce = SMOOTHED_WIND_FORCE.get();
+            if (!WeatherSailForceSmoother.smooth(
+                    ctx,
+                    subLevel,
+                    kinematicContraption,
+                    forceResult.forceWorld(),
+                    timeStep,
+                    TwisterMillConfig.getSailForceSmoothingStrength(),
+                    smoothedForce
+            )) {
+                return;
+            }
+            forceWorld = smoothedForce;
+            forceWorldMagnitude = smoothedForce.length();
+            if (forceWorldMagnitude <= 1.0E-9D) {
+                collectAndMaybeLogObjectDiagnostics(
+                        subLevel,
+                        samplePos,
+                        windSpeed,
+                        windAngle,
+                        windDir,
+                        worldNormal,
+                        exposure,
+                        forceMagnitude,
+                        0.0D,
+                        0.0D,
+                        0.0D,
+                        0.0D
+                );
+                return;
+            }
+        } else {
+            forceWorld = forceResult.forceWorld();
+        }
+        Vector3d forceLocal = subLevelPose.transformNormalInverse(forceWorld, new Vector3d());
         double forceLocalMagnitude = forceLocal.length();
         Vector3d impulseLocal = forceLocal.mul(timeStep, new Vector3d());
-        linearImpulse.add(impulseLocal);
 
-        Vector3d comLocal = new Vector3d(subLevel.getMassTracker().getCenterOfMass());
+        Vector3dc centerOfMass = subLevel.getMassTracker().getCenterOfMass();
+        if (centerOfMass == null) {
+            return;
+        }
+
+        linearImpulse.add(impulseLocal);
+        Vector3d comLocal = new Vector3d(centerOfMass);
         Vector3d localArm = localCenter.sub(comLocal, new Vector3d());
         Vector3d torqueLocal = localArm.cross(impulseLocal, new Vector3d());
         angularImpulse.add(torqueLocal);
+
+        WeatherSailForceSnapshotServer.recordAppliedForce(
+                ctx,
+                subLevel,
+                localPose != null,
+                localCenter,
+                localNormal,
+                worldCenter,
+                windDir,
+                forceResult.referenceForceMagnitude(),
+                forceWorld
+        );
 
         collectAndMaybeLogObjectDiagnostics(subLevel, samplePos, windSpeed, windAngle, windDir, worldNormal, exposure, forceMagnitude,
                 forceWorldMagnitude, forceLocalMagnitude, impulseLocal.length(), torqueLocal.length());
@@ -513,7 +605,7 @@ public class TwisterSailBlock extends SailBlock implements BlockSubLevelLiftProv
         }
 
         @Override
-        public String getSerializedName() {
+        public @NotNull String getSerializedName() {
             return serializedName;
         }
 
@@ -585,7 +677,13 @@ public class TwisterSailBlock extends SailBlock implements BlockSubLevelLiftProv
         }
 
         @Override
-        public PlacementOffset getOffset(Player player, Level world, BlockState state, BlockPos pos, BlockHitResult ray) {
+        public PlacementOffset getOffset(
+                @NotNull Player player,
+                @NotNull Level world,
+                @NotNull BlockState state,
+                @NotNull BlockPos pos,
+                @NotNull BlockHitResult ray
+        ) {
             List<Direction> directions = IPlacementHelper.orderedByDistanceExceptAxis(
                     pos,
                     SablePlacementHitHelper.ensureHitLocationInSameSpaceAsPos(world, pos, ray),

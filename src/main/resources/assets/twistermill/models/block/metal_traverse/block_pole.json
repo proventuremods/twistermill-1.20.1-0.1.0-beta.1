@@ -1,76 +1,196 @@
 {
 	"format_version": "1.9.0",
-	"ambientocclusion": false,
 	"parent": "block/block",
+	"ambientocclusion": false,
 	"textures": {
 		"particle": "twistermill:block/facility_block_stack_lamp_on"
 	},
 	"elements": [
 		{
-			"name": "diagonal",
+			"name": "diagonal_15,8,8",
 			"neoforge_data": {"sky_light": 15},
-			"from": [14.51, -1.76992, 7.53992],
-			"to": [15.49, 17.73008, 8.51992],
-			"rotation": {"angle": 45, "axis": "x", "origin": [8, 8, 8]},
+			"from": [14.51, -1.78524, 7.51707],
+			"to": [15.49, 17.71476, 8.49707],
+			"rotation": {"angle": 45, "axis": "x", "origin": [15, 8, 8]},
 			"faces": {
-				"north": {"uv": [3, 3, 2.5, 3.5], "texture": "#particle"},
-				"east": {"uv": [3.5, 3, 3, 3.5], "texture": "#particle"},
-				"south": {"uv": [3, 3, 2.5, 3.5], "texture": "#particle"},
-				"west": {"uv": [2.5, 3, 2, 3.5], "rotation": 90, "texture": "#particle"},
-				"up": {"uv": [0, 1, 1, 0], "rotation": 270, "texture": "#particle"},
-				"down": {"uv": [0, 1, 1, 0], "rotation": 90, "texture": "#particle"}
+				"north": {"uv": [3, 3, 2.5, 3.5], "texture": "#particle", "tintindex": 1},
+				"east": {"uv": [3.5, 3, 3, 3.5], "texture": "#particle", "tintindex": 1},
+				"south": {"uv": [3, 3, 2.5, 3.5], "texture": "#particle", "tintindex": 1},
+				"west": {"uv": [2.5, 3, 2, 3.5], "rotation": 90, "texture": "#particle", "tintindex": 1},
+				"up": {"uv": [0, 1, 1, 0], "rotation": 270, "texture": "#particle", "tintindex": 1},
+				"down": {"uv": [0, 1, 1, 0], "rotation": 90, "texture": "#particle", "tintindex": 1}
 			}
 		},
 		{
-			"name": "diagonal",
+			"name": "diagonal_8,15,8",
 			"neoforge_data": {"sky_light": 15},
-			"from": [-1.73008, 7.48008, 14.51],
-			"to": [17.76992, 8.46008, 15.49],
-			"rotation": {"angle": 45, "axis": "z", "origin": [8, 8, 8]},
+			"from": [-1.71476, 7.50293, 14.51],
+			"to": [17.78524, 8.48293, 15.49],
+			"rotation": {"angle": 45, "axis": "z", "origin": [8, 8, 15]},
 			"faces": {
-				"north": {"uv": [2.5, 3, 2, 3.5], "rotation": 180, "texture": "#particle"},
-				"east": {"uv": [0, 1, 1, 0], "rotation": 270, "texture": "#particle"},
-				"south": {"uv": [3.5, 3, 3, 3.5], "rotation": 270, "texture": "#particle"},
-				"west": {"uv": [0, 1, 1, 0], "rotation": 270, "texture": "#particle"},
-				"up": {"uv": [3, 3, 2.5, 3.5], "rotation": 270, "texture": "#particle"},
-				"down": {"uv": [3, 3, 2.5, 3.5], "rotation": 270, "texture": "#particle"}
+				"north": {"uv": [2.5, 3, 2, 3.5], "rotation": 180, "texture": "#particle", "tintindex": 5},
+				"east": {"uv": [0, 1, 1, 0], "rotation": 270, "texture": "#particle", "tintindex": 5},
+				"south": {"uv": [3.5, 3, 3, 3.5], "rotation": 270, "texture": "#particle", "tintindex": 5},
+				"west": {"uv": [0, 1, 1, 0], "rotation": 270, "texture": "#particle", "tintindex": 5},
+				"up": {"uv": [3, 3, 2.5, 3.5], "rotation": 270, "texture": "#particle", "tintindex": 5},
+				"down": {"uv": [3, 3, 2.5, 3.5], "rotation": 270, "texture": "#particle", "tintindex": 5}
 			}
 		},
 		{
-			"name": "diagonal",
+			"name": "diagonal_1,8,8",
 			"neoforge_data": {"sky_light": 15},
-			"from": [0.51, -1.76992, 7.53992],
-			"to": [1.49, 17.73008, 8.51992],
-			"rotation": {"angle": -45, "axis": "x", "origin": [8, 8, 8]},
+			"from": [0.51, -1.74293, 7.54524],
+			"to": [1.49, 17.75707, 8.52524],
+			"rotation": {"angle": -45, "axis": "x", "origin": [1, 8, 8]},
 			"faces": {
-				"north": {"uv": [3, 3, 2.5, 3.5], "texture": "#particle"},
-				"east": {"uv": [2.5, 3, 2, 3.5], "texture": "#particle"},
-				"south": {"uv": [3, 3, 2.5, 3.5], "texture": "#particle"},
-				"west": {"uv": [3.5, 3, 3, 3.5], "rotation": 90, "texture": "#particle"},
-				"up": {"uv": [0, 1, 1, 0], "rotation": 270, "texture": "#particle"},
-				"down": {"uv": [0, 1, 1, 0], "rotation": 90, "texture": "#particle"}
+				"north": {"uv": [3, 3, 2.5, 3.5], "texture": "#particle", "tintindex": 0},
+				"east": {"uv": [2.5, 3, 2, 3.5], "texture": "#particle", "tintindex": 0},
+				"south": {"uv": [3, 3, 2.5, 3.5], "texture": "#particle", "tintindex": 0},
+				"west": {"uv": [3.5, 3, 3, 3.5], "rotation": 90, "texture": "#particle", "tintindex": 0},
+				"up": {"uv": [0, 1, 1, 0], "rotation": 270, "texture": "#particle", "tintindex": 0},
+				"down": {"uv": [0, 1, 1, 0], "rotation": 90, "texture": "#particle", "tintindex": 0}
 			}
 		},
 		{
-			"name": "diagonal",
+			"name": "diagonal_8,1,8",
 			"neoforge_data": {"sky_light": 15},
-			"from": [7.48008, -1.76992, 0.51],
-			"to": [8.46008, 17.73008, 1.49],
-			"rotation": {"angle": 45, "axis": "z", "origin": [8, 8, 8]},
+			"from": [7.50293, -1.78524, 0.51],
+			"to": [8.48293, 17.71476, 1.49],
+			"rotation": {"angle": 45, "axis": "z", "origin": [8, 8, 1]},
 			"faces": {
-				"north": {"uv": [3.5, 3, 3, 3.5], "texture": "#particle"},
-				"east": {"uv": [3, 3, 2.5, 3.5], "texture": "#particle"},
-				"south": {"uv": [2.5, 3, 2, 3.5], "texture": "#particle"},
-				"west": {"uv": [3, 3, 2.5, 3.5], "texture": "#particle"},
-				"up": {"uv": [0, 1, 1, 0], "texture": "#particle"},
-				"down": {"uv": [0, 1, 1, 0], "texture": "#particle"}
+				"north": {"uv": [3.5, 3, 3, 3.5], "texture": "#particle", "tintindex": 4},
+				"east": {"uv": [3, 3, 2.5, 3.5], "texture": "#particle", "tintindex": 4},
+				"south": {"uv": [2.5, 3, 2, 3.5], "texture": "#particle", "tintindex": 4},
+				"west": {"uv": [3, 3, 2.5, 3.5], "texture": "#particle", "tintindex": 4},
+				"up": {"uv": [0, 1, 1, 0], "texture": "#particle", "tintindex": 4},
+				"down": {"uv": [0, 1, 1, 0], "texture": "#particle", "tintindex": 4}
+			}
+		},
+		{
+			"name": "traverse",
+			"neoforge_data": {"sky_light": 15},
+			"from": [2, 15.01, 0.02],
+			"to": [14, 15.99, 1.98],
+			"rotation": {"angle": 0, "axis": "y", "origin": [8, 8, 8]},
+			"faces": {
+				"north": {"uv": [1, 0, 2, 11], "rotation": 90, "texture": "#particle"},
+				"east": {"uv": [10, 0, 14, 4], "rotation": 270, "texture": "#particle"},
+				"south": {"uv": [0, 0, 1, 11], "rotation": 270, "texture": "#particle"},
+				"west": {"uv": [14, 4, 10, 0], "texture": "#particle"},
+				"up": {"uv": [2, 11, 0, 0], "rotation": 270, "texture": "#particle"},
+				"down": {"uv": [2, 11, 0, 0], "rotation": 90, "texture": "#particle"}
+			}
+		},
+		{
+			"name": "traverse",
+			"neoforge_data": {"sky_light": 15},
+			"from": [14.02, 15.01, 2],
+			"to": [15.98, 15.99, 14],
+			"rotation": {"angle": 0, "axis": "y", "origin": [8, 8, 8]},
+			"faces": {
+				"north": {"uv": [10, 4, 14, 0], "rotation": 270, "texture": "#particle"},
+				"east": {"uv": [2, 0, 1, 11], "rotation": 270, "texture": "#particle"},
+				"south": {"uv": [10, 4, 14, 0], "texture": "#particle"},
+				"west": {"uv": [1, 0, 0, 11], "rotation": 90, "texture": "#particle"},
+				"up": {"uv": [0, 11, 2, 0], "rotation": 180, "texture": "#particle"},
+				"down": {"uv": [0, 11, 2, 0], "rotation": 180, "texture": "#particle"}
+			}
+		},
+		{
+			"name": "traverse",
+			"neoforge_data": {"sky_light": 15},
+			"from": [2, 15.01, 14.02],
+			"to": [14, 15.99, 15.98],
+			"rotation": {"angle": 0, "axis": "y", "origin": [8, 8, 8]},
+			"faces": {
+				"north": {"uv": [1, 0, 0, 11], "rotation": 90, "texture": "#particle"},
+				"east": {"uv": [10, 4, 14, 0], "rotation": 270, "texture": "#particle"},
+				"south": {"uv": [2, 0, 1, 11], "rotation": 270, "texture": "#particle"},
+				"west": {"uv": [10, 4, 14, 0], "texture": "#particle"},
+				"up": {"uv": [0, 11, 2, 0], "rotation": 270, "texture": "#particle"},
+				"down": {"uv": [0, 11, 2, 0], "rotation": 90, "texture": "#particle"}
+			}
+		},
+		{
+			"name": "traverse",
+			"neoforge_data": {"sky_light": 15},
+			"from": [0.02, 15.01, 2],
+			"to": [1.98, 15.99, 14],
+			"rotation": {"angle": 0, "axis": "y", "origin": [8, 8, 8]},
+			"faces": {
+				"north": {"uv": [10, 0, 14, 4], "rotation": 270, "texture": "#particle"},
+				"east": {"uv": [0, 0, 1, 11], "rotation": 270, "texture": "#particle"},
+				"south": {"uv": [14, 4, 10, 0], "texture": "#particle"},
+				"west": {"uv": [1, 0, 2, 11], "rotation": 90, "texture": "#particle"},
+				"up": {"uv": [2, 11, 0, 0], "rotation": 180, "texture": "#particle"},
+				"down": {"uv": [2, 11, 0, 0], "rotation": 180, "texture": "#particle"}
+			}
+		},
+		{
+			"name": "traverse",
+			"neoforge_data": {"sky_light": 15},
+			"from": [14.02, 0.01, 2],
+			"to": [15.98, 0.99, 14],
+			"rotation": {"angle": 0, "axis": "y", "origin": [8, 8, 8]},
+			"faces": {
+				"north": {"uv": [14, 4, 10, 0], "rotation": 270, "texture": "#particle"},
+				"east": {"uv": [1, 0, 2, 11], "rotation": 270, "texture": "#particle"},
+				"south": {"uv": [10, 0, 14, 4], "texture": "#particle"},
+				"west": {"uv": [0, 0, 1, 11], "rotation": 90, "texture": "#particle"},
+				"up": {"uv": [0, 0, 2, 11], "rotation": 180, "texture": "#particle"},
+				"down": {"uv": [0, 0, 2, 11], "rotation": 180, "texture": "#particle"}
+			}
+		},
+		{
+			"name": "traverse",
+			"neoforge_data": {"sky_light": 15},
+			"from": [0.02, 0.01, 2],
+			"to": [1.98, 0.99, 14],
+			"rotation": {"angle": 0, "axis": "y", "origin": [8, 8, 8]},
+			"faces": {
+				"north": {"uv": [14, 0, 10, 4], "rotation": 270, "texture": "#particle"},
+				"east": {"uv": [1, 0, 0, 11], "rotation": 270, "texture": "#particle"},
+				"south": {"uv": [14, 0, 10, 4], "texture": "#particle"},
+				"west": {"uv": [2, 0, 1, 11], "rotation": 90, "texture": "#particle"},
+				"up": {"uv": [2, 0, 0, 11], "rotation": 180, "texture": "#particle"},
+				"down": {"uv": [2, 0, 0, 11], "rotation": 180, "texture": "#particle"}
+			}
+		},
+		{
+			"name": "traverse",
+			"neoforge_data": {"sky_light": 15},
+			"from": [2, 0.01, 0.02],
+			"to": [14, 0.99, 1.98],
+			"rotation": {"angle": 0, "axis": "y", "origin": [8, 8, 8]},
+			"faces": {
+				"north": {"uv": [2, 0, 1, 11], "rotation": 90, "texture": "#particle"},
+				"east": {"uv": [14, 0, 10, 4], "rotation": 270, "texture": "#particle"},
+				"south": {"uv": [1, 0, 0, 11], "rotation": 270, "texture": "#particle"},
+				"west": {"uv": [14, 0, 10, 4], "texture": "#particle"},
+				"up": {"uv": [2, 0, 0, 11], "rotation": 270, "texture": "#particle"},
+				"down": {"uv": [2, 0, 0, 11], "rotation": 90, "texture": "#particle"}
+			}
+		},
+		{
+			"name": "traverse",
+			"neoforge_data": {"sky_light": 15},
+			"from": [2, 0.01, 14.02],
+			"to": [14, 0.99, 15.98],
+			"rotation": {"angle": 0, "axis": "y", "origin": [8, 8, 8]},
+			"faces": {
+				"north": {"uv": [0, 0, 1, 11], "rotation": 90, "texture": "#particle"},
+				"east": {"uv": [14, 4, 10, 0], "rotation": 270, "texture": "#particle"},
+				"south": {"uv": [1, 0, 2, 11], "rotation": 270, "texture": "#particle"},
+				"west": {"uv": [10, 0, 14, 4], "texture": "#particle"},
+				"up": {"uv": [0, 0, 2, 11], "rotation": 270, "texture": "#particle"},
+				"down": {"uv": [0, 0, 2, 11], "rotation": 90, "texture": "#particle"}
 			}
 		},
 		{
 			"name": "vertical",
 			"neoforge_data": {"sky_light": 15},
-			"from": [14.02, 0, 0.02],
-			"to": [15.98, 16, 1.98],
+			"from": [14.02, 0.005, 0.02],
+			"to": [15.98, 15.995, 1.98],
 			"rotation": {"angle": 0, "axis": "y", "origin": [16, 0, 0]},
 			"faces": {
 				"north": {"uv": [7, 0, 5, 16], "texture": "#particle"},
@@ -84,8 +204,8 @@
 		{
 			"name": "vertical",
 			"neoforge_data": {"sky_light": 15},
-			"from": [0.02, 0, 0.02],
-			"to": [1.98, 16, 1.98],
+			"from": [0.02, 0.005, 0.02],
+			"to": [1.98, 15.995, 1.98],
 			"faces": {
 				"north": {"uv": [5, 0, 7, 16], "texture": "#particle"},
 				"east": {"uv": [5, 0, 7, 16], "texture": "#particle"},
@@ -98,23 +218,8 @@
 		{
 			"name": "vertical",
 			"neoforge_data": {"sky_light": 15},
-			"from": [0.02, 0, 14.02],
-			"to": [1.98, 16, 15.98],
-			"rotation": {"angle": 0, "axis": "y", "origin": [0, 0, 16]},
-			"faces": {
-				"north": {"uv": [7, 0, 5, 16], "texture": "#particle"},
-				"east": {"uv": [7, 0, 5, 16], "texture": "#particle"},
-				"south": {"uv": [7, 0, 5, 16], "texture": "#particle"},
-				"west": {"uv": [7, 0, 5, 16], "texture": "#particle"},
-				"up": {"uv": [5, 2, 7, 0], "texture": "#particle"},
-				"down": {"uv": [7, 0, 5, 2], "rotation": 270, "texture": "#particle"}
-			}
-		},
-		{
-			"name": "vertical",
-			"neoforge_data": {"sky_light": 15},
-			"from": [14.02, 0, 14.02],
-			"to": [15.98, 16, 15.98],
+			"from": [14.02, 0.005, 14.02],
+			"to": [15.98, 15.995, 15.98],
 			"rotation": {"angle": 0, "axis": "y", "origin": [16, 0, 16]},
 			"faces": {
 				"north": {"uv": [5, 0, 7, 16], "texture": "#particle"},
@@ -126,123 +231,18 @@
 			}
 		},
 		{
-			"name": "traverse",
+			"name": "vertical",
 			"neoforge_data": {"sky_light": 15},
-			"from": [2, 15, 14.02],
-			"to": [14, 16, 15.98],
-			"rotation": {"angle": 0, "axis": "x", "origin": [8, 8, 8]},
+			"from": [0.02, 0.005, 14.02],
+			"to": [1.98, 15.995, 15.98],
+			"rotation": {"angle": 0, "axis": "y", "origin": [0, 0, 16]},
 			"faces": {
-				"north": {"uv": [1, 0, 0, 11], "rotation": 90, "texture": "#particle"},
-				"east": {"uv": [10, 4, 14, 0], "rotation": 270, "texture": "#particle", "cullface": "down"},
-				"south": {"uv": [2, 0, 1, 11], "rotation": 270, "texture": "#particle", "cullface": "west"},
-				"west": {"uv": [10, 4, 14, 0], "texture": "#particle", "cullface": "up"},
-				"up": {"uv": [0, 11, 2, 0], "rotation": 270, "texture": "#particle", "cullface": "north"},
-				"down": {"uv": [0, 11, 2, 0], "rotation": 90, "texture": "#particle"}
-			}
-		},
-		{
-			"name": "traverse",
-			"neoforge_data": {"sky_light": 15},
-			"from": [14.02, 15, 2],
-			"to": [15.98, 16, 14],
-			"rotation": {"angle": 0, "axis": "x", "origin": [8, 8, 8]},
-			"faces": {
-				"north": {"uv": [10, 4, 14, 0], "rotation": 270, "texture": "#particle", "cullface": "down"},
-				"east": {"uv": [2, 0, 1, 11], "rotation": 270, "texture": "#particle", "cullface": "west"},
-				"south": {"uv": [10, 4, 14, 0], "texture": "#particle", "cullface": "up"},
-				"west": {"uv": [1, 0, 0, 11], "rotation": 90, "texture": "#particle"},
-				"up": {"uv": [0, 11, 2, 0], "rotation": 180, "texture": "#particle", "cullface": "north"},
-				"down": {"uv": [0, 11, 2, 0], "rotation": 180, "texture": "#particle"}
-			}
-		},
-		{
-			"name": "traverse",
-			"neoforge_data": {"sky_light": 15},
-			"from": [2, 15, 0.02],
-			"to": [14, 16, 1.98],
-			"rotation": {"angle": 0, "axis": "x", "origin": [8, 8, 8]},
-			"faces": {
-				"north": {"uv": [1, 0, 2, 11], "rotation": 90, "texture": "#particle", "cullface": "west"},
-				"east": {"uv": [10, 0, 14, 4], "rotation": 270, "texture": "#particle", "cullface": "down"},
-				"south": {"uv": [0, 0, 1, 11], "rotation": 270, "texture": "#particle"},
-				"west": {"uv": [14, 4, 10, 0], "texture": "#particle", "cullface": "up"},
-				"up": {"uv": [2, 11, 0, 0], "rotation": 270, "texture": "#particle", "cullface": "north"},
-				"down": {"uv": [2, 11, 0, 0], "rotation": 90, "texture": "#particle"}
-			}
-		},
-		{
-			"name": "traverse",
-			"neoforge_data": {"sky_light": 15},
-			"from": [0.02, 15, 2],
-			"to": [1.98, 16, 14],
-			"rotation": {"angle": 0, "axis": "x", "origin": [8, 8, 8]},
-			"faces": {
-				"north": {"uv": [10, 0, 14, 4], "rotation": 270, "texture": "#particle", "cullface": "down"},
-				"east": {"uv": [0, 0, 1, 11], "rotation": 270, "texture": "#particle"},
-				"south": {"uv": [14, 4, 10, 0], "texture": "#particle", "cullface": "up"},
-				"west": {"uv": [1, 0, 2, 11], "rotation": 90, "texture": "#particle", "cullface": "west"},
-				"up": {"uv": [2, 11, 0, 0], "rotation": 180, "texture": "#particle", "cullface": "north"},
-				"down": {"uv": [2, 11, 0, 0], "rotation": 180, "texture": "#particle"}
-			}
-		},
-		{
-			"name": "traverse",
-			"neoforge_data": {"sky_light": 15},
-			"from": [2, 0, 14.02],
-			"to": [14, 1, 15.98],
-			"rotation": {"angle": 0, "axis": "x", "origin": [8, 8, 8]},
-			"faces": {
-				"north": {"uv": [0, 0, 1, 11], "rotation": 90, "texture": "#particle"},
-				"east": {"uv": [14, 4, 10, 0], "rotation": 270, "texture": "#particle", "cullface": "down"},
-				"south": {"uv": [1, 0, 2, 11], "rotation": 270, "texture": "#particle", "cullface": "west"},
-				"west": {"uv": [10, 0, 14, 4], "texture": "#particle", "cullface": "up"},
-				"up": {"uv": [0, 0, 2, 11], "rotation": 270, "texture": "#particle"},
-				"down": {"uv": [0, 0, 2, 11], "rotation": 90, "texture": "#particle", "cullface": "north"}
-			}
-		},
-		{
-			"name": "traverse",
-			"neoforge_data": {"sky_light": 15},
-			"from": [14.02, 0, 2],
-			"to": [15.98, 1, 14],
-			"rotation": {"angle": 0, "axis": "x", "origin": [8, 8, 8]},
-			"faces": {
-				"north": {"uv": [14, 4, 10, 0], "rotation": 270, "texture": "#particle", "cullface": "down"},
-				"east": {"uv": [1, 0, 2, 11], "rotation": 270, "texture": "#particle", "cullface": "west"},
-				"south": {"uv": [10, 0, 14, 4], "texture": "#particle", "cullface": "up"},
-				"west": {"uv": [0, 0, 1, 11], "rotation": 90, "texture": "#particle"},
-				"up": {"uv": [0, 0, 2, 11], "rotation": 180, "texture": "#particle"},
-				"down": {"uv": [0, 0, 2, 11], "rotation": 180, "texture": "#particle", "cullface": "north"}
-			}
-		},
-		{
-			"name": "traverse",
-			"neoforge_data": {"sky_light": 15},
-			"from": [0.02, 0, 2],
-			"to": [1.98, 1, 14],
-			"rotation": {"angle": 0, "axis": "x", "origin": [8, 8, 8]},
-			"faces": {
-				"north": {"uv": [14, 0, 10, 4], "rotation": 270, "texture": "#particle", "cullface": "down"},
-				"east": {"uv": [1, 0, 0, 11], "rotation": 270, "texture": "#particle"},
-				"south": {"uv": [14, 0, 10, 4], "texture": "#particle", "cullface": "up"},
-				"west": {"uv": [2, 0, 1, 11], "rotation": 90, "texture": "#particle", "cullface": "west"},
-				"up": {"uv": [2, 0, 0, 11], "rotation": 180, "texture": "#particle"},
-				"down": {"uv": [2, 0, 0, 11], "rotation": 180, "texture": "#particle", "cullface": "north"}
-			}
-		},
-		{
-			"name": "traverse",
-			"neoforge_data": {"sky_light": 15},
-			"from": [2, 0, 0.02],
-			"to": [14, 1, 1.98],
-			"rotation": {"angle": 0, "axis": "x", "origin": [8, 8, 8]},
-			"faces": {
-				"north": {"uv": [2, 0, 1, 11], "rotation": 90, "texture": "#particle", "cullface": "west"},
-				"east": {"uv": [14, 0, 10, 4], "rotation": 270, "texture": "#particle", "cullface": "down"},
-				"south": {"uv": [1, 0, 0, 11], "rotation": 270, "texture": "#particle"},
-				"west": {"uv": [14, 0, 10, 4], "texture": "#particle", "cullface": "up"},
-				"up": {"uv": [2, 0, 0, 11], "rotation": 270, "texture": "#particle"},
-				"down": {"uv": [2, 0, 0, 11], "rotation": 90, "texture": "#particle", "cullface": "north"}
+				"north": {"uv": [7, 0, 5, 16], "texture": "#particle"},
+				"east": {"uv": [7, 0, 5, 16], "texture": "#particle"},
+				"south": {"uv": [7, 0, 5, 16], "texture": "#particle"},
+				"west": {"uv": [7, 0, 5, 16], "texture": "#particle"},
+				"up": {"uv": [5, 2, 7, 0], "texture": "#particle"},
+				"down": {"uv": [7, 0, 5, 2], "rotation": 270, "texture": "#particle"}
 			}
 		}
 	]

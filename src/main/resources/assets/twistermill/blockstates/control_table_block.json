@@ -1,8 +1,11 @@
 {
   "variants": {
     "facing=north": { "model": "twistermill:block/control_table_block" },
+
     "facing=south": { "model": "twistermill:block/control_table_block", "y": 180 },
-    "facing=west":  { "model": "twistermill:block/control_table_block", "y": 270 },
-    "facing=east":  { "model": "twistermill:block/control_table_block", "y": 90 }
+
+    "facing=west": { "model": "twistermill:block/control_table_block", "y": 270 },
+
+    "facing=east": { "model": "twistermill:block/control_table_block", "y": 90 }
   }
 }

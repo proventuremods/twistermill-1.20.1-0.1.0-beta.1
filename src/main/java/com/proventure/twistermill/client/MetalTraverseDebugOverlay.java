@@ -1,6 +1,6 @@
 package com.proventure.twistermill.client;
 
-import com.proventure.twistermill.block.ModBlocks;
+import com.proventure.twistermill.block.custom.MetalTraverseBlock;
 import com.proventure.twistermill.client.model.ConnectedMetalTraverseModel;
 import com.proventure.twistermill.config.TwisterMillConfig;
 import net.minecraft.client.Minecraft;
@@ -16,6 +16,9 @@ import java.util.List;
 
 public final class MetalTraverseDebugOverlay {
     private static final int MAX_DEBUG_LINE_LENGTH = 100;
+    private static final List<String> METAL_TRAVERSE_BLOCK_IDS = List.of(
+            "twistermill:metal_traverse",
+            "twistermill:metal_traverse_with_girder");
 
     public static void onDebugText(CustomizeGuiOverlayEvent.DebugText event) {
         Minecraft minecraft = Minecraft.getInstance();
@@ -27,18 +30,18 @@ public final class MetalTraverseDebugOverlay {
 
         BlockPos pos = blockHitResult.getBlockPos();
         BlockState state = level.getBlockState(pos);
-        if (state.getBlock() != ModBlocks.METAL_TRAVERSE.get()) {
+        if (!(state.getBlock() instanceof MetalTraverseBlock)) {
             return;
         }
 
         if (!TwisterMillConfig.isMetalTraverseDebugOverlayShown()) {
-            keepOnlyTargetedBlockId(event.getRight(), "twistermill:metal_traverse");
+            keepOnlyTargetedBlockId(event.getRight());
             return;
         }
 
         List<String> models = ConnectedMetalTraverseModel.describeVisibleJsonModels(level, pos, state);
         if (!models.isEmpty()) {
-            insertModelLines(event.getRight(), "twistermill:metal_traverse", formatModelLines(models));
+            insertModelLines(event.getRight(), formatModelLines(models));
         }
     }
 
@@ -60,7 +63,7 @@ public final class MetalTraverseDebugOverlay {
         return lines;
     }
 
-    private static void keepOnlyTargetedBlockId(List<String> rightDebugLines, String blockId) {
+    private static void keepOnlyTargetedBlockId(List<String> rightDebugLines) {
         int targetedBlockLine = -1;
         for (int i = 0; i < rightDebugLines.size(); i++) {
             String line = stripFormatting(rightDebugLines.get(i));
@@ -68,7 +71,7 @@ public final class MetalTraverseDebugOverlay {
                 targetedBlockLine = i;
                 continue;
             }
-            if (targetedBlockLine >= 0 && line.equals(blockId)) {
+            if (targetedBlockLine >= 0 && METAL_TRAVERSE_BLOCK_IDS.contains(line)) {
                 removeTargetedBlockDetails(rightDebugLines, i + 1);
                 return;
             }
@@ -89,7 +92,7 @@ public final class MetalTraverseDebugOverlay {
         }
     }
 
-    private static void insertModelLines(List<String> rightDebugLines, String blockId, List<String> modelLines) {
+    private static void insertModelLines(List<String> rightDebugLines, List<String> modelLines) {
         int targetedBlockLine = -1;
         for (int i = 0; i < rightDebugLines.size(); i++) {
             String line = stripFormatting(rightDebugLines.get(i));
@@ -97,14 +100,14 @@ public final class MetalTraverseDebugOverlay {
                 targetedBlockLine = i;
                 continue;
             }
-            if (targetedBlockLine >= 0 && line.equals(blockId)) {
+            if (targetedBlockLine >= 0 && METAL_TRAVERSE_BLOCK_IDS.contains(line)) {
                 rightDebugLines.addAll(i + 1, modelLines);
                 return;
             }
         }
 
         for (int i = 0; i < rightDebugLines.size(); i++) {
-            if (stripFormatting(rightDebugLines.get(i)).equals(blockId)) {
+            if (METAL_TRAVERSE_BLOCK_IDS.contains(stripFormatting(rightDebugLines.get(i)))) {
                 rightDebugLines.addAll(i + 1, modelLines);
                 return;
             }
@@ -114,7 +117,7 @@ public final class MetalTraverseDebugOverlay {
     }
 
     private static String stripFormatting(String line) {
-        return line.replaceAll("\u00a7.", "");
+        return line.replaceAll("§.", "");
     }
 
     private MetalTraverseDebugOverlay() {

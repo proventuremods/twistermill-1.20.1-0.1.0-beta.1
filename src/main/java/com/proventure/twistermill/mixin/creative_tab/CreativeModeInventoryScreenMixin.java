@@ -29,6 +29,7 @@ public abstract class CreativeModeInventoryScreenMixin {
     )
     private void twistermill$renderCreativeTabHeader(GuiGraphics guiGraphics, int mouseX, int mouseY,
                                                      float partialTick, CallbackInfo ci) {
-        TwisterMillCreativeTabHeader.render((CreativeModeInventoryScreen) (Object) this, selectedTab, guiGraphics);
+        TwisterMillCreativeTabHeader.render(
+                (CreativeModeInventoryScreen) (Object) this, selectedTab, guiGraphics, mouseX, mouseY);
     }
 }

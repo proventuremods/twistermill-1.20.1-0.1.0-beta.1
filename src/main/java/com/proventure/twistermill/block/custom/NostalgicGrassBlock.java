@@ -15,6 +15,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.lighting.LightEngine;
 import net.neoforged.neoforge.common.ItemAbilities;
 import net.neoforged.neoforge.common.ItemAbility;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 public class NostalgicGrassBlock extends GrassBlock {
@@ -44,7 +45,8 @@ public class NostalgicGrassBlock extends GrassBlock {
     }
 
     @Override
-    protected void randomTick(BlockState state, ServerLevel level, BlockPos pos, RandomSource random) {
+    protected void randomTick(@NotNull BlockState state, @NotNull ServerLevel level, @NotNull BlockPos pos,
+                              @NotNull RandomSource random) {
         if (!canBeGrassLocal(state, level, pos)) {
             if (!level.isAreaLoaded(pos, 1)) return;
             level.setBlockAndUpdate(pos, Blocks.DIRT.defaultBlockState());
@@ -57,7 +59,7 @@ public class NostalgicGrassBlock extends GrassBlock {
                     BlockPos blockpos = pos.offset(random.nextInt(3) - 1, random.nextInt(5) - 3, random.nextInt(3) - 1);
                     if (level.getBlockState(blockpos).is(Blocks.DIRT) && canPropagateLocal(blockstate, level, blockpos)) {
                         level.setBlockAndUpdate(
-                                blockpos, blockstate.setValue(SNOWY, Boolean.valueOf(level.getBlockState(blockpos.above()).is(Blocks.SNOW)))
+                                blockpos, blockstate.setValue(SNOWY, level.getBlockState(blockpos.above()).is(Blocks.SNOW))
                         );
                     }
                 }
@@ -66,7 +68,8 @@ public class NostalgicGrassBlock extends GrassBlock {
     }
 
     @Override
-    public @Nullable BlockState getToolModifiedState(BlockState state, UseOnContext context, ItemAbility itemAbility, boolean simulate) {
+    public @Nullable BlockState getToolModifiedState(@NotNull BlockState state, @NotNull UseOnContext context,
+                                                     @NotNull ItemAbility itemAbility, boolean simulate) {
         if (itemAbility == ItemAbilities.HOE_TILL
                 && context.getClickedFace() != Direction.DOWN
                 && context.getLevel().getBlockState(context.getClickedPos().above()).isAir()) {

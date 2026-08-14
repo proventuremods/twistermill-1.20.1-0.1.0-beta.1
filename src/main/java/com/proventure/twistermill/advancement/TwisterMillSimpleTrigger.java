@@ -6,13 +6,14 @@ import net.minecraft.advancements.critereon.ContextAwarePredicate;
 import net.minecraft.advancements.critereon.EntityPredicate;
 import net.minecraft.advancements.critereon.SimpleCriterionTrigger;
 import net.minecraft.server.level.ServerPlayer;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.Optional;
 
 public class TwisterMillSimpleTrigger extends SimpleCriterionTrigger<TwisterMillSimpleTrigger.Instance> {
 
     @Override
-    public Codec<Instance> codec() {
+    public @NotNull Codec<Instance> codec() {
         return Instance.CODEC;
     }
 

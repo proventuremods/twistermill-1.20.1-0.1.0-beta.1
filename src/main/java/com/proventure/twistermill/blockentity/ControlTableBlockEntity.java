@@ -2,7 +2,7 @@ package com.proventure.twistermill.blockentity;
 
 import com.proventure.twistermill.TwisterMill;
 import com.proventure.twistermill.advancement.ModCriteriaTriggers;
-import com.proventure.twistermill.config.TwisterMillConfig;
+import com.proventure.twistermill.config.AdvancementRewardManager;
 import com.simibubi.create.api.equipment.goggles.IHaveGoggleInformation;
 import com.simibubi.create.AllKeys;
 import com.proventure.twistermill.block.ModBlocks;
@@ -18,17 +18,12 @@ import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.sounds.SoundEvents;
-import net.minecraft.sounds.SoundSource;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.MenuProvider;
-import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.state.BlockState;
 import com.proventure.twistermill.menu.ControlTableMenu;
 import org.jetbrains.annotations.NotNull;
@@ -49,7 +44,8 @@ public class ControlTableBlockEntity extends SmartBlockEntity implements MenuPro
 
     private static final int MIN_TICKS = 0;
     private static final int MAX_TICKS = 400;
-    private static final int SEND_COALESCE_TICKS = 10;
+    private static final int ON_CHANGE_QUIET_TICKS = 20;
+    private static final long NO_PENDING_COUNT_GAME_TIME = Long.MIN_VALUE;
     private static final int RIBOB_SLOT_COUNT = 3;
     private static final int EMPTY_SIGNAL = -1;
     private static final int LEGACY_SEND_OPTION_1 = 0;
@@ -64,10 +60,10 @@ public class ControlTableBlockEntity extends SmartBlockEntity implements MenuPro
     private static final String TAG_RIBOB_SLOT_1_SIGNAL = "RibobSlot1Signal";
     private static final String TAG_RIBOB_SLOT_2_SIGNAL = "RibobSlot2Signal";
     private static final String TAG_RIBOB_SLOT_3_SIGNAL = "RibobSlot3Signal";
+    private static final String TAG_PENDING_DISPATCH_CODE = "PendingDispatchCode";
     private static final String TAG_OWNER_UUID = "OwnerUuid";
     private static final ResourceLocation BINARY_CODE_TRANSMITTER_ADVANCEMENT_ID =
             ResourceLocation.fromNamespaceAndPath(TwisterMill.MOD_ID, "binary_code_transmitter");
-    private static final int BINARY_CODE_TRANSMITTER_REWARD_ANCIENT_DEBRIS = 6;
 
     private int sequenceLengthTicks = DEFAULT_SEQUENCE_LENGTH_TICKS;
     private int pulseLengthTicks = DEFAULT_PULSE_LENGTH_TICKS;
@@ -77,7 +73,8 @@ public class ControlTableBlockEntity extends SmartBlockEntity implements MenuPro
     private final BlockPos[] ribobSlotPositions = new BlockPos[RIBOB_SLOT_COUNT];
     private final int[] ribobSlotSignals = new int[]{EMPTY_SIGNAL, EMPTY_SIGNAL, EMPTY_SIGNAL};
     private String pendingDispatchCode;
-    private int coalesceTicksRemaining;
+    private int pendingDispatchStableTicks;
+    private long pendingDispatchLastCountedGameTime = NO_PENDING_COUNT_GAME_TIME;
     private boolean bottomPulseInitialized = false;
     private boolean lastBottomPulseHigh = false;
     private UUID ownerUuid;
@@ -90,6 +87,7 @@ public class ControlTableBlockEntity extends SmartBlockEntity implements MenuPro
     public void addBehaviours(List<BlockEntityBehaviour> behaviours) {
     }
 
+    @SuppressWarnings("unused")
     public UUID getOwnerUuid() {
         return ownerUuid;
     }
@@ -145,6 +143,7 @@ public class ControlTableBlockEntity extends SmartBlockEntity implements MenuPro
             return;
         }
 
+        String previousCode = getCurrentCode();
         boolean changed = validateSlotsInternal();
         int clampedSignal = Math.clamp(signal, 0, 15);
         int slotIndex = findSlotIndexByRibobPos(ribobPos);
@@ -174,7 +173,7 @@ public class ControlTableBlockEntity extends SmartBlockEntity implements MenuPro
         if (changed) {
             setChanged();
             sendData();
-            requestCodeDispatch(false);
+            handleRibobStateChange(previousCode);
         }
         tryTriggerSystemCompleteAdvancement();
     }
@@ -184,6 +183,7 @@ public class ControlTableBlockEntity extends SmartBlockEntity implements MenuPro
             return;
         }
 
+        String previousCode = getCurrentCode();
         boolean changed = validateSlotsInternal();
         int slotIndex = findSlotIndexByRibobPos(ribobPos);
         if (slotIndex >= 0) {
@@ -194,7 +194,7 @@ public class ControlTableBlockEntity extends SmartBlockEntity implements MenuPro
         if (changed) {
             setChanged();
             sendData();
-            requestCodeDispatch(false);
+            handleRibobStateChange(previousCode);
         }
     }
 
@@ -203,15 +203,17 @@ public class ControlTableBlockEntity extends SmartBlockEntity implements MenuPro
             return;
         }
 
+        String previousCode = getCurrentCode();
         if (validateSlotsInternal()) {
             setChanged();
             sendData();
-            requestCodeDispatch(false);
+            handleRibobStateChange(previousCode);
         }
     }
 
     public void applyConfig(int sequenceLengthTicks, int pulseLengthTicks, int pauseLengthTicks, int repeatIntervalTicks,
                             int launchMode) {
+        int previousLaunchMode = this.launchMode;
         this.sequenceLengthTicks = clampTicks(sequenceLengthTicks);
         this.pulseLengthTicks = clampTicks(pulseLengthTicks);
         this.pauseLengthTicks = clampTicks(pauseLengthTicks);
@@ -219,7 +221,7 @@ public class ControlTableBlockEntity extends SmartBlockEntity implements MenuPro
         this.launchMode = sanitizeLaunchMode(launchMode);
         setChanged();
         sendData();
-        requestCodeDispatch(true);
+        handleLaunchModeChange(previousLaunchMode);
     }
 
     private int clampTicks(int value) {
@@ -247,18 +249,64 @@ public class ControlTableBlockEntity extends SmartBlockEntity implements MenuPro
         return LAUNCH_MODE_OFF;
     }
 
-    private void requestCodeDispatch(boolean immediate) {
+    private void handleRibobStateChange(String previousCode) {
         if (level == null || level.isClientSide) {
             return;
         }
 
-        if (launchMode == LAUNCH_MODE_OFF) {
+        if (launchMode != LAUNCH_MODE_ON_CHANGE) {
             clearPendingDispatchState();
             abortDstbTransmissions();
             return;
         }
 
-        if (launchMode == LAUNCH_MODE_RS_PULSE) {
+        String currentCode = getCurrentCode();
+        if (currentCode.equals(previousCode)) {
+            return;
+        }
+
+        beginOnChangeQuietPeriod(currentCode);
+    }
+
+    private void handleLaunchModeChange(int previousLaunchMode) {
+        if (level == null || level.isClientSide) {
+            return;
+        }
+
+        if (launchMode != LAUNCH_MODE_ON_CHANGE) {
+            clearPendingDispatchState();
+            abortDstbTransmissions();
+            return;
+        }
+
+        if (previousLaunchMode != LAUNCH_MODE_ON_CHANGE) {
+            beginOnChangeQuietPeriod(getCurrentCode());
+        }
+    }
+
+    private void beginOnChangeQuietPeriod(String code) {
+        if (level == null || level.isClientSide || launchMode != LAUNCH_MODE_ON_CHANGE) {
+            return;
+        }
+
+        if (hasNoValidDstbNeighbor()) {
+            clearPendingDispatchState();
+            return;
+        }
+
+        pendingDispatchCode = code;
+        pendingDispatchStableTicks = 0;
+        pendingDispatchLastCountedGameTime = level.getGameTime();
+        clearPendingDstbCodeFrames();
+        setChanged();
+    }
+
+    private void tickOnChangeDispatch() {
+        if (pendingDispatchCode == null || level == null || level.isClientSide) {
+            return;
+        }
+
+        if (launchMode != LAUNCH_MODE_ON_CHANGE) {
             clearPendingDispatchState();
             abortDstbTransmissions();
             return;
@@ -269,39 +317,47 @@ public class ControlTableBlockEntity extends SmartBlockEntity implements MenuPro
             return;
         }
 
-        String code = getCurrentCode();
-        if (immediate) {
-            clearPendingDispatchState();
-            dispatchCodeToDstbs(code);
+        String currentCode = getCurrentCode();
+        if (!currentCode.equals(pendingDispatchCode)) {
+            beginOnChangeQuietPeriod(currentCode);
             return;
         }
 
-        pendingDispatchCode = code;
-        coalesceTicksRemaining = SEND_COALESCE_TICKS;
-    }
-
-    private void flushPendingDispatchIfDue() {
-        if (coalesceTicksRemaining > 0) {
-            coalesceTicksRemaining--;
+        long gameTime = level.getGameTime();
+        if (pendingDispatchLastCountedGameTime == NO_PENDING_COUNT_GAME_TIME) {
+            pendingDispatchLastCountedGameTime = gameTime;
+            return;
+        }
+        if (gameTime <= pendingDispatchLastCountedGameTime) {
+            return;
         }
 
-        if (coalesceTicksRemaining > 0 || pendingDispatchCode == null) {
+        pendingDispatchLastCountedGameTime = gameTime;
+        pendingDispatchStableTicks++;
+        if (pendingDispatchStableTicks < ON_CHANGE_QUIET_TICKS) {
             return;
         }
 
         String code = pendingDispatchCode;
         clearPendingDispatchState();
-
-        if (launchMode != LAUNCH_MODE_ON_CHANGE) {
-            abortDstbTransmissions();
-            return;
-        }
-
-        if (hasNoValidDstbNeighbor()) {
-            return;
-        }
-
         dispatchCodeToDstbs(code);
+    }
+
+    private void clearPendingDstbCodeFrames() {
+        if (level == null || level.isClientSide) {
+            return;
+        }
+
+        for (Direction direction : Direction.Plane.HORIZONTAL) {
+            BlockPos neighborPos = worldPosition.relative(direction);
+            if (!(level.getBlockEntity(neighborPos) instanceof DigitalSignalTxBlockEntity dstb)) {
+                continue;
+            }
+            if (!worldPosition.equals(dstb.getExpectedControlTablePos())) {
+                continue;
+            }
+            dstb.clearPendingCodeFrameFromControlTable();
+        }
     }
 
     private void dispatchCodeToDstbs(String code) {
@@ -360,8 +416,26 @@ public class ControlTableBlockEntity extends SmartBlockEntity implements MenuPro
     }
 
     private void clearPendingDispatchState() {
+        boolean hadPendingDispatch = pendingDispatchCode != null;
         pendingDispatchCode = null;
-        coalesceTicksRemaining = 0;
+        pendingDispatchStableTicks = 0;
+        pendingDispatchLastCountedGameTime = NO_PENDING_COUNT_GAME_TIME;
+        if (hadPendingDispatch) {
+            setChanged();
+        }
+    }
+
+    private boolean isValidDispatchCode(String code) {
+        if (code == null || code.length() != RIBOB_SLOT_COUNT * 4) {
+            return false;
+        }
+        for (int i = 0; i < code.length(); i++) {
+            char bit = code.charAt(i);
+            if (bit != '0' && bit != '1') {
+                return false;
+            }
+        }
+        return true;
     }
 
     private int getBottomPulseSignal() {
@@ -562,9 +636,8 @@ public class ControlTableBlockEntity extends SmartBlockEntity implements MenuPro
             ModCriteriaTriggers.CTB_SYSTEM_COMPLETE.trigger(ownerPlayer);
             ModCriteriaTriggers.BINARY_CODE_TRANSMITTER.trigger(ownerPlayer);
             if (!alreadyCompleted
-                    && TwisterMillConfig.isNetheriteAdvancementDropEnabled()
                     && isBinaryCodeTransmitterAdvancementDone(ownerPlayer)) {
-                giveBinaryCodeTransmitterAdvancementReward(ownerPlayer);
+                AdvancementRewardManager.awardIfEnabled(ownerPlayer);
             }
         }
     }
@@ -576,30 +649,6 @@ public class ControlTableBlockEntity extends SmartBlockEntity implements MenuPro
         }
         AdvancementProgress progress = player.getAdvancements().getOrStartProgress(advancement);
         return progress.isDone();
-    }
-
-    private static void giveBinaryCodeTransmitterAdvancementReward(ServerPlayer player) {
-        ItemStack reward = new ItemStack(Items.ANCIENT_DEBRIS, BINARY_CODE_TRANSMITTER_REWARD_ANCIENT_DEBRIS);
-        if (player.addItem(reward)) {
-            player.level().playSound(
-                    null,
-                    player.getX(),
-                    player.getY(),
-                    player.getZ(),
-                    SoundEvents.ITEM_PICKUP,
-                    SoundSource.PLAYERS,
-                    0.2F,
-                    ((player.getRandom().nextFloat() - player.getRandom().nextFloat()) * 0.7F + 1.0F) * 2.0F
-            );
-            player.containerMenu.broadcastChanges();
-            return;
-        }
-
-        ItemEntity droppedReward = player.drop(reward, false);
-        if (droppedReward != null) {
-            droppedReward.setNoPickUpDelay();
-            droppedReward.setTarget(player.getUUID());
-        }
     }
 
     private ServerPlayer resolveCompleteSystemOwner(DigitalSignalTxBlockEntity requiredTransmitter) {
@@ -697,6 +746,9 @@ public class ControlTableBlockEntity extends SmartBlockEntity implements MenuPro
         tag.putInt(TAG_RIBOB_SLOT_1_SIGNAL, ribobSlotSignals[0]);
         tag.putInt(TAG_RIBOB_SLOT_2_SIGNAL, ribobSlotSignals[1]);
         tag.putInt(TAG_RIBOB_SLOT_3_SIGNAL, ribobSlotSignals[2]);
+        if (!clientPacket && pendingDispatchCode != null) {
+            tag.putString(TAG_PENDING_DISPATCH_CODE, pendingDispatchCode);
+        }
         if (ownerUuid != null) {
             tag.putUUID(TAG_OWNER_UUID, ownerUuid);
         }
@@ -728,6 +780,17 @@ public class ControlTableBlockEntity extends SmartBlockEntity implements MenuPro
         if (ribobSlotPositions[0] == null) ribobSlotSignals[0] = EMPTY_SIGNAL;
         if (ribobSlotPositions[1] == null) ribobSlotSignals[1] = EMPTY_SIGNAL;
         if (ribobSlotPositions[2] == null) ribobSlotSignals[2] = EMPTY_SIGNAL;
+        if (!clientPacket) {
+            pendingDispatchCode = null;
+            pendingDispatchStableTicks = 0;
+            pendingDispatchLastCountedGameTime = NO_PENDING_COUNT_GAME_TIME;
+            if (launchMode == LAUNCH_MODE_ON_CHANGE && tag.contains(TAG_PENDING_DISPATCH_CODE)) {
+                String savedPendingCode = tag.getString(TAG_PENDING_DISPATCH_CODE);
+                if (isValidDispatchCode(savedPendingCode)) {
+                    pendingDispatchCode = savedPendingCode;
+                }
+            }
+        }
         ownerUuid = tag.hasUUID(TAG_OWNER_UUID) ? tag.getUUID(TAG_OWNER_UUID) : null;
     }
 
@@ -739,7 +802,7 @@ public class ControlTableBlockEntity extends SmartBlockEntity implements MenuPro
             return;
         }
 
-        flushPendingDispatchIfDue();
+        tickOnChangeDispatch();
         tickBottomPulseDispatch();
     }
 

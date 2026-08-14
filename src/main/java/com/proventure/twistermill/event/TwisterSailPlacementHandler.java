@@ -19,6 +19,7 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.BlockHitResult;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
 import java.util.function.Predicate;
@@ -91,7 +92,8 @@ public final class TwisterSailPlacementHandler {
         }
 
         @Override
-        public PlacementOffset getOffset(Player player, Level world, BlockState state, BlockPos pos, BlockHitResult ray) {
+        public PlacementOffset getOffset(@NotNull Player player, @NotNull Level world, @NotNull BlockState state,
+                                         @NotNull BlockPos pos, @NotNull BlockHitResult ray) {
             List<Direction> directions = IPlacementHelper.orderedByDistanceExceptAxis(
                     pos,
                     SablePlacementHitHelper.ensureHitLocationInSameSpaceAsPos(world, pos, ray),

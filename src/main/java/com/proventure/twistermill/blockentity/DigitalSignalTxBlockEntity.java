@@ -132,6 +132,17 @@ public class DigitalSignalTxBlockEntity extends SmartBlockEntity implements IHav
         }
     }
 
+    void clearPendingCodeFrameFromControlTable() {
+        if (level == null || level.isClientSide) {
+            return;
+        }
+
+        pendingFrame = null;
+        if (!isTransmissionActive() && !pendingControlToggle) {
+            startPendingNextTick = false;
+        }
+    }
+
     public void queueControlToggleFromControlTable() {
         if (level == null || level.isClientSide) {
             return;
@@ -208,6 +219,7 @@ public class DigitalSignalTxBlockEntity extends SmartBlockEntity implements IHav
         progressTransmission();
     }
 
+    @SuppressWarnings("BooleanMethodIsAlwaysInverted")
     private boolean isTransmissionActive() {
         return phase != TransmissionPhase.IDLE;
     }

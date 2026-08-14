@@ -52,6 +52,7 @@ public class WindRotoVerticalBlockEntity extends MechanicalBearingBlockEntity {
     private static final String TAG_SABLE_ACTIVE = "SableActive";
     private static final String TAG_SABLE_SUBLEVEL_ID = "SableSubLevelId";
     private static final String TAG_PENDING_DISASSEMBLE_AFTER_ZERO = "PendingDisassembleAfterZero";
+    private static final String TAG_DISASSEMBLY_RETURN_MEASURED_ANGLE = "DisassemblyReturnMeasuredAngle";
     private static final String TAG_ASSEMBLED_BLOCK_COUNT = "AssembledBlockCount";
 
     private static final float DEGREES_PER_TICK_AT_1_RPM = 0.3F;
@@ -117,6 +118,7 @@ public class WindRotoVerticalBlockEntity extends MechanicalBearingBlockEntity {
     private long nextWindAngleSampleAt = 0;
     private boolean pendingDisassembleAfterZero = false;
     private int pendingDisassembleStableTicks = 0;
+    private transient float disassemblyReturnMeasuredAngleDeg = 0.0F;
     private transient int sableLoadRecoveryTicks = 0;
     private transient int sableReloadReattachGraceTicks = 0;
     private transient SableInteractiveContraptionBackend.RefreshFailureReason lastSableRefreshFailureReason =
@@ -140,8 +142,6 @@ public class WindRotoVerticalBlockEntity extends MechanicalBearingBlockEntity {
 
     private boolean canSendData() {
         if (!(level instanceof ServerLevel serverLevel))
-            return false;
-        if (serverLevel.getServer() == null)
             return false;
         return serverLevel.getServer().isRunning();
     }
@@ -181,7 +181,7 @@ public class WindRotoVerticalBlockEntity extends MechanicalBearingBlockEntity {
                 pendingDisassembleAfterZero);
     }
 
-    private void logSableReadNbtDiagnostics(String event, CompoundTag tag, boolean clientPacket) {
+    private void logSableReadNbtDiagnostics(String event, CompoundTag tag) {
         if (!TwisterMillDiagnostics.isWrvbLoggingEnabled()) {
             return;
         }
@@ -199,7 +199,7 @@ public class WindRotoVerticalBlockEntity extends MechanicalBearingBlockEntity {
                 chunkPos.x,
                 chunkPos.z,
                 level == null ? -1L : level.getGameTime(),
-                clientPacket,
+                false,
                 running,
                 getFacingDirection(),
                 containsSableActive,
@@ -387,6 +387,7 @@ public class WindRotoVerticalBlockEntity extends MechanicalBearingBlockEntity {
         restoreFreeModeAfterManualDisassembly = false;
         pendingDisassembleAfterZero = false;
         pendingDisassembleStableTicks = 0;
+        disassemblyReturnMeasuredAngleDeg = 0.0F;
         sableLoadRecoveryTicks = 0;
         verticalAutoParkedByMissingMarker = false;
 
@@ -675,6 +676,7 @@ public class WindRotoVerticalBlockEntity extends MechanicalBearingBlockEntity {
                 return;
             }
 
+            disassemblyReturnMeasuredAngleDeg = 0.0F;
             pendingDisassembleAfterZero = true;
             pendingDisassembleStableTicks = 0;
             stopAllMotionState();
@@ -683,6 +685,7 @@ public class WindRotoVerticalBlockEntity extends MechanicalBearingBlockEntity {
             return;
         }
 
+        disassemblyReturnMeasuredAngleDeg = 0.0F;
         stopAllMotionState();
         updateVisualRunning(false);
 
@@ -800,6 +803,7 @@ public class WindRotoVerticalBlockEntity extends MechanicalBearingBlockEntity {
 
     @Override
     public void onChunkUnloaded() {
+        disassemblyReturnMeasuredAngleDeg = 0.0F;
         sableBackend.clearRuntimeForUnload();
         super.onChunkUnloaded();
     }
@@ -807,6 +811,7 @@ public class WindRotoVerticalBlockEntity extends MechanicalBearingBlockEntity {
     @Override
     public void remove() {
         skipDisassembleDuringRemove = true;
+        disassemblyReturnMeasuredAngleDeg = 0.0F;
 
         if (level != null && !level.isClientSide) {
             sableBackend.clearRuntimeForUnload();
@@ -853,6 +858,7 @@ public class WindRotoVerticalBlockEntity extends MechanicalBearingBlockEntity {
             } else {
                 SableInteractiveContraptionBackend.RefreshFailureReason reason = refresh.failureReason();
                 if (shouldKeepPersistentSableLinkOnRefreshFailure(reason)) {
+                    resetDisassemblyReturnMeasuredAngleForClient();
                     handleRetryableSableRefreshFailure(reason);
                     return;
                 }
@@ -867,6 +873,10 @@ public class WindRotoVerticalBlockEntity extends MechanicalBearingBlockEntity {
 
         if (level.isClientSide) {
             return;
+        }
+
+        if (level instanceof ServerLevel serverLevel) {
+            updateDisassemblyReturnMeasuredAngleForClient(serverLevel);
         }
 
         long time = level.getGameTime();
@@ -1194,6 +1204,47 @@ public class WindRotoVerticalBlockEntity extends MechanicalBearingBlockEntity {
         return current;
     }
 
+    private void updateDisassemblyReturnMeasuredAngleForClient(ServerLevel serverLevel) {
+        Float measuredAngle = null;
+        if (pendingDisassembleAfterZero && running && sableBackend.isActive()) {
+            measuredAngle = sableBackend.measureFacingAxisRelativeAngleDegrees(
+                    serverLevel,
+                    worldPosition,
+                    getFacingDirection()
+            );
+        }
+
+        syncDisassemblyReturnMeasuredAngleForClient(measuredAngle);
+    }
+
+    private void resetDisassemblyReturnMeasuredAngleForClient() {
+        syncDisassemblyReturnMeasuredAngleForClient(0.0F);
+    }
+
+    private void syncDisassemblyReturnMeasuredAngleForClient(@Nullable Float measuredAngle) {
+        float visibleAngle = normalizeDisassemblyReturnMeasuredAngle(measuredAngle);
+        if (Float.compare(disassemblyReturnMeasuredAngleDeg, visibleAngle) == 0) {
+            return;
+        }
+
+        disassemblyReturnMeasuredAngleDeg = visibleAngle;
+        if (canSendData()) {
+            sendData();
+        }
+    }
+
+    private static float normalizeDisassemblyReturnMeasuredAngle(@Nullable Float measuredAngle) {
+        if (measuredAngle == null || !Float.isFinite(measuredAngle)) {
+            return 0.0F;
+        }
+
+        float wrappedAngle = wrap360(measuredAngle);
+        if (!Float.isFinite(wrappedAngle) || wrappedAngle == 0.0F) {
+            return 0.0F;
+        }
+        return wrappedAngle;
+    }
+
     private void tickPendingDisassembleAfterZero() {
         if (!running) {
             pendingDisassembleAfterZero = false;
@@ -1202,7 +1253,7 @@ public class WindRotoVerticalBlockEntity extends MechanicalBearingBlockEntity {
         }
 
         float wrappedCurrent = Mth.wrapDegrees(angle);
-        float wrappedNew = approachAngle(wrappedCurrent, 0.0F, getVerticalDisassembleReturnDegreesPerTick());
+        float wrappedNew = approachAngleToZero(wrappedCurrent, getVerticalDisassembleReturnDegreesPerTick());
         boolean changed = Math.abs(wrappedNew - wrappedCurrent) > 0.0001F;
 
         if (changed) {
@@ -1233,11 +1284,11 @@ public class WindRotoVerticalBlockEntity extends MechanicalBearingBlockEntity {
         pendingDisassembleStableTicks = 0;
     }
 
-    private static float approachAngle(float current, float target, float maxStep) {
-        float diff = target - current;
+    private static float approachAngleToZero(float current, float maxStep) {
+        float diff = -current;
 
         if (Math.abs(diff) <= maxStep)
-            return target;
+            return 0.0F;
 
         return current + Math.signum(diff) * maxStep;
     }
@@ -1429,9 +1480,9 @@ public class WindRotoVerticalBlockEntity extends MechanicalBearingBlockEntity {
             return 0.0F;
         }
 
-        WindSample windSample = TwisterWeatherService.sampleAtBlock(level, worldPosition);
+        WindSample windSample = TwisterWeatherService.sampleWrvbDirectionAtBlock(level, worldPosition);
         if (!windSample.valid()) {
-            return 0.0F;
+            return "pmweather".equals(windSample.backendName()) ? lastWorldWindAngleDeg : 0.0F;
         }
         return wrap360(windSample.windAngleDegrees());
     }
@@ -1554,6 +1605,7 @@ public class WindRotoVerticalBlockEntity extends MechanicalBearingBlockEntity {
             running = true;
             pendingDisassembleAfterZero = false;
             pendingDisassembleStableTicks = 0;
+            disassemblyReturnMeasuredAngleDeg = 0.0F;
             verticalAutoParkedByMissingMarker = false;
             angle = 0.0F;
             sequencedAngleLimit = -1.0;
@@ -1575,6 +1627,7 @@ public class WindRotoVerticalBlockEntity extends MechanicalBearingBlockEntity {
         sableLoadRecoveryTicks = 0;
         pendingDisassembleAfterZero = false;
         pendingDisassembleStableTicks = 0;
+        disassemblyReturnMeasuredAngleDeg = 0.0F;
         verticalAutoParkedByMissingMarker = false;
         clearAssembledBlockCount();
 
@@ -1714,6 +1767,7 @@ public class WindRotoVerticalBlockEntity extends MechanicalBearingBlockEntity {
         tag.putInt(TAG_ASSEMBLED_BLOCK_COUNT, assembledBlockCount);
         if (clientPacket) {
             tag.putBoolean(TAG_PENDING_DISASSEMBLE_AFTER_ZERO, pendingDisassembleAfterZero);
+            tag.putFloat(TAG_DISASSEMBLY_RETURN_MEASURED_ANGLE, disassemblyReturnMeasuredAngleDeg);
             tag.putBoolean("BlockOnBearingForDisplay", blockOnBearingForDisplay);
             tag.putByte("PlacementNorthMarkerStatus", placementNorthMarkerStatus);
         }
@@ -1793,6 +1847,15 @@ public class WindRotoVerticalBlockEntity extends MechanicalBearingBlockEntity {
         } else {
             assembledBlockCount = 0;
         }
+        if (clientPacket) {
+            disassemblyReturnMeasuredAngleDeg = normalizeDisassemblyReturnMeasuredAngle(
+                    tag.contains(TAG_DISASSEMBLY_RETURN_MEASURED_ANGLE)
+                            ? tag.getFloat(TAG_DISASSEMBLY_RETURN_MEASURED_ANGLE)
+                            : null
+            );
+        } else {
+            disassemblyReturnMeasuredAngleDeg = 0.0F;
+        }
         if (tag.contains(TAG_PENDING_DISASSEMBLE_AFTER_ZERO)) {
             pendingDisassembleAfterZero = tag.getBoolean(TAG_PENDING_DISASSEMBLE_AFTER_ZERO);
         }
@@ -1813,14 +1876,14 @@ public class WindRotoVerticalBlockEntity extends MechanicalBearingBlockEntity {
         }
 
         if (!clientPacket) {
-            logSableReadNbtDiagnostics("read-before-backend", tag, clientPacket);
+            logSableReadNbtDiagnostics("read-before-backend", tag);
         }
         sableBackend.read(tag, TAG_SABLE_ACTIVE, TAG_SABLE_SUBLEVEL_ID);
         if (!clientPacket) {
             rememberedShipMemory.read(tag);
         }
         if (!clientPacket) {
-            logSableReadNbtDiagnostics("read-after-backend", tag, clientPacket);
+            logSableReadNbtDiagnostics("read-after-backend", tag);
         }
         diagnosticFirstRefreshLogged = false;
         diagnosticRefreshFailureLogged = false;
@@ -1841,7 +1904,12 @@ public class WindRotoVerticalBlockEntity extends MechanicalBearingBlockEntity {
                 .style(ChatFormatting.GRAY)
                 .forGoggles(tooltip);
 
-        CreateLang.number(wrap360(verticalCurrentYawDeg))
+        float displayedYawDeg = pendingDisassembleAfterZero
+                ? disassemblyReturnMeasuredAngleDeg
+                : (running || sableBackend.isActive())
+                        ? verticalCurrentYawDeg
+                        : 0.0F;
+        CreateLang.number(wrap360(displayedYawDeg))
                 .style(ChatFormatting.YELLOW)
                 .space()
                 .add(Component.literal("°"))
@@ -2064,6 +2132,7 @@ public class WindRotoVerticalBlockEntity extends MechanicalBearingBlockEntity {
         nextWindAngleSampleAt = 0;
         pendingDisassembleAfterZero = false;
         pendingDisassembleStableTicks = 0;
+        disassemblyReturnMeasuredAngleDeg = 0.0F;
         if (!verticalParkedMode) {
             verticalAutoParkedByMissingMarker = false;
         }
@@ -2157,6 +2226,7 @@ public class WindRotoVerticalBlockEntity extends MechanicalBearingBlockEntity {
         }
     }
 
+    @SuppressWarnings("unused")
     public ManualReseatCommandResult manualReseatFromCommand() {
         TwisterMillReseatService.ReseatResult result =
                 reseatFromDiagnostics(TwisterMillReseatService.Trigger.MANUAL_COMMAND);
@@ -2400,6 +2470,7 @@ public class WindRotoVerticalBlockEntity extends MechanicalBearingBlockEntity {
         assembleNextTick = false;
         pendingDisassembleAfterZero = false;
         pendingDisassembleStableTicks = 0;
+        disassemblyReturnMeasuredAngleDeg = 0.0F;
         verticalAutoParkedByMissingMarker = false;
         sableLoadRecoveryTicks = 0;
         logSableClearCauseDiagnostics(

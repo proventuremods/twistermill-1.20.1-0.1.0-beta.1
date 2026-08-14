@@ -9,6 +9,7 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 import javax.annotation.Nullable;
 import java.util.LinkedHashSet;
 
+@SuppressWarnings("unused")
 public final class ServoBindingResolver {
 
     public record ResolvedServoSample(

@@ -1,7 +1,10 @@
 package com.proventure.twistermill.command;
 
 import com.mojang.brigadier.CommandDispatcher;
+import com.mojang.brigadier.arguments.BoolArgumentType;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.mojang.logging.LogUtils;
+import com.proventure.twistermill.config.TwisterMillConfig;
 import com.proventure.twistermill.diagnostics.TwisterMillDiagnostics;
 import com.proventure.twistermill.diagnostics.TwisterMillDiagnostics.Target;
 import com.proventure.twistermill.diagnostics.TwisterMillReseatService;
@@ -13,10 +16,15 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
+import org.slf4j.Logger;
 
 import java.util.Locale;
 
 public final class TwisterMillDiagnosticsCommands {
+
+    private static final Logger LOGGER = LogUtils.getLogger();
+    private static final String WIND_FORCE_UPDATE_FAILED_MESSAGE =
+            "Weather Sail wind-force physics could not be updated.";
 
     private TwisterMillDiagnosticsCommands() {
     }
@@ -31,9 +39,53 @@ public final class TwisterMillDiagnosticsCommands {
                                 .then(target("windvaneblock", Target.WRVB, "Wind Vane Block"))
                                 .then(target("servo", Target.SERVO, "Servo"))
                                 .then(target("invservo", Target.INV_SERVO, "InvServo"))))
+                .then(Commands.literal("wind_force_physics")
+                        .then(Commands.argument("enabled", BoolArgumentType.bool())
+                                .executes(context -> setWindForcePhysics(
+                                        context.getSource(),
+                                        BoolArgumentType.getBool(context, "enabled")))))
                 .then(Commands.literal("reseat")
                         .then(Commands.literal("now")
                                 .executes(context -> reseatNow(context.getSource())))));
+    }
+
+    private static int setWindForcePhysics(CommandSourceStack source, boolean enabled) {
+        if (!TwisterMillConfig.COMMON_SPEC.isLoaded()) {
+            LOGGER.error("Cannot update Weather Sail wind-force physics because the common config is not loaded.");
+            source.sendFailure(Component.literal(WIND_FORCE_UPDATE_FAILED_MESSAGE));
+            return 0;
+        }
+
+        final boolean previousValue;
+        try {
+            previousValue = TwisterMillConfig.ENABLE_SAIL_WIND_FORCE.getRaw();
+        } catch (RuntimeException exception) {
+            LOGGER.error("Failed to read the Weather Sail wind-force physics setting.", exception);
+            source.sendFailure(Component.literal(WIND_FORCE_UPDATE_FAILED_MESSAGE));
+            return 0;
+        }
+
+        try {
+            TwisterMillConfig.ENABLE_SAIL_WIND_FORCE.set(enabled);
+            TwisterMillConfig.ENABLE_SAIL_WIND_FORCE.save();
+        } catch (RuntimeException exception) {
+            try {
+                if (TwisterMillConfig.COMMON_SPEC.isLoaded()) {
+                    TwisterMillConfig.ENABLE_SAIL_WIND_FORCE.set(previousValue);
+                }
+            } catch (RuntimeException rollbackException) {
+                exception.addSuppressed(rollbackException);
+            }
+            LOGGER.error("Failed to persist the Weather Sail wind-force physics setting.", exception);
+            source.sendFailure(Component.literal(WIND_FORCE_UPDATE_FAILED_MESSAGE));
+            return 0;
+        }
+
+        source.sendSuccess(
+                () -> Component.literal("Weather Sail wind-force physics: " + (enabled ? "ON" : "OFF")),
+                false
+        );
+        return 1;
     }
 
     private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> target(String literal,

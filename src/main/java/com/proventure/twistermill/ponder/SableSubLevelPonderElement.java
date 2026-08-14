@@ -393,6 +393,10 @@ final class SableSubLevelPonderElement extends PonderElementBase implements Pond
         for (StructureTemplate.StructureBlockInfo info : filterRootBlocks(template, ModBlocks.METAL_TRAVERSE.get())) {
             traversePositions.add(info.pos().immutable());
         }
+        for (StructureTemplate.StructureBlockInfo info : filterRootBlocks(
+                template, ModBlocks.METAL_TRAVERSE_WITH_GIRDER.get())) {
+            traversePositions.add(info.pos().immutable());
+        }
 
         Direction bestDirection = null;
         List<BlockPos> bestChain = List.of();
@@ -434,6 +438,7 @@ final class SableSubLevelPonderElement extends PonderElementBase implements Pond
 
         Map<BlockPos, StructureTemplate.StructureBlockInfo> candidates = new HashMap<>();
         addRootBlockCandidates(candidates, template, ModBlocks.METAL_TRAVERSE.get());
+        addRootBlockCandidates(candidates, template, ModBlocks.METAL_TRAVERSE_WITH_GIRDER.get());
         addRootBlockCandidates(candidates, template, ModBlocks.WIND_ROTO_BLOCK.get());
         addRootBlockCandidates(candidates, template, ModBlocks.TWISTER_SAIL_BLOCK.get());
         addRootBlockCandidates(candidates, template, ModBlocks.TWISTER_SAIL_FRAME_BLOCK.get());

@@ -27,10 +27,6 @@ final class WindRotoChildShipSailCounter {
     private WindRotoChildShipSailCounter() {
     }
 
-    static int countSailLikeBlocksRecursive(ServerLevel rootLevel, UUID rootSubLevelId, Predicate<BlockState> sailLikePredicate) {
-        return countBlocksRecursive(rootLevel, rootSubLevelId, sailLikePredicate).sailLikeBlocks();
-    }
-
     static CountResult countBlocksRecursive(ServerLevel rootLevel, UUID rootSubLevelId, Predicate<BlockState> sailLikePredicate) {
         if (rootSubLevelId == null) {
             return CountResult.EMPTY;
@@ -77,7 +73,7 @@ final class WindRotoChildShipSailCounter {
             totalBlocks += subLevelCounts.totalBlocks();
             sailLikeBlocks += subLevelCounts.sailLikeBlocks();
 
-            if (node.depth() >= MAX_CHILD_SHIP_DEPTH) {
+            if (node.depth() == MAX_CHILD_SHIP_DEPTH) {
                 continue;
             }
 

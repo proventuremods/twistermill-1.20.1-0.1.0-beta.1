@@ -1,7 +1,5 @@
 {
   "variants": {
-    "": {
-      "model": "twistermill:block/nostalgic_grass_block"
-    }
+    "": { "model": "twistermill:block/nostalgic_grass_block" }
   }
 }

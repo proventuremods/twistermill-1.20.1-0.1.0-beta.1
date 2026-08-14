@@ -9,7 +9,6 @@ import com.proventure.twistermill.util.SablePlacementHitHelper;
 import dev.ryanhcode.sable.Sable;
 import dev.ryanhcode.sable.api.sublevel.SubLevelContainer;
 import dev.ryanhcode.sable.companion.ClientSubLevelAccess;
-import dev.ryanhcode.sable.companion.SubLevelAccess;
 import dev.ryanhcode.sable.companion.math.Pose3d;
 import dev.ryanhcode.sable.companion.math.Pose3dc;
 import dev.ryanhcode.sable.sublevel.SubLevel;
@@ -36,6 +35,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.WeakHashMap;
 
+@SuppressWarnings("unused")
 public final class ServoOption7PreviewRenderer {
     private static final float GREEN_RED = 0.20F;
     private static final float GREEN_GREEN = 1.00F;
@@ -65,6 +65,7 @@ public final class ServoOption7PreviewRenderer {
     private ServoOption7PreviewRenderer() {
     }
 
+    @SuppressWarnings("unused")
     public static void onRenderLevelStage(RenderLevelStageEvent event) {
         if (event.getStage() != RenderLevelStageEvent.Stage.AFTER_PARTICLES) {
             return;
@@ -193,6 +194,7 @@ public final class ServoOption7PreviewRenderer {
         }
     }
 
+    @SuppressWarnings("unused")
     public static void renderPersistentConnectionBeams(
             ServoTwisterBlockEntity servo,
             float partialTick,
@@ -287,7 +289,7 @@ public final class ServoOption7PreviewRenderer {
         for (int slot = 0; slot < slotCenters.length; slot++) {
             SubLevel slotSubLevel = resolveSubLevel(container, servo.getPropellerSlotSubLevelIdForPreview(slot));
             Vector3d slotLocalCenter = servo.getPropellerSlotAnchorLocalCenterForPreview(slot);
-            if (slotSubLevel == null || slotLocalCenter == null || !isFinite(slotLocalCenter)) {
+            if (slotSubLevel == null || !isFinite(slotLocalCenter)) {
                 return null;
             }
 
@@ -403,10 +405,6 @@ public final class ServoOption7PreviewRenderer {
             Level servoLevel,
             ServoTwisterBlockEntity servo
     ) {
-        if (servoLevel instanceof SubLevelAccess access && access instanceof SubLevel subLevel && !subLevel.isRemoved()) {
-            return subLevel;
-        }
-
         Vector3d servoWorldCenter = computeWorldCenter(servoLevel, servo.getBlockPos());
         if (!isFinite(servoWorldCenter)) {
             return null;
@@ -425,16 +423,13 @@ public final class ServoOption7PreviewRenderer {
             Level servoLevel,
             ServoTwisterBlockEntity servo
     ) {
-        if (servoLevel instanceof SubLevelAccess access && access instanceof SubLevel) {
-            return true;
-        }
-
         Vector3d servoWorldCenter = computeWorldCenter(servoLevel, servo.getBlockPos());
         if (!isFinite(servoWorldCenter)) {
             return false;
         }
 
         try {
+            //noinspection DataFlowIssue
             if (Sable.HELPER.getContaining(rootLevel, servoWorldCenter) instanceof SubLevel) {
                 return true;
             }
@@ -551,6 +546,7 @@ public final class ServoOption7PreviewRenderer {
         }
     }
 
+    @SuppressWarnings("BooleanMethodIsAlwaysInverted")
     private static boolean hasSubLevelBlockAt(ClientLevel rootLevel, SubLevel expectedSubLevel, BlockPos pos) {
         try {
             if (!isLoaded(rootLevel, pos) || !isPosInSubLevel(rootLevel, expectedSubLevel, pos)) {
@@ -604,6 +600,7 @@ public final class ServoOption7PreviewRenderer {
                 && Double.isFinite(vector.z);
     }
 
+    @SuppressWarnings("BooleanMethodIsAlwaysInverted")
     private static boolean isRenderableLine(Vector3d start, Vector3d end) {
         return isFinite(start)
                 && isFinite(end)
@@ -734,7 +731,7 @@ public final class ServoOption7PreviewRenderer {
     }
 
     private static void renderGreenHologram(PoseStack poseStack, Minecraft minecraft) {
-        renderFilledCube(poseStack, minecraft, GREEN_FILL_ALPHA);
+        renderFilledCube(poseStack, minecraft);
 
         MultiBufferSource.BufferSource bufferSource = minecraft.renderBuffers().bufferSource();
         LevelRenderer.renderLineBox(
@@ -747,7 +744,7 @@ public final class ServoOption7PreviewRenderer {
         bufferSource.endBatch(RenderType.lines());
     }
 
-    private static void renderFilledCube(PoseStack poseStack, Minecraft minecraft, float alpha) {
+    private static void renderFilledCube(PoseStack poseStack, Minecraft minecraft) {
         RenderSystem.enableBlend();
         RenderSystem.defaultBlendFunc();
         RenderSystem.enableDepthTest();
@@ -759,7 +756,7 @@ public final class ServoOption7PreviewRenderer {
                 bufferSource.getBuffer(RenderType.debugFilledBox()),
                 MIN, MIN, MIN,
                 MAX, MAX, MAX,
-                GREEN_RED, GREEN_GREEN, GREEN_BLUE, alpha
+                GREEN_RED, GREEN_GREEN, GREEN_BLUE, GREEN_FILL_ALPHA
         );
         bufferSource.endBatch(RenderType.debugFilledBox());
 

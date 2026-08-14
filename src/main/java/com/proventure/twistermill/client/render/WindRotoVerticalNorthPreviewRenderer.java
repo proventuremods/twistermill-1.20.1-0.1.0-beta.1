@@ -106,11 +106,7 @@ public final class WindRotoVerticalNorthPreviewRenderer {
             return false;
         }
 
-        if (!GogglesItem.isWearingGoggles(player)) {
-            return false;
-        }
-
-        return true;
+        return GogglesItem.isWearingGoggles(player);
     }
 
     private static float getMarkerScale(LocalPlayer player, float partialTick) {
@@ -176,7 +172,7 @@ public final class WindRotoVerticalNorthPreviewRenderer {
     }
 
     private static void renderGreenHologram(PoseStack poseStack, Minecraft minecraft) {
-        renderFilledCube(poseStack, minecraft, GREEN_FILL_ALPHA);
+        renderFilledCube(poseStack, minecraft);
 
         MultiBufferSource.BufferSource bufferSource = minecraft.renderBuffers().bufferSource();
         LevelRenderer.renderLineBox(
@@ -189,7 +185,7 @@ public final class WindRotoVerticalNorthPreviewRenderer {
         bufferSource.endBatch(RenderType.lines());
     }
 
-    private static void renderFilledCube(PoseStack poseStack, Minecraft minecraft, float alpha) {
+    private static void renderFilledCube(PoseStack poseStack, Minecraft minecraft) {
         RenderSystem.enableBlend();
         RenderSystem.defaultBlendFunc();
         RenderSystem.enableDepthTest();
@@ -200,7 +196,7 @@ public final class WindRotoVerticalNorthPreviewRenderer {
                 bufferSource.getBuffer(RenderType.debugFilledBox()),
                 MIN, MIN, MIN,
                 MAX, MAX, MAX,
-                GREEN_RED, GREEN_GREEN, GREEN_BLUE, alpha
+                GREEN_RED, GREEN_GREEN, GREEN_BLUE, GREEN_FILL_ALPHA
         );
         bufferSource.endBatch(RenderType.debugFilledBox());
 

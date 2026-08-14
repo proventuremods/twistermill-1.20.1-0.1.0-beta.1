@@ -8,6 +8,7 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LevelAccessor;
 import org.joml.Vector3d;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.ModifyVariable;
 import org.spongepowered.asm.mixin.injection.Redirect;
@@ -31,7 +32,7 @@ public abstract class RedstoneLinkNetworkHandlerMixin {
             remap = false
     )
     private LevelAccessor twistermill$useRootLevelForNetwork(LevelAccessor world) {
-        return normalizeWorld(world);
+        return twistermill$normalizeWorld(world);
     }
 
     @Redirect(
@@ -62,7 +63,8 @@ public abstract class RedstoneLinkNetworkHandlerMixin {
         return fromWorld.distanceSquared(toWorld) < (double) linkRange * (double) linkRange;
     }
 
-    private static LevelAccessor normalizeWorld(LevelAccessor world) {
+    @Unique
+    private static LevelAccessor twistermill$normalizeWorld(LevelAccessor world) {
         if (world instanceof Level level) {
             return SableLevelWrapper.getRootLevel(level);
         }

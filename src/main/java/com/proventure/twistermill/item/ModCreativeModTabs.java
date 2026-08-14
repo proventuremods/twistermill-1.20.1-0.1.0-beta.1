@@ -16,6 +16,7 @@ public class ModCreativeModTabs {
     public static final DeferredRegister<CreativeModeTab> CREATIVE_MODE_TABS =
             DeferredRegister.create(Registries.CREATIVE_MODE_TAB, TwisterMill.MOD_ID);
 
+    @SuppressWarnings("unused")
     public static final DeferredHolder<CreativeModeTab, CreativeModeTab> Twistermill =
             CREATIVE_MODE_TABS.register("create_twistermill_tab",
                     () -> CreativeModeTab.builder()

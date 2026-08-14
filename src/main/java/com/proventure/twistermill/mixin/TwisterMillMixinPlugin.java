@@ -51,19 +51,12 @@ public class TwisterMillMixinPlugin implements IMixinConfigPlugin {
             return isWeather2PresentInLoadingContext();
         }
 
-        if (TWISTER_CLICK_TO_LINK_MIXIN_CLASS.equals(mixinClassName)) {
-            return shouldApplyTwisterClickToLinkMixin();
-        }
-
-        if (TWISTER_REDSTONE_LINK_MIXIN_CLASS.equals(mixinClassName)) {
-            return shouldApplyTwisterRedstoneLinkMixin();
-        }
-
-        if (TWISTER_LINK_RENDERER_MIXIN_CLASS.equals(mixinClassName)) {
-            return shouldApplyTwisterLinkRendererMixin();
-        }
-
-        return true;
+        return switch (mixinClassName) {
+            case TWISTER_CLICK_TO_LINK_MIXIN_CLASS -> shouldApplyTwisterClickToLinkMixin();
+            case TWISTER_REDSTONE_LINK_MIXIN_CLASS -> shouldApplyTwisterRedstoneLinkMixin();
+            case TWISTER_LINK_RENDERER_MIXIN_CLASS -> shouldApplyTwisterLinkRendererMixin();
+            default -> true;
+        };
     }
 
     @Override
@@ -116,27 +109,24 @@ public class TwisterMillMixinPlugin implements IMixinConfigPlugin {
     }
 
     private static boolean shouldApplyTwisterClickToLinkMixin() {
-        applyTwisterClickToLinkMixin = computeApplyCached(
+        return computeApplyCached(
                 applyTwisterClickToLinkMixin,
                 SABLE_CLICK_TO_LINK_MIXIN_ENTRY
         );
-        return applyTwisterClickToLinkMixin;
     }
 
     private static boolean shouldApplyTwisterRedstoneLinkMixin() {
-        applyTwisterRedstoneLinkMixin = computeApplyCached(
+        return computeApplyCached(
                 applyTwisterRedstoneLinkMixin,
                 SABLE_REDSTONE_LINK_MIXIN_ENTRY
         );
-        return applyTwisterRedstoneLinkMixin;
     }
 
     private static boolean shouldApplyTwisterLinkRendererMixin() {
-        applyTwisterLinkRendererMixin = computeApplyCached(
+        return computeApplyCached(
                 applyTwisterLinkRendererMixin,
                 SABLE_LINK_RENDERER_MIXIN_ENTRY
         );
-        return applyTwisterLinkRendererMixin;
     }
 
     private static boolean computeApplyCached(Boolean cachedValue, String sableMixinEntry) {

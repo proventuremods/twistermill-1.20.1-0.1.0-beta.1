@@ -165,10 +165,11 @@ final class RememberedSableShipMemory {
     }
 
     static boolean isRememberShipAllowedBlock(ServerLevel level, BlockPos pos, BlockPos ownerPos,
-            Direction assemblyDirection, boolean requireMovementAllowed) {
+            Direction assemblyDirection, @SuppressWarnings("SameParameterValue") boolean requireMovementAllowed) {
         return classifyCandidate(level, pos, ownerPos, assemblyDirection, requireMovementAllowed) == CandidateStatus.VALID;
     }
 
+    @SuppressWarnings("BooleanMethodIsAlwaysInverted")
     static boolean isRememberShipAllowedState(BlockState state) {
         return state != null
                 && !state.isAir()
@@ -198,6 +199,7 @@ final class RememberedSableShipMemory {
         return CandidateStatus.VALID;
     }
 
+    @SuppressWarnings("BooleanMethodIsAlwaysInverted")
     private static boolean isOnAssemblySide(BlockPos ownerPos, BlockPos pos, Direction assemblyDirection) {
         return signedAssemblyDistance(ownerPos, pos, assemblyDirection) >= 1;
     }

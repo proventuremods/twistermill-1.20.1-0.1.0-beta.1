@@ -24,7 +24,7 @@ public class ServoOption7AeronauticsScenes {
         scene.title("servo_option_7_ponder", "Servo Option 7");
         scene.configureBasePlate(0, 0, 14);
         scene.setSceneOffsetY(0f);
-        scene.scaleSceneView(0.75f);
+        scene.scaleSceneView(0.65f);
 
         applyCameraMove(scene, -90f, 6);
         scene.idle(20);

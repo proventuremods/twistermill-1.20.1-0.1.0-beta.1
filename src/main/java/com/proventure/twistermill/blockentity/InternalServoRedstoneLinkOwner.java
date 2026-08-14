@@ -12,19 +12,34 @@ public interface InternalServoRedstoneLinkOwner {
 
     Direction getInternalRedstoneLinkSide();
 
+    boolean isSecondaryInternalRedstoneLinkEligible();
+
+    boolean isSecondaryInternalRedstoneLinkReceiverActive();
+
+    default Direction getSecondaryInternalRedstoneLinkSide() {
+        return getInternalRedstoneLinkSide().getOpposite();
+    }
+
     default boolean shouldRenderInternalRedstoneLinkSlots() {
         return isInternalRedstoneLinkMode();
+    }
+
+    default boolean shouldRenderSecondaryInternalRedstoneLinkSlots() {
+        return isSecondaryInternalRedstoneLinkEligible();
+    }
+
+    default boolean isAnyInternalRedstoneLinkReceiverActive() {
+        return isInternalRedstoneLinkReceiverActive()
+                || isSecondaryInternalRedstoneLinkReceiverActive();
     }
 
     static Direction getServoInternalLinkSide(BlockState state) {
         Direction facing = getFacing(state);
         return switch (facing) {
-            case NORTH -> Direction.EAST;
+            case NORTH, UP -> Direction.EAST;
             case EAST -> Direction.SOUTH;
-            case SOUTH -> Direction.WEST;
+            case SOUTH, DOWN -> Direction.WEST;
             case WEST -> Direction.NORTH;
-            case UP -> Direction.EAST;
-            case DOWN -> Direction.WEST;
         };
     }
 

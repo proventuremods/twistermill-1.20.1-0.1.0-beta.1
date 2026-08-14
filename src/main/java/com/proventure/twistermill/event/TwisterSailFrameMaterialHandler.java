@@ -33,7 +33,7 @@ public final class TwisterSailFrameMaterialHandler {
         BlockPos pos = event.getPos();
         BlockState state = level.getBlockState(pos);
 
-        if (!(state.getBlock() instanceof TwisterSailBlock))
+        if (!(state.getBlock() instanceof TwisterSailBlock clickedSail))
             return;
 
         ItemStack stack = player.getItemInHand(event.getHand());
@@ -56,7 +56,6 @@ public final class TwisterSailFrameMaterialHandler {
         boolean isStemMaterial = materialName.endsWith("_stem");
         boolean isConsumableMaterial = isWoolMaterial || isLogMaterial || isStemMaterial;
 
-        TwisterSailBlock clickedSail = (TwisterSailBlock) state.getBlock();
         boolean isFrameClicked = clickedSail.isFrame();
 
         if (!isFrameClicked && isConsumableMaterial && state.getValue(TwisterSailBlock.FRAME_MATERIAL) == material)

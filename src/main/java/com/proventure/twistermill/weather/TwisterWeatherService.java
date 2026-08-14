@@ -24,6 +24,17 @@ public final class TwisterWeatherService {
         return sample(level, worldPos, worldCenterVec);
     }
 
+    public static WindSample sampleWrvbDirectionAtBlock(Level level, BlockPos pos) {
+        if (level == null || pos == null) {
+            return WindSample.invalid("none");
+        }
+
+        Vector3d worldCenter = SableLevelWrapper.toWorldCenter(level, pos);
+        Vec3 worldCenterVec = new Vec3(worldCenter.x, worldCenter.y, worldCenter.z);
+        BlockPos worldPos = BlockPos.containing(worldCenter.x, worldCenter.y, worldCenter.z);
+        return getProvider().sampleWrvbDirection(level, worldPos, worldCenterVec);
+    }
+
     public static WindSample sampleAtWorldPosition(Level level, Vec3 worldCenter) {
         if (level == null || worldCenter == null) {
             return WindSample.invalid("none");

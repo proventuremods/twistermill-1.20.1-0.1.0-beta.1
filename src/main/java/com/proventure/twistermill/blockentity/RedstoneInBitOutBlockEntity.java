@@ -138,6 +138,7 @@ public class RedstoneInBitOutBlockEntity extends SmartBlockEntity implements IHa
         return level.getBlockState(worldPosition.relative(opposite)).is(ModBlocks.CONTROL_TABLE_BLOCK.get());
     }
 
+    @SuppressWarnings("unused")
     public boolean isRunningAllowed() {
         return hasControlTableOpposite();
     }

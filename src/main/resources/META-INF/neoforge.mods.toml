@@ -4,11 +4,11 @@ license="MIT"
 
 [[mods]]
 modId="twistermill"
-version="1.21.1-0.2.0-beta.1"
+version="${mod_version}"
 displayName="Create Twistermill"
 logoFile="icon.png"
-authors="ProVenture"
-description='''Build wind turbines that power Create machinery using Sable's ship-on-ship sublevel physics.'''
+authors="proventure"
+description='''Compatibility bridge between Sable and Create’s kinetic system for Weather2 or ProtoManly’s Weather'''
 
 [[mixins]]
 config="twistermill.mixins.json"
@@ -16,7 +16,7 @@ config="twistermill.mixins.json"
 [[dependencies.twistermill]]
 modId="neoforge"
 type="required"
-versionRange="[21.1.228,)"
+versionRange="[21.1.229,)"
 ordering="NONE"
 side="BOTH"
 
@@ -44,14 +44,14 @@ side="BOTH"
 [[dependencies.twistermill]]
 modId="weather2"
 type="optional"
-versionRange="[1.21.0-2.8.3,)"
+versionRange="[1.21.0-2.8.7,)"
 ordering="AFTER"
 side="BOTH"
 
 [[dependencies.twistermill]]
 modId="coroutil"
 type="optional"
-versionRange="[1.3.7,)"
+versionRange="[1.3.9,)"
 ordering="AFTER"
 side="BOTH"
 
@@ -61,6 +61,13 @@ type="optional"
 versionRange="[0.16.4,)"
 ordering="AFTER"
 side="BOTH"
+
+[[dependencies.twistermill]]
+modId="sodium"
+type="required"
+versionRange="[0.8.12+mc1.21.1,)"
+ordering="NONE"
+side="CLIENT"
 
 [[dependencies.twistermill]]
 modId="framedblocks"

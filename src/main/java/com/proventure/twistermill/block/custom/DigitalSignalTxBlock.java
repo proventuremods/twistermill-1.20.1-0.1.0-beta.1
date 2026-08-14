@@ -74,7 +74,7 @@ public class DigitalSignalTxBlock extends Block implements IBE<DigitalSignalTxBl
 
     @Override
     protected BlockState mirror(BlockState state, Mirror mirror) {
-        return state.rotate(mirror.getRotation(state.getValue(HORIZONTAL_FACING)));
+        return rotate(state, mirror.getRotation(state.getValue(HORIZONTAL_FACING)));
     }
 
     @Override

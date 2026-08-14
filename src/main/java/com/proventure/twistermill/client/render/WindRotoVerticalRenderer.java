@@ -14,6 +14,7 @@ import net.minecraft.core.Direction;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.phys.AABB;
+import org.jetbrains.annotations.NotNull;
 
 public class WindRotoVerticalRenderer extends KineticBlockEntityRenderer<WindRotoVerticalBlockEntity> {
 
@@ -39,7 +40,7 @@ public class WindRotoVerticalRenderer extends KineticBlockEntityRenderer<WindRot
         float angle;
         if (sableTopAngleDegrees != null) {
             angle = sableTopAngleDegrees;
-            if (shouldInvertSableTopRotation(facing)) {
+            if (shouldInvertSableTopRotation()) {
                 angle = -angle;
             }
         } else {
@@ -67,11 +68,11 @@ public class WindRotoVerticalRenderer extends KineticBlockEntityRenderer<WindRot
     }
 
     @Override
-    public AABB getRenderBoundingBox(WindRotoVerticalBlockEntity be) {
+    public @NotNull AABB getRenderBoundingBox(@NotNull WindRotoVerticalBlockEntity be) {
         return SableTopVisualTransform.renderBounds(be.getBlockPos(), be.getActiveTopSubLevelIdForRender());
     }
 
-    private static boolean shouldInvertSableTopRotation(Direction facing) {
+    private static boolean shouldInvertSableTopRotation() {
         return true;
     }
 

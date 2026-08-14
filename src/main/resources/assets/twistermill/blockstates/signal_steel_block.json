@@ -1,7 +1,5 @@
 {
   "variants": {
-    "": {
-      "model": "twistermill:block/signal_steel_block"
-    }
+    "": { "model": "twistermill:block/signal_steel_block" }
   }
 }

@@ -55,6 +55,18 @@ public class TwisterMillPartialModels {
     public static final ResourceLocation METAL_TRAVERSE_BRACKET_WEST_LOCATION =
             ResourceLocation.fromNamespaceAndPath(TwisterMill.MOD_ID, "block/metal_traverse/bracket_west");
 
+    public static final ResourceLocation METAL_TRAVERSE_BRACKET_NORTH_LADDER_LOCATION =
+            ResourceLocation.fromNamespaceAndPath(TwisterMill.MOD_ID, "block/metal_traverse/bracket_north_ladder");
+
+    public static final ResourceLocation METAL_TRAVERSE_BRACKET_SOUTH_LADDER_LOCATION =
+            ResourceLocation.fromNamespaceAndPath(TwisterMill.MOD_ID, "block/metal_traverse/bracket_south_ladder");
+
+    public static final ResourceLocation METAL_TRAVERSE_BRACKET_EAST_LADDER_LOCATION =
+            ResourceLocation.fromNamespaceAndPath(TwisterMill.MOD_ID, "block/metal_traverse/bracket_east_ladder");
+
+    public static final ResourceLocation METAL_TRAVERSE_BRACKET_WEST_LADDER_LOCATION =
+            ResourceLocation.fromNamespaceAndPath(TwisterMill.MOD_ID, "block/metal_traverse/bracket_west_ladder");
+
     public static final ResourceLocation METAL_TRAVERSE_BRACKET_UP_LOCATION =
             ResourceLocation.fromNamespaceAndPath(TwisterMill.MOD_ID, "block/metal_traverse/bracket_up");
 
@@ -77,10 +89,6 @@ public class TwisterMillPartialModels {
             ResourceLocation.fromNamespaceAndPath(TwisterMill.MOD_ID,
                     "block/metal_traverse/block_pole_y90_hide_es_corner");
 
-    public static final ResourceLocation METAL_TRAVERSE_POLE_Y180_HIDE_WS_CORNER_LOCATION =
-            ResourceLocation.fromNamespaceAndPath(TwisterMill.MOD_ID,
-                    "block/metal_traverse/block_pole_y180_hide_ws_corner");
-
     public static final ResourceLocation METAL_TRAVERSE_POLE_Y180_HIDE_EN_CORNER_LOCATION =
             ResourceLocation.fromNamespaceAndPath(TwisterMill.MOD_ID,
                     "block/metal_traverse/block_pole_y180_hide_en_corner");
@@ -92,6 +100,15 @@ public class TwisterMillPartialModels {
             ResourceLocation.fromNamespaceAndPath(TwisterMill.MOD_ID,
                     "block/metal_traverse/block_pole_y270_hide_es_corner");
 
+    public static final ResourceLocation CREATE_METAL_GIRDER_X_LOCATION =
+            ResourceLocation.fromNamespaceAndPath("create", "block/metal_girder/block_x");
+
+    public static final ResourceLocation CREATE_METAL_GIRDER_Y_LOCATION =
+            ResourceLocation.fromNamespaceAndPath("create", "block/metal_girder/block_pole");
+
+    public static final ResourceLocation CREATE_METAL_GIRDER_Z_LOCATION =
+            ResourceLocation.fromNamespaceAndPath("create", "block/metal_girder/block_z");
+
     public static ResourceLocation getMetalTraverseBracketLocation(Direction direction) {
         return switch (direction) {
             case NORTH -> METAL_TRAVERSE_BRACKET_NORTH_LOCATION;
@@ -100,6 +117,16 @@ public class TwisterMillPartialModels {
             case WEST -> METAL_TRAVERSE_BRACKET_WEST_LOCATION;
             case UP -> METAL_TRAVERSE_BRACKET_UP_LOCATION;
             case DOWN -> METAL_TRAVERSE_BRACKET_DOWN_LOCATION;
+        };
+    }
+
+    public static ResourceLocation getMetalTraverseLadderBracketLocation(Direction direction) {
+        return switch (direction) {
+            case NORTH -> METAL_TRAVERSE_BRACKET_NORTH_LADDER_LOCATION;
+            case SOUTH -> METAL_TRAVERSE_BRACKET_SOUTH_LADDER_LOCATION;
+            case EAST -> METAL_TRAVERSE_BRACKET_EAST_LADDER_LOCATION;
+            case WEST -> METAL_TRAVERSE_BRACKET_WEST_LADDER_LOCATION;
+            default -> throw new IllegalArgumentException("Ladder bracket direction must be horizontal: " + direction);
         };
     }
 

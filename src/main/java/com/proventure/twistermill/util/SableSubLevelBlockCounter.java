@@ -12,11 +12,13 @@ import net.minecraft.world.level.block.state.BlockState;
 import java.util.UUID;
 import java.util.function.Predicate;
 
+@SuppressWarnings("unused")
 public final class SableSubLevelBlockCounter {
 
     private SableSubLevelBlockCounter() {
     }
 
+    @SuppressWarnings("unused")
     public static int countBlocksMatchingTag(ServerLevel serverLevel, UUID subLevelId, TagKey<Block> tag) {
         return countBlocksMatching(serverLevel, subLevelId, state -> state.is(tag));
     }

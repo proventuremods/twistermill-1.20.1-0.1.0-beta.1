@@ -1,5 +1,6 @@
 package com.proventure.twistermill.block.custom;
 
+import com.proventure.twistermill.block.ModBlocks;
 import com.proventure.twistermill.blockentity.ModBlockEntities;
 import com.proventure.twistermill.blockentity.WrenchSideCycleBlockEntity;
 import com.simibubi.create.AllShapes;
@@ -18,6 +19,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.ItemInteractionResult;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.ItemStack;
@@ -27,6 +29,7 @@ import net.minecraft.world.level.BlockAndTintGetter;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LevelAccessor;
+import net.minecraft.world.level.LevelReader;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.ChainBlock;
 import net.minecraft.world.level.block.LanternBlock;
@@ -51,9 +54,14 @@ import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.shapes.CollisionContext;
 import net.minecraft.world.phys.shapes.Shapes;
 import net.minecraft.world.phys.shapes.VoxelShape;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
+import java.util.function.Supplier;
 
 import static net.minecraft.world.level.block.FaceAttachedHorizontalDirectionalBlock.FACE;
 import static net.minecraft.world.level.block.state.properties.BlockStateProperties.WATERLOGGED;
@@ -62,6 +70,15 @@ public class MetalTraverseBlock extends Block
         implements SimpleWaterloggedBlock, IWrenchable, IBE<WrenchSideCycleBlockEntity> {
 
     private static final int PLACEMENT_HELPER_ID = PlacementHelpers.register(new MetalTraversePlacementHelper());
+
+    private static final VoxelShape LADDER_CONTACT_NORTH = Block.box(1.0, 1.0, -4.0, 15.0, 15.0, -3.0);
+    private static final VoxelShape LADDER_CONTACT_WEST = Block.box(-4.0, 1.0, 1.0, -3.0, 15.0, 15.0);
+    private static final VoxelShape LADDER_CONTACT_EAST = Block.box(19.0, 1.0, 1.0, 20.0, 15.0, 15.0);
+    private static final VoxelShape LADDER_CONTACT_SOUTH = Block.box(1.0, 1.0, 19.0, 15.0, 15.0, 20.0);
+    private static final VoxelShape LADDER_COLLISION_NORTH = Block.box(1.0, 1.0, -3.0, 15.0, 15.0, 0.0);
+    private static final VoxelShape LADDER_COLLISION_WEST = Block.box(-3.0, 1.0, 1.0, 0.0, 15.0, 15.0);
+    private static final VoxelShape LADDER_COLLISION_EAST = Block.box(16.0, 1.0, 1.0, 19.0, 15.0, 15.0);
+    private static final VoxelShape LADDER_COLLISION_SOUTH = Block.box(1.0, 1.0, 16.0, 15.0, 15.0, 19.0);
 
     public static final BooleanProperty X = BooleanProperty.create("x");
     public static final BooleanProperty Z = BooleanProperty.create("z");
@@ -80,10 +97,16 @@ public class MetalTraverseBlock extends Block
     private static final long TRAVERSE_HIDE_CORNER_BREAK_TTL_TICKS = 200L;
     private static final Map<TraverseCornerHideBreakKey, TraverseCornerHideBreakMarker>
             RECENT_TRAVERSE_HIDE_CORNER_BREAKS = new HashMap<>();
+    private static final ThreadLocal<Set<TraverseCornerHideBreakKey>>
+            SUPPRESSED_TRAVERSE_HIDE_CORNER_BREAK_HISTORY = new ThreadLocal<>();
 
     public MetalTraverseBlock(Properties properties) {
+        this(properties, true);
+    }
+
+    protected MetalTraverseBlock(Properties properties, boolean includeLegacyManualBracketProperties) {
         super(properties);
-        registerDefaultState(defaultBlockState()
+        BlockState state = defaultBlockState()
                 .setValue(WATERLOGGED, false)
                 .setValue(AXIS, Axis.Y)
                 .setValue(TOP, false)
@@ -91,33 +114,67 @@ public class MetalTraverseBlock extends Block
                 .setValue(X, false)
                 .setValue(Z, false)
                 .setValue(Y_ROTATED, false)
-                .setValue(SUPPRESS_CORNER_HIDE, false)
-                .setValue(MANUAL_BRACKET_NORTH, false)
-                .setValue(MANUAL_BRACKET_SOUTH, false)
-                .setValue(MANUAL_BRACKET_EAST, false)
-                .setValue(MANUAL_BRACKET_WEST, false)
-                .setValue(MANUAL_BRACKET_UP, false)
-                .setValue(MANUAL_BRACKET_DOWN, false));
+                .setValue(SUPPRESS_CORNER_HIDE, false);
+        if (includeLegacyManualBracketProperties) {
+            state = state
+                    .setValue(MANUAL_BRACKET_NORTH, false)
+                    .setValue(MANUAL_BRACKET_SOUTH, false)
+                    .setValue(MANUAL_BRACKET_EAST, false)
+                    .setValue(MANUAL_BRACKET_WEST, false)
+                    .setValue(MANUAL_BRACKET_UP, false)
+                    .setValue(MANUAL_BRACKET_DOWN, false);
+        }
+        registerDefaultState(state);
     }
 
     @Override
-    protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder) {
+    protected void createBlockStateDefinition(@NotNull StateDefinition.Builder<Block, BlockState> builder) {
+        addCoreProperties(builder);
         super.createBlockStateDefinition(builder.add(
-                X, Z, TOP, BOTTOM, AXIS, Y_ROTATED, WATERLOGGED,
-                SUPPRESS_CORNER_HIDE,
                 MANUAL_BRACKET_NORTH, MANUAL_BRACKET_SOUTH, MANUAL_BRACKET_EAST,
                 MANUAL_BRACKET_WEST, MANUAL_BRACKET_UP, MANUAL_BRACKET_DOWN));
     }
 
-    @Override
-    @SuppressWarnings("deprecation")
-    public VoxelShape getBlockSupportShape(BlockState state, BlockGetter reader, BlockPos pos) {
-        return Shapes.or(super.getBlockSupportShape(state, reader, pos), AllShapes.EIGHT_VOXEL_POLE.get(Axis.Y));
+    protected static void addCoreProperties(StateDefinition.Builder<Block, BlockState> builder) {
+        builder.add(X, Z, TOP, BOTTOM, AXIS, Y_ROTATED, WATERLOGGED, SUPPRESS_CORNER_HIDE);
+    }
+
+    protected static BlockState copyCoreProperties(BlockState source, BlockState target) {
+        target = copyProperty(source, target, X);
+        target = copyProperty(source, target, Z);
+        target = copyProperty(source, target, TOP);
+        target = copyProperty(source, target, BOTTOM);
+        target = copyProperty(source, target, AXIS);
+        target = copyProperty(source, target, Y_ROTATED);
+        target = copyProperty(source, target, WATERLOGGED);
+        return copyProperty(source, target, SUPPRESS_CORNER_HIDE);
+    }
+
+    protected static BlockState toPlainTraverseState(BlockState source) {
+        return copyCoreProperties(source, ModBlocks.METAL_TRAVERSE.get().defaultBlockState());
+    }
+
+    private static <T extends Comparable<T>> BlockState copyProperty(
+            BlockState source, BlockState target, Property<T> property) {
+        return target.setValue(property, source.getValue(property));
+    }
+
+    protected final void createBlockStateDefinitionForComposite(
+            StateDefinition.Builder<Block, BlockState> builder) {
+        super.createBlockStateDefinition(builder);
     }
 
     @Override
-    protected ItemInteractionResult useItemOn(ItemStack stack, BlockState state, Level level, BlockPos pos, Player player, InteractionHand hand, BlockHitResult hitResult) {
-        if (player == null || player.isShiftKeyDown()) {
+    public @NotNull VoxelShape getBlockSupportShape(@NotNull BlockState state, @NotNull BlockGetter reader,
+                                                    @NotNull BlockPos pos) {
+        return Shapes.block();
+    }
+
+    @Override
+    protected @NotNull ItemInteractionResult useItemOn(
+            @NotNull ItemStack stack, @NotNull BlockState state, @NotNull Level level, @NotNull BlockPos pos,
+            @NotNull Player player, @NotNull InteractionHand hand, @NotNull BlockHitResult hitResult) {
+        if (player.isShiftKeyDown()) {
             return ItemInteractionResult.PASS_TO_DEFAULT_BLOCK_INTERACTION;
         }
 
@@ -131,17 +188,20 @@ public class MetalTraverseBlock extends Block
     }
 
     @Override
-    public FluidState getFluidState(BlockState state) {
+    public @NotNull FluidState getFluidState(@NotNull BlockState state) {
         return state.getValue(WATERLOGGED) ? Fluids.WATER.getSource(false) : Fluids.EMPTY.defaultFluidState();
     }
 
     @Override
-    public void tick(BlockState state, ServerLevel level, BlockPos pos, RandomSource random) {
+    public void tick(@NotNull BlockState state, @NotNull ServerLevel level, @NotNull BlockPos pos,
+                     @NotNull RandomSource random) {
         Block.updateOrDestroy(state, Block.updateFromNeighbourShapes(state, level, pos), level, pos, 3);
     }
 
     @Override
-    public BlockState updateShape(BlockState state, Direction direction, BlockState neighbourState, LevelAccessor world, BlockPos pos, BlockPos neighbourPos) {
+    public @NotNull BlockState updateShape(
+            @NotNull BlockState state, @NotNull Direction direction, @NotNull BlockState neighbourState,
+            @NotNull LevelAccessor world, @NotNull BlockPos pos, @NotNull BlockPos neighbourPos) {
         if (state.getValue(WATERLOGGED)) {
             world.scheduleTick(pos, Fluids.WATER, Fluids.WATER.getTickDelay(world));
         }
@@ -209,7 +269,8 @@ public class MetalTraverseBlock extends Block
         if (!(state.getBlock() instanceof MetalTraverseBlock)) {
             return false;
         }
-        return state.getValue(getManualBracketProperty(direction));
+        BooleanProperty property = getManualBracketProperty(direction);
+        return state.hasProperty(property) && state.getValue(property);
     }
 
     public static boolean shouldAutoCloseVerticalCaps(BlockAndTintGetter world, BlockPos pos, BlockState state) {
@@ -220,24 +281,77 @@ public class MetalTraverseBlock extends Block
             return false;
         }
 
-        boolean zPair = hasAxisTraverseNeighbour(world, pos, Direction.NORTH, Axis.Z, Z)
-                && hasAxisTraverseNeighbour(world, pos, Direction.SOUTH, Axis.Z, Z);
-        boolean xPair = hasAxisTraverseNeighbour(world, pos, Direction.EAST, Axis.X, X)
-                && hasAxisTraverseNeighbour(world, pos, Direction.WEST, Axis.X, X);
+        boolean zPair = hasAxisTraverseNeighbour(world, pos, Direction.NORTH, Axis.Z)
+                && hasAxisTraverseNeighbour(world, pos, Direction.SOUTH, Axis.Z);
+        boolean xPair = hasAxisTraverseNeighbour(world, pos, Direction.EAST, Axis.X)
+                && hasAxisTraverseNeighbour(world, pos, Direction.WEST, Axis.X);
         return zPair || xPair;
     }
 
     @Override
-    public BlockState getStateForPlacement(BlockPlaceContext context) {
-        Level level = context.getLevel();
-        BlockPos pos = context.getClickedPos();
-        Direction face = context.getClickedFace();
-        FluidState fluidState = level.getFluidState(pos);
-
+    public @Nullable BlockState getStateForPlacement(@NotNull BlockPlaceContext context) {
         BlockState state = super.getStateForPlacement(context);
         if (state == null) {
             return null;
         }
+
+        return buildPlacementState(
+                context.getLevel(), context.getClickedPos(), context.getClickedFace(), state);
+    }
+
+    public static @NotNull BlockState getStateForDirectPlacement(@NotNull Level level, @NotNull BlockPos pos,
+                                                                  @NotNull Direction face) {
+        return buildPlacementState(level, pos, face, ModBlocks.METAL_TRAVERSE.get().defaultBlockState());
+    }
+
+    public static @NotNull BlockState getStateForIsolatedPlacement(@NotNull Direction face) {
+        Axis axis = face.getAxis();
+        return ModBlocks.METAL_TRAVERSE.get().defaultBlockState()
+                .setValue(WATERLOGGED, false)
+                .setValue(AXIS, axis)
+                .setValue(TOP, axis == Axis.Y)
+                .setValue(BOTTOM, axis == Axis.Y)
+                .setValue(X, axis == Axis.X)
+                .setValue(Z, axis == Axis.Z)
+                .setValue(Y_ROTATED, false)
+                .setValue(SUPPRESS_CORNER_HIDE, false)
+                .setValue(MANUAL_BRACKET_NORTH, false)
+                .setValue(MANUAL_BRACKET_SOUTH, false)
+                .setValue(MANUAL_BRACKET_EAST, false)
+                .setValue(MANUAL_BRACKET_WEST, false)
+                .setValue(MANUAL_BRACKET_UP, false)
+                .setValue(MANUAL_BRACKET_DOWN, false);
+    }
+
+    public static <T> T runWithoutTraverseHideCornerBreakHistory(
+            @NotNull Level level,
+            @NotNull BlockPos pos,
+            @NotNull Supplier<T> action
+    ) {
+        TraverseCornerHideBreakKey key = new TraverseCornerHideBreakKey(
+                level.dimension(), pos.asLong(), ModBlocks.METAL_TRAVERSE.get());
+        Set<TraverseCornerHideBreakKey> activeKeys = SUPPRESSED_TRAVERSE_HIDE_CORNER_BREAK_HISTORY.get();
+        if (activeKeys == null) {
+            activeKeys = new HashSet<>();
+            SUPPRESSED_TRAVERSE_HIDE_CORNER_BREAK_HISTORY.set(activeKeys);
+        }
+
+        boolean activatedByThisScope = activeKeys.add(key);
+        try {
+            return action.get();
+        } finally {
+            if (activatedByThisScope) {
+                activeKeys.remove(key);
+            }
+            if (activeKeys.isEmpty()) {
+                SUPPRESSED_TRAVERSE_HIDE_CORNER_BREAK_HISTORY.remove();
+            }
+        }
+    }
+
+    private static @NotNull BlockState buildPlacementState(@NotNull Level level, @NotNull BlockPos pos,
+                                                            @NotNull Direction face, @NotNull BlockState state) {
+        FluidState fluidState = level.getFluidState(pos);
 
         state = state.setValue(X, face.getAxis() == Axis.X);
         state = state.setValue(Z, face.getAxis() == Axis.Z);
@@ -288,6 +402,28 @@ public class MetalTraverseBlock extends Block
                     .setValue(Y_ROTATED, yRotated);
         }
 
+        return applyTraverseCornerHideSuppression(level, pos, state);
+    }
+
+    public static BlockState computeGirderHelperState(Level level, BlockPos pos, Axis girderAxis,
+                                                       boolean yRotated, boolean waterlogged) {
+        Direction extensionDirection = Direction.fromAxisAndDirection(
+                girderAxis, Direction.AxisDirection.POSITIVE);
+        BlockState state = computePlacementHelperState(
+                level,
+                pos,
+                ModBlocks.METAL_TRAVERSE.get().defaultBlockState(),
+                ModBlocks.METAL_TRAVERSE.get().defaultBlockState(),
+                extensionDirection,
+                extensionDirection,
+                yRotated)
+                .setValue(AXIS, girderAxis)
+                .setValue(X, girderAxis == Axis.X)
+                .setValue(Z, girderAxis == Axis.Z)
+                .setValue(TOP, girderAxis == Axis.Y)
+                .setValue(BOTTOM, girderAxis == Axis.Y)
+                .setValue(Y_ROTATED, yRotated)
+                .setValue(WATERLOGGED, waterlogged);
         return applyTraverseCornerHideSuppression(level, pos, state);
     }
 
@@ -384,7 +520,9 @@ public class MetalTraverseBlock extends Block
     }
 
     private static void rememberTraverseHideCornerBreak(Level level, BlockPos pos, BlockState state) {
-        if (!(state.getBlock() instanceof MetalTraverseBlock) || suppressesCornerHide(state)) {
+        if (!(state.getBlock() instanceof MetalTraverseBlock)
+                || suppressesCornerHide(state)
+                || isTraverseHideCornerBreakHistorySuppressed(level, pos, state.getBlock())) {
             return;
         }
 
@@ -399,6 +537,12 @@ public class MetalTraverseBlock extends Block
         RECENT_TRAVERSE_HIDE_CORNER_BREAKS.put(
                 key,
                 new TraverseCornerHideBreakMarker(signature, expiresAtTick));
+    }
+
+    private static boolean isTraverseHideCornerBreakHistorySuppressed(Level level, BlockPos pos, Block block) {
+        Set<TraverseCornerHideBreakKey> activeKeys = SUPPRESSED_TRAVERSE_HIDE_CORNER_BREAK_HISTORY.get();
+        return activeKeys != null
+                && activeKeys.contains(new TraverseCornerHideBreakKey(level.dimension(), pos.asLong(), block));
     }
 
     private static void pruneExpiredTraverseHideCornerBreaks(Level level) {
@@ -434,13 +578,10 @@ public class MetalTraverseBlock extends Block
         if (westX && southZ) {
             return TraverseCornerHideSignature.WEST_SOUTH;
         }
-        if (westX && northZ) {
+        if (westX) {
             return TraverseCornerHideSignature.WEST_NORTH;
         }
-        if (eastX && southZ) {
-            return TraverseCornerHideSignature.EAST_SOUTH;
-        }
-        return TraverseCornerHideSignature.NONE;
+        return TraverseCornerHideSignature.EAST_SOUTH;
     }
 
     private static boolean hasTraverseNeighbourOnAxisForCornerHide(BlockAndTintGetter world, BlockPos pos,
@@ -467,7 +608,7 @@ public class MetalTraverseBlock extends Block
         if (shape.isEmpty()) {
             return false;
         }
-        return Block.isFaceFull(shape, side.getOpposite()) && blockState.isSolid();
+        return Block.isFaceFull(shape, side.getOpposite()) && isLegacySolid(blockState);
     }
 
     public static boolean wouldAutoRenderBracket(BlockAndTintGetter world, BlockPos pos, BlockState state,
@@ -482,7 +623,7 @@ public class MetalTraverseBlock extends Block
         }
 
         boolean connected = isConnected(world, pos, state, side);
-        return connected && !isStraightMetalFrameRow(world, pos, state, side, connected);
+        return connected && !isStraightMetalFrameRow(world, pos, state, side);
     }
 
     private static boolean hasNonTraverseSupport(BlockAndTintGetter world, BlockPos pos, Direction direction) {
@@ -498,12 +639,12 @@ public class MetalTraverseBlock extends Block
         if (shape.isEmpty()) {
             return false;
         }
-        return Block.isFaceFull(shape, direction.getOpposite()) && blockState.isSolid();
+        return Block.isFaceFull(shape, direction.getOpposite()) && isLegacySolid(blockState);
     }
 
     private static boolean isStraightMetalFrameRow(BlockAndTintGetter world, BlockPos pos, BlockState state,
-                                                   Direction direction, boolean connected) {
-        if (!connected || !direction.getAxis().isHorizontal()) {
+                                                   Direction direction) {
+        if (!direction.getAxis().isHorizontal()) {
             return false;
         }
 
@@ -518,8 +659,8 @@ public class MetalTraverseBlock extends Block
     }
 
     @Override
-    @SuppressWarnings("deprecation")
-    public VoxelShape getShape(BlockState state, BlockGetter level, BlockPos pos, CollisionContext context) {
+    public @NotNull VoxelShape getShape(@NotNull BlockState state, @NotNull BlockGetter level, @NotNull BlockPos pos,
+                                       @NotNull CollisionContext context) {
         boolean x = state.getValue(X);
         boolean z = state.getValue(Z);
         return x ? (z ? AllShapes.GIRDER_CROSS : AllShapes.GIRDER_BEAM.get(Axis.X))
@@ -527,12 +668,77 @@ public class MetalTraverseBlock extends Block
     }
 
     @Override
-    protected boolean isPathfindable(BlockState state, PathComputationType pathComputationType) {
+    protected @NotNull VoxelShape getCollisionShape(@NotNull BlockState state, @NotNull BlockGetter level,
+                                                    @NotNull BlockPos pos, @NotNull CollisionContext context) {
+        VoxelShape collision = super.getCollisionShape(state, level, pos, context);
+        if (state.getBlock() != ModBlocks.METAL_TRAVERSE.get()
+                && state.getBlock() != ModBlocks.METAL_TRAVERSE_WITH_GIRDER.get()
+                || !(level.getBlockEntity(pos) instanceof WrenchSideCycleBlockEntity sideCycle)) {
+            return collision;
+        }
+
+        for (Direction direction : Iterate.horizontalDirections) {
+            if (WrenchSideCycleBlockEntity.isLadderStage(sideCycle.getStage(direction))) {
+                collision = Shapes.or(collision, getLadderCollisionShape(direction));
+            }
+        }
+        return collision;
+    }
+
+    @Override
+    public boolean isLadder(
+            @NotNull BlockState state,
+            @NotNull LevelReader level,
+            @NotNull BlockPos pos,
+            @Nullable LivingEntity entity
+    ) {
+        if (entity == null
+                || state.getBlock() != ModBlocks.METAL_TRAVERSE.get()
+                && state.getBlock() != ModBlocks.METAL_TRAVERSE_WITH_GIRDER.get()
+                || !(level.getBlockEntity(pos) instanceof WrenchSideCycleBlockEntity sideCycle)) {
+            return false;
+        }
+
+        for (Direction direction : Iterate.horizontalDirections) {
+            if (WrenchSideCycleBlockEntity.isLadderStage(sideCycle.getStage(direction))
+                    && getLadderContactShape(direction).bounds().move(pos).intersects(entity.getBoundingBox())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static VoxelShape getLadderContactShape(Direction direction) {
+        return switch (direction) {
+            case NORTH -> LADDER_CONTACT_NORTH;
+            case WEST -> LADDER_CONTACT_WEST;
+            case EAST -> LADDER_CONTACT_EAST;
+            case SOUTH -> LADDER_CONTACT_SOUTH;
+            default -> Shapes.empty();
+        };
+    }
+
+    private static VoxelShape getLadderCollisionShape(Direction direction) {
+        return switch (direction) {
+            case NORTH -> LADDER_COLLISION_NORTH;
+            case WEST -> LADDER_COLLISION_WEST;
+            case EAST -> LADDER_COLLISION_EAST;
+            case SOUTH -> LADDER_COLLISION_SOUTH;
+            default -> Shapes.empty();
+        };
+    }
+
+    @Override
+    protected boolean isPathfindable(@NotNull BlockState state, @NotNull PathComputationType pathComputationType) {
         return false;
     }
 
     @Override
-    public void onRemove(BlockState state, Level level, BlockPos pos, BlockState newState, boolean isMoving) {
+    public void onRemove(@NotNull BlockState state, @NotNull Level level, @NotNull BlockPos pos,
+                         @NotNull BlockState newState, boolean isMoving) {
+        if (newState.getBlock() instanceof MetalTraverseBlock) {
+            return;
+        }
         if (state.getBlock() != newState.getBlock()) {
             rememberTraverseHideCornerBreak(level, pos, state);
         }
@@ -561,11 +767,11 @@ public class MetalTraverseBlock extends Block
         if (shape.isEmpty()) {
             return false;
         }
-        return Block.isFaceFull(shape, side.getOpposite()) && blockState.isSolid();
+        return Block.isFaceFull(shape, side.getOpposite()) && isLegacySolid(blockState);
     }
 
     @Override
-    protected BlockState rotate(BlockState state, Rotation rotation) {
+    protected @NotNull BlockState rotate(@NotNull BlockState state, @NotNull Rotation rotation) {
         Axis rotatedAxis =
                 rotation.rotate(Direction.fromAxisAndDirection(state.getValue(AXIS), AxisDirection.POSITIVE)).getAxis();
         boolean previousX = state.getValue(X);
@@ -578,7 +784,7 @@ public class MetalTraverseBlock extends Block
     }
 
     @Override
-    protected BlockState mirror(BlockState state, Mirror mirror) {
+    protected @NotNull BlockState mirror(@NotNull BlockState state, @NotNull Mirror mirror) {
         return mirrorManualBrackets(state, mirror);
     }
 
@@ -592,13 +798,16 @@ public class MetalTraverseBlock extends Block
             WrenchSideCycleBlockEntity be = getOrCreateSideCycleBlockEntity(level, pos);
             if (be != null) {
                 BlockState currentState = level.getBlockState(pos);
-                boolean extrasAllowed = isExtraCycleAllowed(state, level, pos, side);
+                boolean extrasAllowed = isExtraCycleAllowed();
                 boolean autoBracketVisible = wouldAutoRenderBracket(level, pos, currentState, side);
-                byte nextStage = be.advance(side, extrasAllowed, autoBracketVisible);
+                byte nextStage = context.getHand() == InteractionHand.MAIN_HAND && side.getAxis().isHorizontal()
+                        ? be.advanceHorizontalBracketCycle(side, autoBracketVisible)
+                        : be.advance(side, extrasAllowed, autoBracketVisible);
 
-                BlockState updatedState = currentState.setValue(
-                        getManualBracketProperty(side),
-                        WrenchSideCycleBlockEntity.isBracketStage(nextStage));
+                BooleanProperty manualProperty = getManualBracketProperty(side);
+                BlockState updatedState = currentState.hasProperty(manualProperty)
+                        ? currentState.setValue(manualProperty, WrenchSideCycleBlockEntity.isBracketStage(nextStage))
+                        : currentState;
                 if (updatedState != currentState) {
                     level.setBlock(pos, updatedState, 3);
                 }
@@ -610,15 +819,20 @@ public class MetalTraverseBlock extends Block
         return InteractionResult.sidedSuccess(level.isClientSide);
     }
 
-    private static boolean isExtraCycleAllowed(BlockState state, Level level, BlockPos pos, Direction side) {
+    private static boolean isExtraCycleAllowed() {
         return false;
     }
 
-    private static boolean hasAxisTraverseNeighbour(BlockAndTintGetter level, BlockPos pos, Direction direction, Axis axis,
-                                                    BooleanProperty axisProperty) {
+    private static boolean hasAxisTraverseNeighbour(BlockAndTintGetter level, BlockPos pos, Direction direction,
+                                                    Axis axis) {
         BlockState neighbourState = level.getBlockState(pos.relative(direction));
         return MetalFrameConnectionHelper.isMetalFrameConnector(neighbourState)
                 && MetalFrameConnectionHelper.hasMetalFrameAxis(neighbourState, axis);
+    }
+
+    @SuppressWarnings("deprecation")
+    private static boolean isLegacySolid(BlockState state) {
+        return state.isSolid();
     }
 
     private WrenchSideCycleBlockEntity getOrCreateSideCycleBlockEntity(Level level, BlockPos pos) {
@@ -646,6 +860,9 @@ public class MetalTraverseBlock extends Block
     }
 
     private static BlockState rotateManualBrackets(BlockState state, Rotation rotation) {
+        if (!state.hasProperty(MANUAL_BRACKET_NORTH)) {
+            return state;
+        }
         boolean north = state.getValue(MANUAL_BRACKET_NORTH);
         boolean south = state.getValue(MANUAL_BRACKET_SOUTH);
         boolean east = state.getValue(MANUAL_BRACKET_EAST);
@@ -672,6 +889,9 @@ public class MetalTraverseBlock extends Block
     }
 
     private static BlockState mirrorManualBrackets(BlockState state, Mirror mirror) {
+        if (!state.hasProperty(MANUAL_BRACKET_NORTH)) {
+            return state;
+        }
         boolean north = state.getValue(MANUAL_BRACKET_NORTH);
         boolean south = state.getValue(MANUAL_BRACKET_SOUTH);
         boolean east = state.getValue(MANUAL_BRACKET_EAST);

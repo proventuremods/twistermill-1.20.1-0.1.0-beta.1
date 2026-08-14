@@ -79,7 +79,7 @@ public class RedstoneInBitOutBlock extends Block implements IBE<RedstoneInBitOut
 
     @Override
     protected BlockState mirror(BlockState state, Mirror mirror) {
-        return state.rotate(mirror.getRotation(state.getValue(HORIZONTAL_FACING)));
+        return rotate(state, mirror.getRotation(state.getValue(HORIZONTAL_FACING)));
     }
 
     @Override

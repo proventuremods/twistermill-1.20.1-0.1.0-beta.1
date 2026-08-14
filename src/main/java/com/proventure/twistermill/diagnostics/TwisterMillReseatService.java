@@ -34,6 +34,7 @@ public final class TwisterMillReseatService {
             return shortLabel;
         }
 
+        @SuppressWarnings("unused")
         public String displayLabel() {
             return displayLabel;
         }
@@ -97,6 +98,7 @@ public final class TwisterMillReseatService {
         return null;
     }
 
+    @SuppressWarnings("BooleanMethodIsAlwaysInverted")
     public static boolean anyAutoReseatOnLoadEnabled() {
         return TwisterMillConfig.isAutoReseatWrvbOnLoadEnabled()
                 || TwisterMillConfig.isAutoReseatWrbOnLoadEnabled()
@@ -104,6 +106,7 @@ public final class TwisterMillReseatService {
                 || TwisterMillConfig.isAutoReseatInvServoOnLoadEnabled();
     }
 
+    @SuppressWarnings("BooleanMethodIsAlwaysInverted")
     public static boolean isAutoEnabled(TargetType targetType) {
         return switch (targetType) {
             case WRVB -> TwisterMillConfig.isAutoReseatWrvbOnLoadEnabled();
@@ -121,6 +124,7 @@ public final class TwisterMillReseatService {
         return reseat(blockEntity, Trigger.MANUAL_COMMAND, true);
     }
 
+    @SuppressWarnings("UnusedReturnValue")
     public static ReseatResult reseatAuto(BlockEntity blockEntity, Trigger trigger) {
         return reseat(blockEntity, trigger, false);
     }

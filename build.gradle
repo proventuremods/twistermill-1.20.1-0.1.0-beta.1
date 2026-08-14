@@ -1,5 +1,8 @@
 // build.gradle
 
+import net.neoforged.moddevgradle.dsl.ModModel
+import net.neoforged.moddevgradle.dsl.RunModel
+
 plugins {
     id 'java-library'
     id 'eclipse'
@@ -14,6 +17,12 @@ tasks.named('wrapper', Wrapper).configure {
 
 version = mod_version
 group = mod_group_id
+
+def developmentWeatherBackend = providers.gradleProperty('development_weather_backend').getOrElse('weather2')
+def supportedDevelopmentWeatherBackends = ['weather2', 'pmweather']
+if (!supportedDevelopmentWeatherBackends.contains(developmentWeatherBackend)) {
+    throw new GradleException("Unsupported development_weather_backend '${developmentWeatherBackend}'. Expected one of: ${supportedDevelopmentWeatherBackends.join(', ')}")
+}
 
 repositories {
     mavenLocal()
@@ -51,6 +60,18 @@ repositories {
         }
     }
 
+    exclusiveContent {
+        forRepository {
+            maven {
+                name = 'Modrinth'
+                url = 'https://api.modrinth.com/maven'
+            }
+        }
+        filter {
+            includeGroup 'maven.modrinth'
+        }
+    }
+
     maven {
         name = 'CurseMaven'
         url = 'https://cursemaven.com'
@@ -75,25 +96,25 @@ neoForge {
     }
 
     runs {
-        client {
+        client { RunModel run ->
             client()
-            systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
+            run.systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
         }
 
-        server {
+        server { RunModel run ->
             server()
             programArgument '--nogui'
-            systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
+            run.systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
         }
 
-        gameTestServer {
+        gameTestServer { RunModel run ->
             type = "gameTestServer"
-            systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
+            run.systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
         }
 
-        data {
+        data { RunModel run ->
             data()
-            programArguments.addAll(
+            run.programArguments.addAll(
                     '--mod', project.mod_id,
                     '--all',
                     '--output', file('src/generated/resources/').getAbsolutePath(),
@@ -108,8 +129,8 @@ neoForge {
     }
 
     mods {
-        "${mod_id}" {
-            sourceSet(sourceSets.main)
+        "${mod_id}" { ModModel mod ->
+            mod.sourceSet(sourceSets.main)
         }
     }
 }
@@ -152,13 +173,15 @@ dependencies {
         exclude group: "me.fallenbreath", module: "*"
     }
 
-    implementation "curse.maven:weather-storms-tornadoes-237746:6926103"
-    compileOnly("curse.maven:weather-storms-tornadoes-237746:6926103")
-    runtimeOnly("curse.maven:weather-storms-tornadoes-237746:6926103")
+    if (developmentWeatherBackend == 'weather2') {
+        implementation "curse.maven:weather-storms-tornadoes-237746:8140264"
+    } else {
+        compileOnly "curse.maven:weather-storms-tornadoes-237746:8140264"
+        implementation "maven.modrinth:TfCsmTLI:7VkfNYsM"
+    }
 
     implementation "curse.maven:coroutil-237749:7796187"
-    compileOnly("curse.maven:coroutil-237749:7796187")
-    runtimeOnly("curse.maven:coroutil-237749:7796187")
+    implementation "curse.maven:sodium-394468:8382328"
 
     implementation "curse.maven:framedblocks-441647:8139800"
 }
@@ -187,8 +210,8 @@ tasks.withType(ProcessResources).configureEach {
 
 publishing {
     publications {
-        register('mavenJava', MavenPublication) {
-            from components.java
+        register('mavenJava', MavenPublication) { MavenPublication publication ->
+            publication.from(components.java)
         }
     }
     repositories {

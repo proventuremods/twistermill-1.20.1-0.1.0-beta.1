@@ -18,6 +18,7 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.phys.AABB;
+import org.jetbrains.annotations.NotNull;
 
 public class WindRotoRenderer extends KineticBlockEntityRenderer<WindRotoBlockEntity> {
 
@@ -41,13 +42,13 @@ public class WindRotoRenderer extends KineticBlockEntityRenderer<WindRotoBlockEn
                 : light;
 
         float shaftBaseAngleRad = getShaftAngle(be, facing);
-        float shaftAngleRad = shouldInvertAxisRotation(facing) ? -shaftBaseAngleRad : shaftBaseAngleRad;
+        float shaftAngleRad = shouldInvertAxisRotation() ? -shaftBaseAngleRad : shaftBaseAngleRad;
         Float sableTopAngleDegrees = be.computeSableTopVisualAngleDegrees(partialTicks);
 
         float topAngleRad;
         if (sableTopAngleDegrees != null) {
             topAngleRad = (float) Math.toRadians(sableTopAngleDegrees);
-            if (shouldInvertSableTopRotation(facing)) {
+            if (shouldInvertSableTopRotation()) {
                 topAngleRad = -topAngleRad;
             }
         } else {
@@ -99,7 +100,7 @@ public class WindRotoRenderer extends KineticBlockEntityRenderer<WindRotoBlockEn
     }
 
     @Override
-    public AABB getRenderBoundingBox(WindRotoBlockEntity be) {
+    public @NotNull AABB getRenderBoundingBox(@NotNull WindRotoBlockEntity be) {
         return SableTopVisualTransform.renderBounds(be.getBlockPos(), be.getActiveTopSubLevelIdForRender());
     }
 
@@ -112,7 +113,7 @@ public class WindRotoRenderer extends KineticBlockEntityRenderer<WindRotoBlockEn
         return (float) Math.toRadians(angleDeg);
     }
 
-    private static boolean shouldInvertAxisRotation(Direction facing) {
+    private static boolean shouldInvertAxisRotation() {
         return false;
     }
 
@@ -122,7 +123,7 @@ public class WindRotoRenderer extends KineticBlockEntityRenderer<WindRotoBlockEn
                 || facing == Direction.EAST;
     }
 
-    private static boolean shouldInvertSableTopRotation(Direction facing) {
+    private static boolean shouldInvertSableTopRotation() {
         return true;
     }
 

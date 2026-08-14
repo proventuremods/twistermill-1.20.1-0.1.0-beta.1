@@ -6,6 +6,7 @@ import com.proventure.twistermill.block.custom.ControlTableBlock;
 import com.proventure.twistermill.block.custom.DigitalSignalTxBlock;
 import com.proventure.twistermill.block.custom.InvServoTwisterBlock;
 import com.proventure.twistermill.block.custom.MetalTraverseBlock;
+import com.proventure.twistermill.block.custom.MetalTraverseWithGirderBlock;
 import com.proventure.twistermill.block.custom.NostalgicGrassBlock;
 import com.proventure.twistermill.block.custom.RedstoneInBitOutBlock;
 import com.proventure.twistermill.block.custom.ServoTwisterBlock;
@@ -119,8 +120,18 @@ public class ModBlocks {
             () -> new MetalTraverseBlock(BlockBehaviour.Properties.ofFullCopy(Blocks.IRON_BLOCK)
                     .strength(3.5F, 6.0F)
                     .noOcclusion()
+                    .dynamicShape()
                     .requiresCorrectToolForDrops()
                     .sound(SoundType.METAL)));
+
+    public static final DeferredBlock<MetalTraverseWithGirderBlock> METAL_TRAVERSE_WITH_GIRDER =
+            BLOCKS.register("metal_traverse_with_girder",
+                    () -> new MetalTraverseWithGirderBlock(BlockBehaviour.Properties.ofFullCopy(Blocks.IRON_BLOCK)
+                            .strength(3.5F, 6.0F)
+                            .noOcclusion()
+                            .dynamicShape()
+                            .requiresCorrectToolForDrops()
+                            .sound(SoundType.METAL)));
 
     public static final DeferredBlock<Block> BLADE_ARM_BLOCK = registerBlock("blade_arm_block",
             () -> new BladeArmBlock(BlockBehaviour.Properties.ofFullCopy(Blocks.IRON_BLOCK)

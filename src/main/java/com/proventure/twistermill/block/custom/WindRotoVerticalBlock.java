@@ -104,6 +104,25 @@ public class WindRotoVerticalBlock extends BearingBlock implements IBE<WindRotoV
     }
 
     @Override
+    public BlockState getRotatedBlockState(BlockState originalState, Direction targetedFace) {
+        Direction currentFacing = originalState.getValue(BlockStateProperties.FACING);
+
+        if (currentFacing == Direction.UP) {
+            return originalState.setValue(BlockStateProperties.FACING, Direction.DOWN);
+        }
+
+        if (currentFacing == Direction.DOWN) {
+            return originalState.setValue(BlockStateProperties.FACING, Direction.UP);
+        }
+
+        if (targetedFace == Direction.UP || targetedFace == Direction.DOWN) {
+            return originalState.setValue(BlockStateProperties.FACING, targetedFace);
+        }
+
+        return originalState;
+    }
+
+    @Override
     public void onRemove(BlockState state, Level level, BlockPos pos, BlockState newState, boolean isMoving) {
         boolean blockTypeChanged = state.getBlock() != newState.getBlock();
         if (blockTypeChanged && !level.isClientSide) {
@@ -115,10 +134,14 @@ public class WindRotoVerticalBlock extends BearingBlock implements IBE<WindRotoV
 
     @Override
     public BlockState getStateForPlacement(BlockPlaceContext context) {
-        Direction nearest = context.getNearestLookingDirection().getOpposite();
+        Direction nearest = Direction.UP;
 
-        if (context.getPlayer() != null && context.getPlayer().isShiftKeyDown()) {
-            nearest = nearest.getOpposite();
+        if (context.getPlayer() != null) {
+            nearest = context.getNearestLookingVerticalDirection().getOpposite();
+
+            if (context.getPlayer().isShiftKeyDown()) {
+                nearest = nearest.getOpposite();
+            }
         }
 
         return defaultBlockState()

@@ -73,7 +73,8 @@ public class ModBlockEntities {
             BLOCK_ENTITIES.register("metal_side_cycle_block_entity",
                     () -> buildWithoutDataFixer(BlockEntityType.Builder.of(
                             WrenchSideCycleBlockEntity::new,
-                            ModBlocks.METAL_TRAVERSE.get()
+                            ModBlocks.METAL_TRAVERSE.get(),
+                            ModBlocks.METAL_TRAVERSE_WITH_GIRDER.get()
                     )));
 
     public static void register(IEventBus eventBus) {
