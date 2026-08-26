@@ -26,6 +26,7 @@ import com.simibubi.create.foundation.gui.AllIcons;
 import com.simibubi.create.foundation.item.TooltipHelper;
 import com.simibubi.create.foundation.utility.CreateLang;
 import dev.ryanhcode.sable.Sable;
+import dev.ryanhcode.sable.api.block.BlockEntitySubLevelActor;
 import dev.ryanhcode.sable.api.sublevel.SubLevelContainer;
 import dev.ryanhcode.sable.companion.ClientSubLevelAccess;
 import dev.ryanhcode.sable.companion.math.Pose3d;
@@ -57,7 +58,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 
-public class InvServoTwisterBlockEntity extends KineticBlockEntity implements IDisplayAssemblyExceptions, InternalServoRedstoneLinkOwner {
+public class InvServoTwisterBlockEntity extends KineticBlockEntity implements IDisplayAssemblyExceptions,
+        InternalServoRedstoneLinkOwner, BlockEntitySubLevelActor {
     private static final Logger LOGGER = LogUtils.getLogger();
     private static final float ANGLE_EPSILON = 0.01F;
     private static final float NORMAL_MOTION_EPSILON = 0.0001F;
@@ -333,6 +335,19 @@ public class InvServoTwisterBlockEntity extends KineticBlockEntity implements ID
         if (activeSubLevelId != null) {
             target.add(activeSubLevelId);
         }
+    }
+
+    @Override
+    public Iterable<SubLevel> sable$getConnectionDependencies() {
+        return TwisterMillSableSchematicRemapper.resolveConnectionDependencies(
+                level,
+                this::collectChildSubLevelIdsForWindRotoSailCount
+        );
+    }
+
+    @Override
+    public Iterable<SubLevel> sable$getLoadingDependencies() {
+        return List.of();
     }
 
     public void setBoundToWindRoto(boolean boundToWindRoto) {
@@ -3241,10 +3256,20 @@ public class InvServoTwisterBlockEntity extends KineticBlockEntity implements ID
         if (!clientPacket) {
             rememberedShipMemory.write(tag);
         }
+        TwisterMillSableSchematicRemapper.remapForWrite(
+                tag,
+                clientPacket,
+                TwisterMillSableSchematicRemapper.OwnerType.INV_SERVO
+        );
     }
 
     @Override
     protected void read(CompoundTag tag, HolderLookup.Provider registries, boolean clientPacket) {
+        tag = TwisterMillSableSchematicRemapper.prepareForRead(
+                tag,
+                clientPacket,
+                TwisterMillSableSchematicRemapper.OwnerType.INV_SERVO
+        );
         super.read(tag, registries, clientPacket);
 
         if (clientPacket) {

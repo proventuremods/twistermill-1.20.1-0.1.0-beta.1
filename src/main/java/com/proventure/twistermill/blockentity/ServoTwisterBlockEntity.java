@@ -29,6 +29,7 @@ import com.simibubi.create.foundation.gui.AllIcons;
 import com.simibubi.create.foundation.item.TooltipHelper;
 import com.simibubi.create.foundation.utility.CreateLang;
 import dev.ryanhcode.sable.Sable;
+import dev.ryanhcode.sable.api.block.BlockEntitySubLevelActor;
 import dev.ryanhcode.sable.api.physics.PhysicsPipeline;
 import dev.ryanhcode.sable.api.sublevel.ServerSubLevelContainer;
 import dev.ryanhcode.sable.api.sublevel.SubLevelContainer;
@@ -69,7 +70,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 
-public class ServoTwisterBlockEntity extends KineticBlockEntity implements IDisplayAssemblyExceptions, InternalServoRedstoneLinkOwner {
+public class ServoTwisterBlockEntity extends KineticBlockEntity implements IDisplayAssemblyExceptions,
+        InternalServoRedstoneLinkOwner, BlockEntitySubLevelActor {
     private static final Logger LOGGER = LogUtils.getLogger();
     private static final float ANGLE_EPSILON = 0.1F;
     private static final float NORMAL_MOTION_EPSILON = 0.0001F;
@@ -426,6 +428,19 @@ public class ServoTwisterBlockEntity extends KineticBlockEntity implements IDisp
             target.add(activeSubLevelId);
         }
         propellerSlotManager.collectActiveSlotSubLevelIds(target);
+    }
+
+    @Override
+    public Iterable<SubLevel> sable$getConnectionDependencies() {
+        return TwisterMillSableSchematicRemapper.resolveConnectionDependencies(
+                level,
+                this::collectChildSubLevelIdsForWindRotoSailCount
+        );
+    }
+
+    @Override
+    public Iterable<SubLevel> sable$getLoadingDependencies() {
+        return List.of();
     }
 
     public void setBoundToWindRoto(boolean boundToWindRoto) {
@@ -867,6 +882,7 @@ public class ServoTwisterBlockEntity extends KineticBlockEntity implements IDisp
         if (level == null || level.isClientSide)
             return;
 
+        sableBackend.disableFacingAxisHardHinge("gui-mode-changed");
         mode7MeasuredRpm = 0.0F;
         if (isSafeBinaryDisassemblyReturnActive()) {
             resetMode3DisassemblyConfirmation();
@@ -2668,18 +2684,25 @@ public class ServoTwisterBlockEntity extends KineticBlockEntity implements IDisp
         boolean deferLaterGuiControl = laterGuiAssemblyCompletedThisTick;
         laterGuiAssemblyCompletedThisTick = false;
         if (!deferLaterGuiControl) {
-        int previousModeSignal = lastOppositeTopSignal;
-        updateControlSignalsFromInputs(true);
-        updateVisualPowerState();
-        boolean safeBinaryDisassemblySignalChangedThisTick = isSafeBinaryDisassemblyReturnActive()
-                && previousModeSignal != lastOppositeTopSignal;
-        boolean directInputPriority = hasDirectInputPriority(lastWestSignal, lastEastSignal);
-        desiredRotationProfile = getDesiredRotationProfile();
-        boolean pitchClearanceMotionReady =
-                ensurePitchClearanceBeforeMotion(desiredRotationProfile, sableConstraintRefreshPending);
-        boolean freeBearingMode = isFreeBearingOperatingMode();
-        boolean worldLockedMode = isWorldLockedModeSignal(lastOppositeTopSignal);
-        boolean oscillationMode = isOscillationModeSignal(lastOppositeTopSignal);
+            int previousModeSignal = lastOppositeTopSignal;
+            updateControlSignalsFromInputs(true);
+            updateVisualPowerState();
+            boolean safeBinaryDisassemblySignalChangedThisTick = isSafeBinaryDisassemblyReturnActive()
+                    && previousModeSignal != lastOppositeTopSignal;
+            boolean directInputPriority = hasDirectInputPriority(lastWestSignal, lastEastSignal);
+            desiredRotationProfile = getDesiredRotationProfile();
+            boolean pitchClearanceMotionReady =
+                    ensurePitchClearanceBeforeMotion(desiredRotationProfile, sableConstraintRefreshPending);
+            boolean mode4HardHingeRequired = isMode4Code12HardHingeRequired(directInputPriority);
+            boolean mode4HardHingeReady = reconcileMode4Code12HardHinge(
+                    desiredRotationProfile,
+                    sableConstraintRefreshPending,
+                    pitchClearanceMotionReady,
+                    mode4HardHingeRequired
+            );
+            boolean freeBearingMode = isFreeBearingOperatingMode();
+            boolean worldLockedMode = isWorldLockedModeSignal(lastOppositeTopSignal);
+            boolean oscillationMode = isOscillationModeSignal(lastOppositeTopSignal);
         if (oscillationMode && previousModeSignal != lastOppositeTopSignal) {
             mode6OscillationPhase = 0.0D;
         }
@@ -2723,7 +2746,11 @@ public class ServoTwisterBlockEntity extends KineticBlockEntity implements IDisp
                 }
                 skipFinalSableApplyRotation = true;
             } else if (pendingDisassembleAfterZero) {
-                if (isSafeBinaryDisassemblyReturnActive()
+                if (mode4HardHingeRequired && !mode4HardHingeReady) {
+                    pendingDisassembleZeroHoldTicks = 0;
+                    resetMode3DisassemblyConfirmation();
+                    resetLaterGuiDisassemblyRuntimeState();
+                } else if (isSafeBinaryDisassemblyReturnActive()
                         && level instanceof ServerLevel serverLevel) {
                     if (activeRotationProfile
                             == SableInteractiveContraptionBackend.RotationProfile.FACING_AXIS) {
@@ -2821,25 +2848,31 @@ public class ServoTwisterBlockEntity extends KineticBlockEntity implements IDisp
                 }
                 skipFinalSableApplyRotation = true;
             } else if (!freeBearingMode && mode3ExitReturnActive) {
-                float previousAngle = angle;
-                float newAngle = approachAngle(angle, targetAngle, MODE3_EXIT_RETURN_DEGREES_PER_TICK);
-                boolean changed = Math.abs(newAngle - previousAngle) > ANGLE_EPSILON;
+                if (mode4HardHingeRequired && !mode4HardHingeReady) {
+                    skipFinalSableApplyRotation = true;
+                } else {
+                    float previousAngle = angle;
+                    float newAngle = approachAngle(angle, targetAngle, MODE3_EXIT_RETURN_DEGREES_PER_TICK);
+                    boolean changed = Math.abs(newAngle - previousAngle) > ANGLE_EPSILON;
 
-                if (changed) {
-                    angle = newAngle;
-                    applyRotation();
-                    setChanged();
-                    if (canSendData()) sendData();
+                    if (changed) {
+                        angle = newAngle;
+                        applyRotation();
+                        setChanged();
+                        if (canSendData()) sendData();
+                    }
+
+                    if (Math.abs(targetAngle - newAngle) <= ANGLE_EPSILON) {
+                        angle = targetAngle;
+                        mode3ExitReturnActive = false;
+                    }
+
+                    skipFinalSableApplyRotation = true;
                 }
-
-                if (Math.abs(targetAngle - newAngle) <= ANGLE_EPSILON) {
-                    angle = targetAngle;
-                    mode3ExitReturnActive = false;
-                }
-
-                skipFinalSableApplyRotation = true;
             } else if (!freeBearingMode) {
-                if (worldLockedMode) {
+                if (mode4HardHingeRequired && !mode4HardHingeReady) {
+                    skipFinalSableApplyRotation = true;
+                } else if (worldLockedMode) {
                     if (applyWorldLockedMotorNeedsFallback(lastOppositeTopSignal)) {
                         applyFreeBearingNeutralMotor();
                     }
@@ -2891,7 +2924,7 @@ public class ServoTwisterBlockEntity extends KineticBlockEntity implements IDisp
                 }
             }
 
-        }
+            }
         }
 
         if (level instanceof ServerLevel serverLevel && updatePropellerSlotMotion(serverLevel)) {
@@ -2914,6 +2947,101 @@ public class ServoTwisterBlockEntity extends KineticBlockEntity implements IDisp
         if (level instanceof ServerLevel serverLevel) {
             updateMode7MeasuredRpmForClient(serverLevel);
             updatePhysicalBearingMeasuredAngleForClient(serverLevel);
+        }
+    }
+
+    private boolean isMode4Code12HardHingeRequired(boolean directInputPriority) {
+        if (level == null
+                || level.isClientSide
+                || getClass() != ServoTwisterBlockEntity.class
+                || !running
+                || assembleNextTick
+                || !sableBackend.isActive()
+                || getCurrentMaxAngleOption() != MaxAngleOption.DEG_60_LINK
+                || !isInternalRedstoneLinkMode()
+                || !TwisterMillConfig.isServoTwisterBinaryInputEnabled()
+                || !hasValidBinaryFrame
+                || (binaryModeSignal != 1 && binaryModeSignal != 2)) {
+            return false;
+        }
+
+        boolean steadyState = !directInputPriority
+                && !getOppositeTopInputLocked()
+                && !pendingDisassembleAfterZero
+                && !pendingMode3DisassemblyReturn
+                && !pendingExtendedBinaryDisassemblyReturn
+                && lastOppositeTopSignal == binaryModeSignal;
+        boolean disassemblyReturnContinuation = pendingDisassembleAfterZero
+                && pendingExtendedBinaryDisassemblyReturn;
+        return steadyState || disassemblyReturnContinuation;
+    }
+
+    private boolean reconcileMode4Code12HardHinge(
+            SableInteractiveContraptionBackend.RotationProfile desiredRotationProfile,
+            boolean sableConstraintRefreshPending,
+            boolean pitchClearanceMotionReady,
+            boolean required
+    ) {
+        if (!required) {
+            sableBackend.disableFacingAxisHardHinge("control-not-eligible");
+            return true;
+        }
+        if (!(level instanceof ServerLevel serverLevel)) {
+            return false;
+        }
+        if (activeRotationProfile != SableInteractiveContraptionBackend.RotationProfile.FACING_AXIS
+                || desiredRotationProfile != SableInteractiveContraptionBackend.RotationProfile.FACING_AXIS) {
+            sableBackend.disableFacingAxisHardHinge("rotation-profile-not-facing-axis");
+            return false;
+        }
+        if (sableConstraintRefreshPending
+                || rotationProfileTransitionActive
+                || !pitchClearanceMotionReady) {
+            return false;
+        }
+
+        SableInteractiveContraptionBackend.HardHingeEnsureResult result =
+                sableBackend.ensureFacingAxisHardHinge(
+                        serverLevel,
+                        worldPosition,
+                        getFacingDirection()
+                );
+        if (result.status() == SableInteractiveContraptionBackend.HardHingeEnsureStatus.INVALID) {
+            handleTerminalMode4HardHingeFailure(result.reason());
+            return false;
+        }
+        if (!result.readyForMotor() && TwisterMillDiagnostics.isServoLoggingEnabled()) {
+            LOGGER.info(
+                    "[ServoHardHingeDiag] event=control-paused pos={} gameTime={} code={} reason={}",
+                    worldPosition,
+                    serverLevel.getGameTime(),
+                    binaryModeSignal,
+                    result.reason()
+            );
+        }
+        return result.readyForMotor();
+    }
+
+    private void handleTerminalMode4HardHingeFailure(String reason) {
+        LOGGER.warn(
+                "Stopping Servo Mode 4 Code {}/{} control at {} because the structural hard hinge is invalid: {}",
+                binaryModeSignal,
+                lastOppositeTopSignal,
+                worldPosition,
+                reason
+        );
+        running = false;
+        pendingDisassembleAfterZero = false;
+        pendingDisassembleZeroHoldTicks = 0;
+        clearMode3DisassemblyReturnState();
+        clearLaterGuiDisassemblyReturnState();
+        mode3ExitReturnActive = false;
+        pendingPropellerSlotRejoinSyncTicks = 0;
+        clearPropellerSlotPreviewSync();
+        sableBackend.clearState();
+        setChanged();
+        if (canSendData()) {
+            sendData();
         }
     }
 
@@ -3703,7 +3831,16 @@ public class ServoTwisterBlockEntity extends KineticBlockEntity implements IDisp
                 commitFreeBearingRecoveryPending();
             }
         } else {
-            applyRotation();
+            boolean mode4HardHingeRequired = isMode4Code12HardHingeRequired(false);
+            boolean mode4HardHingeReady = reconcileMode4Code12HardHinge(
+                    assemblyRotationProfile,
+                    false,
+                    true,
+                    mode4HardHingeRequired
+            );
+            if (!mode4HardHingeRequired || mode4HardHingeReady) {
+                applyRotation();
+            }
         }
         laterGuiAssemblyCompletedThisTick = running
                 && isLaterGuiAssemblyOption()
@@ -4223,11 +4360,21 @@ public class ServoTwisterBlockEntity extends KineticBlockEntity implements IDisp
             rememberedShipMemory.write(tag);
         }
         propellerSlotManager.write(tag);
+        TwisterMillSableSchematicRemapper.remapForWrite(
+                tag,
+                clientPacket,
+                TwisterMillSableSchematicRemapper.OwnerType.SERVO
+        );
     }
 
     @Override
     protected void read(CompoundTag tag, HolderLookup.Provider registries, boolean clientPacket) {
         tag = migrateLegacyServoGuiOptionForRead(tag);
+        tag = TwisterMillSableSchematicRemapper.prepareForRead(
+                tag,
+                clientPacket,
+                TwisterMillSableSchematicRemapper.OwnerType.SERVO
+        );
         super.read(tag, registries, clientPacket);
 
         if (clientPacket) {

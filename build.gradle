@@ -184,6 +184,10 @@ dependencies {
     implementation "curse.maven:sodium-394468:8382328"
 
     implementation "curse.maven:framedblocks-441647:8139800"
+
+    runtimeOnly("maven.modrinth:5fUBLqeW:pcD0Yutw") {
+        transitive = false
+    }
 }
 
 tasks.withType(ProcessResources).configureEach {

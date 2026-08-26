@@ -35,16 +35,17 @@ Build wind turbines that power Create machinery using Sable's ship-on-ship suble
 
 #### mandatory Dependencies:
 
-- twistermill-1.21.1-0.2.0-beta.2
+- twistermill-1.21.1-0.2.0-beta.3
 - create-1.21.1-6.0.10
+- create_aeronautics_toolgun-0.3.6
 - sable-neoforge-1.21.1-2.0.3
 - pmweather-0.16.4-1.21.1-alpha
+- Sodium NeoForge 0.8.12-alpha.2+mc1.21.1
 
 
 #### optional Dependencies:
 
 - Create Aeronautics 1.3.0
-- Sodium NeoForge 0.8.12-alpha.2+mc1.21.1
 - FluxNetworks-1.21.1-8.0.0
 - createendertransmission-2.1.1-1.21.1
 - FramedBlocks-10.6.1
@@ -55,17 +56,18 @@ Build wind turbines that power Create machinery using Sable's ship-on-ship suble
 
 #### mandatory Dependencies:
 
-- twistermill-1.21.1-0.2.0-beta.2
+- twistermill-1.21.1-0.2.0-beta.3
 - create-1.21.1-6.0.10
+- create_aeronautics_toolgun-0.3.6
 - sable-neoforge-1.21.1-2.0.3
 - weather2-neoforge-1.21.0-2.8.7
 - coroutil-neoforge-1.21.0-1.3.9
+- Sodium NeoForge 0.8.12-alpha.2+mc1.21.1
 
 
 #### optional Dependencies:
 
 - Create Aeronautics 1.3.0
-- Sodium NeoForge 0.8.12-alpha.2+mc1.21.1
 - FluxNetworks-1.21.1-8.0.0
 - createendertransmission-2.1.1-1.21.1
 - FramedBlocks-10.6.1

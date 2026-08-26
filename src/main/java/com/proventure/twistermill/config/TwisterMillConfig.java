@@ -17,7 +17,7 @@ public class TwisterMillConfig {
     private static final double DEFAULT_WIND_ROTO_VERTICAL_SERVO_STIFFNESS_PER_INERTIA = 1600.0D;
     private static final double DEFAULT_WIND_ROTO_VERTICAL_SERVO_DAMPING_PER_INERTIA = 40.0D;
     private static final double DEFAULT_WIND_ROTO_VERTICAL_MIN_EFFECTIVE_INERTIA = 10.0D;
-    private static final int DEFAULT_WIND_ROTO_VERTICAL_MAX_YAW_RPM = 6;
+    private static final int DEFAULT_WIND_ROTO_VERTICAL_MAX_YAW_RPM = 1;
     private static final double DEFAULT_WIND_ROTO_VERTICAL_YAW_DEADZONE_DEG = 3.6D;
     private static final double DEFAULT_WIND_ROTO_VERTICAL_YAW_TARGET_OFFSET_DEG = 0.0D;
     private static final int DEFAULT_WIND_ROTO_VERTICAL_PULSE_MIN_TICKS = 2;
@@ -383,44 +383,44 @@ public class TwisterMillConfig {
                 .defineInRange("servo_damping_per_inertia", 40.0D, 0.0D, 1000000.0D);
 
         MODE_7_DISASSEMBLY_RETURN_MOTOR_STRENGTH_MULTIPLIER = b
-                .comment("Multiplier for Servo Bearing GUI mode 7 motor stiffness during requested disassembly return-to-zero and physical zero confirmation for all block facings; damping is multiplied by the square root of this value. Requires a world/server restart. Range: 1.0 - 100.0. Default: 4.0.")
+                .comment("Multiplier for Servo Bearing GUI mode 7 motor stiffness during requested disassembly return-to-zero and physical zero confirmation for all block facings; damping is multiplied by the square root of this value. Requires a world/server restart. Range: 1.0 - 100.0. Default: 24.0.")
                 .worldRestart()
-                .defineInRange("mode_7_disassembly_return_motor_strength_multiplier", 4.0D, 1.0D, 100.0D);
+                .defineInRange("mode_7_disassembly_return_motor_strength_multiplier", 24.0D, 1.0D, 100.0D);
 
         SERVO_DISASSEMBLY_RETURN_SPEED_MULTIPLIER = b
-                .comment("Multiplier for the commanded Servo Bearing return-to-zero speed during requested disassembly in GUI mode 7. Applies to the full return curve, including its minimum step, and does not change motor or physical safety thresholds. Requires a world/server restart. Range: 0.05 - 10.0. Default: 5.0.")
+                .comment("Multiplier for the commanded Servo Bearing return-to-zero speed during requested disassembly in GUI mode 7. Applies to the full return curve, including its minimum step, and does not change motor or physical safety thresholds. Requires a world/server restart. Range: 0.05 - 10.0. Default: 4.0.")
                 .worldRestart()
-                .defineInRange("disassembly_return_speed_multiplier", 5.0D, 0.05D, 10.0D);
+                .defineInRange("disassembly_return_speed_multiplier", 4.0D, 0.05D, 10.0D);
 
         SERVO_DISASSEMBLY_RETURN_SPEED_MULTIPLIER_MODES_1_TO_3 = b
-                .comment("Multiplier for the commanded Servo and Inverted Servo Bearing return-to-zero speed during requested disassembly in GUI modes 1 to 3. Applies to the full return curve, including its minimum step, and does not change motor or physical safety thresholds. Requires a world/server restart. Range: 0.05 - 10.0. Default: 5.0.")
+                .comment("Multiplier for the commanded Servo and Inverted Servo Bearing return-to-zero speed during requested disassembly in GUI modes 1 to 3. Applies to the full return curve, including its minimum step, and does not change motor or physical safety thresholds. Requires a world/server restart. Range: 0.05 - 10.0. Default: 4.0.")
                 .worldRestart()
-                .defineInRange("disassembly_return_speed_multiplier_modes_1_to_3", 5.0D, 0.05D, 10.0D);
+                .defineInRange("disassembly_return_speed_multiplier_modes_1_to_3", 4.0D, 0.05D, 10.0D);
 
         SERVO_DISASSEMBLY_RETURN_SPEED_MULTIPLIER_MODES_4_TO_6 = b
-                .comment("Multiplier for the commanded Servo and Inverted Servo Bearing return-to-zero speed during requested disassembly in GUI modes 4 to 6. Applies to the full return curve, including its minimum step, and does not change motor or physical safety thresholds. Requires a world/server restart. Range: 0.05 - 10.0. Default: 5.0.")
+                .comment("Multiplier for the commanded Servo and Inverted Servo Bearing return-to-zero speed during requested disassembly in GUI modes 4 to 6. Applies to the full return curve, including its minimum step, and does not change motor or physical safety thresholds. Requires a world/server restart. Range: 0.05 - 10.0. Default: 4.0.")
                 .worldRestart()
-                .defineInRange("disassembly_return_speed_multiplier_modes_4_to_6", 5.0D, 0.05D, 10.0D);
+                .defineInRange("disassembly_return_speed_multiplier_modes_4_to_6", 4.0D, 0.05D, 10.0D);
 
         PROPELLER_SLOT_SERVO_STIFFNESS_MULTIPLIER = b
-                .comment("Multiplier applied to Servo Bearing motor stiffness while mounted on an existing propeller-slot sublevel. Requires a world/server restart. Range: 0.0 - 100.0. Default: 4.0.")
+                .comment("Multiplier applied to Servo Bearing motor stiffness while mounted on an existing propeller-slot sublevel. Requires a world/server restart. Range: 0.0 - 100.0. Default: 9.0.")
                 .worldRestart()
-                .defineInRange("propeller_slot_servo_stiffness_multiplier", 4.0D, 0.0D, 100.0D);
+                .defineInRange("propeller_slot_servo_stiffness_multiplier", 9.0D, 0.0D, 100.0D);
 
         PROPELLER_SLOT_SERVO_DAMPING_MULTIPLIER = b
-                .comment("Multiplier applied to Servo Bearing motor damping while mounted on an existing propeller-slot sublevel. Requires a world/server restart. Range: 0.0 - 100.0. Default: 4.0.")
+                .comment("Multiplier applied to Servo Bearing motor damping while mounted on an existing propeller-slot sublevel. Requires a world/server restart. Range: 0.0 - 100.0. Default: 6.0.")
                 .worldRestart()
-                .defineInRange("propeller_slot_servo_damping_multiplier", 4.0D, 0.0D, 100.0D);
+                .defineInRange("propeller_slot_servo_damping_multiplier", 6.0D, 0.0D, 100.0D);
 
         FREE_BEARING_DAMPING_PER_INERTIA = b
-                .comment("Sable motor damping per effective inertia in Free Bearing mode for Servo and Inverted Servo Bearings; stiffness remains 0.0. Requires a world/server restart. Range: 0.0 - 1000.0. Default: 0.03.")
+                .comment("Sable motor damping per effective inertia in Free Bearing mode for Servo and Inverted Servo Bearings; stiffness remains 0.0. Requires a world/server restart. Range: 0.0 - 1000.0. Default: 0.01.")
                 .worldRestart()
-                .defineInRange("free_bearing_damping_per_inertia", 0.03D, 0.0D, 1000.0D);
+                .defineInRange("free_bearing_damping_per_inertia", 0.01D, 0.0D, 1000.0D);
 
         SERVO_MIN_EFFECTIVE_INERTIA = b
-                .comment("Minimum effective inertia used when scaling Servo and Inverted Servo Bearing Sable motors. Requires a world/server restart. Range: 0.0001 - 1000000.0. Default: 10.0.")
+                .comment("Minimum effective inertia used when scaling Servo and Inverted Servo Bearing Sable motors. Requires a world/server restart. Range: 0.0001 - 1000000.0. Default: 1.5.")
                 .worldRestart()
-                .defineInRange("min_effective_inertia", 10.0D, 0.0001D, 1000000.0D);
+                .defineInRange("min_effective_inertia", 1.5D, 0.0001D, 1000000.0D);
 
         b.pop();
 
@@ -467,7 +467,7 @@ public class TwisterMillConfig {
                 .defineInRange("min_effective_inertia", DEFAULT_WIND_ROTO_VERTICAL_MIN_EFFECTIVE_INERTIA, 0.0001D, 1000000.0D);
 
         WIND_ROTO_VERTICAL_MAX_YAW_RPM = b
-                .comment("Maximum yaw RPM commanded by Windvane Bearing wind tracking. 0 disables commanded yaw motion. Range: 0 - 256. Default: 6")
+                .comment("Maximum yaw RPM commanded by Windvane Bearing wind tracking. 0 disables commanded yaw motion. Range: 0 - 256. Default: 1")
                 .defineInRange("max_yaw_rpm", DEFAULT_WIND_ROTO_VERTICAL_MAX_YAW_RPM, 0, 256);
 
         WIND_ROTO_VERTICAL_YAW_DEADZONE_DEG = b

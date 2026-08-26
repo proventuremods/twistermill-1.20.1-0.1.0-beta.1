@@ -10,8 +10,13 @@ import dev.ryanhcode.sable.api.SubLevelAssemblyHelper;
 import dev.ryanhcode.sable.api.physics.PhysicsPipeline;
 import dev.ryanhcode.sable.api.physics.PhysicsPipelineBody;
 import dev.ryanhcode.sable.api.physics.constraint.ConstraintJointAxis;
+import dev.ryanhcode.sable.api.physics.constraint.FixedConstraintConfiguration;
+import dev.ryanhcode.sable.api.physics.constraint.FixedConstraintHandle;
 import dev.ryanhcode.sable.api.physics.constraint.GenericConstraintConfiguration;
 import dev.ryanhcode.sable.api.physics.constraint.GenericConstraintHandle;
+import dev.ryanhcode.sable.api.physics.constraint.PhysicsConstraintHandle;
+import dev.ryanhcode.sable.api.schematic.SubLevelSchematicSerializationContext;
+import dev.ryanhcode.sable.api.schematic.SubLevelSchematicSerializationContext.SchematicMapping;
 import dev.ryanhcode.sable.api.sublevel.ServerSubLevelContainer;
 import dev.ryanhcode.sable.api.sublevel.SubLevelContainer;
 import dev.ryanhcode.sable.companion.math.BoundingBox3i;
@@ -28,6 +33,7 @@ import dev.ryanhcode.sable.sublevel.storage.SubLevelRemovalReason;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.Tag;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.BlockItem;
@@ -64,6 +70,11 @@ public final class ServoPropellerSlotManager {
     private static final double DEFAULT_SLOT_RADIUS = 2.0D;
     private static final double UP_SLOT_RADIUS = 2.0D;
     private static final double[] SLOT_ANGLES_DEGREES = {0.0D, 120.0D, 240.0D};
+    private static final int[][] SLOT_TRIANGLE_EDGES = {
+            {0, 1},
+            {1, 2},
+            {2, 0}
+    };
     private static final Set<ConstraintJointAxis> LOCKED_AXES = EnumSet.allOf(ConstraintJointAxis.class);
     private static final ConstraintJointAxis[] LINEAR_MOTOR_AXES = {
             ConstraintJointAxis.LINEAR_X,
@@ -101,20 +112,25 @@ public final class ServoPropellerSlotManager {
 
     private final UUID[] slotSubLevelIds = new UUID[SLOT_COUNT];
     private final Vector3d[] slotAnchorLocalCenters = new Vector3d[SLOT_COUNT];
-    private final GenericConstraintHandle[] slotConstraintHandles = new GenericConstraintHandle[SLOT_COUNT];
+    private final PhysicsConstraintHandle[] slotConstraintHandles = new PhysicsConstraintHandle[SLOT_COUNT];
     private final ConstraintParentKind[] slotConstraintParentKinds = new ConstraintParentKind[SLOT_COUNT];
     private final UUID[] slotConstraintParentSubLevelIds = new UUID[SLOT_COUNT];
     private final Vector3d[] slotConstraintFrame1Positions = new Vector3d[SLOT_COUNT];
     private final Quaterniond[] slotConstraintFrame1Orientations = new Quaterniond[SLOT_COUNT];
-    private final UUID[] slotLastSnapTopSubLevelIds = new UUID[SLOT_COUNT];
-    private final int[] slotLastSnapTopRuntimeIds = new int[SLOT_COUNT];
-    private final int[] slotLastSnapTopObjectIdentities = new int[SLOT_COUNT];
     private final UUID[] slotConstraintTopSubLevelIds = new UUID[SLOT_COUNT];
     private final boolean[] slotConstraintAttachedToTop = new boolean[SLOT_COUNT];
     private final int[] slotConstraintParentRuntimeIds = new int[SLOT_COUNT];
     private final int[] slotConstraintChildRuntimeIds = new int[SLOT_COUNT];
     private final int[] slotConstraintParentObjectIdentities = new int[SLOT_COUNT];
     private final int[] slotConstraintChildObjectIdentities = new int[SLOT_COUNT];
+    private final FixedConstraintHandle[] triangleConstraintHandles =
+            new FixedConstraintHandle[SLOT_TRIANGLE_EDGES.length];
+    private final UUID[] triangleFirstSubLevelIds = new UUID[SLOT_TRIANGLE_EDGES.length];
+    private final UUID[] triangleSecondSubLevelIds = new UUID[SLOT_TRIANGLE_EDGES.length];
+    private final int[] triangleFirstRuntimeIds = new int[SLOT_TRIANGLE_EDGES.length];
+    private final int[] triangleSecondRuntimeIds = new int[SLOT_TRIANGLE_EDGES.length];
+    private final int[] triangleFirstObjectIdentities = new int[SLOT_TRIANGLE_EDGES.length];
+    private final int[] triangleSecondObjectIdentities = new int[SLOT_TRIANGLE_EDGES.length];
     private UUID activeTopSubLevelId;
     private Vector3d activeTopAnchorLocalCenter;
     private Direction slotFacing = Direction.UP;
@@ -130,6 +146,12 @@ public final class ServoPropellerSlotManager {
     private transient boolean freeBearingAllowTopRebind;
     @Nullable
     private transient UUID freeBearingExpectedTopSubLevelId;
+    private transient boolean canonicalRebindDiagnosticsArmed;
+    private transient boolean canonicalRebindPostSnapshotPending;
+    private final transient ConstraintFrameDiagnostics[] canonicalTopPreAddDiagnostics =
+            new ConstraintFrameDiagnostics[SLOT_COUNT];
+    private final transient ConstraintFrameDiagnostics[] canonicalTrianglePreAddDiagnostics =
+            new ConstraintFrameDiagnostics[SLOT_TRIANGLE_EDGES.length];
 
     ServoPropellerSlotManager() {
         Arrays.fill(slotConstraintParentKinds, ConstraintParentKind.NONE);
@@ -137,8 +159,10 @@ public final class ServoPropellerSlotManager {
         Arrays.fill(slotConstraintChildRuntimeIds, DIAGNOSTIC_UNKNOWN_RUNTIME_ID);
         Arrays.fill(slotConstraintParentObjectIdentities, DIAGNOSTIC_UNKNOWN_RUNTIME_ID);
         Arrays.fill(slotConstraintChildObjectIdentities, DIAGNOSTIC_UNKNOWN_RUNTIME_ID);
-        Arrays.fill(slotLastSnapTopRuntimeIds, DIAGNOSTIC_UNKNOWN_RUNTIME_ID);
-        Arrays.fill(slotLastSnapTopObjectIdentities, DIAGNOSTIC_UNKNOWN_RUNTIME_ID);
+        Arrays.fill(triangleFirstRuntimeIds, DIAGNOSTIC_UNKNOWN_RUNTIME_ID);
+        Arrays.fill(triangleSecondRuntimeIds, DIAGNOSTIC_UNKNOWN_RUNTIME_ID);
+        Arrays.fill(triangleFirstObjectIdentities, DIAGNOSTIC_UNKNOWN_RUNTIME_ID);
+        Arrays.fill(triangleSecondObjectIdentities, DIAGNOSTIC_UNKNOWN_RUNTIME_ID);
     }
 
     private record ConstraintFrameDiagnostics(
@@ -237,6 +261,7 @@ public final class ServoPropellerSlotManager {
     }
 
     public static void onPostPhysicsTick(ForgeSablePostPhysicsTickEvent event) {
+        capturePendingCanonicalRebindPostSnapshots(event.getPhysicsSystem());
         stabilizeActiveManagers(event.getPhysicsSystem(), true);
     }
 
@@ -266,6 +291,20 @@ public final class ServoPropellerSlotManager {
         }
     }
 
+    private static void capturePendingCanonicalRebindPostSnapshots(SubLevelPhysicsSystem physicsSystem) {
+        ServerLevel rootLevel = physicsSystem.getLevel();
+        List<ServoPropellerSlotManager> managers;
+        synchronized (ACTIVE_MANAGERS) {
+            managers = List.copyOf(ACTIVE_MANAGERS);
+        }
+
+        for (ServoPropellerSlotManager manager : managers) {
+            if (manager.isBoundTo(physicsSystem)) {
+                manager.captureCanonicalRebindPostSnapshot(rootLevel);
+            }
+        }
+    }
+
     private boolean registerActiveManager(ServerLevel rootLevel) {
         ServerSubLevelContainer container = SubLevelContainer.getContainer(rootLevel);
         if (container == null) {
@@ -289,6 +328,7 @@ public final class ServoPropellerSlotManager {
     }
 
     void unregisterActiveManager() {
+        resetCanonicalRebindDiagnostics();
         if (!activeManagerRegistered) {
             return;
         }
@@ -433,7 +473,8 @@ public final class ServoPropellerSlotManager {
         }
 
         for (int slot = 0; slot < SLOT_COUNT; slot++) {
-            if (!hasValidConstraint(slot)) {
+            if (!hasValidConstraint(slot)
+                    || !constraintHandleMatchesKind(slotConstraintHandles[slot], ConstraintParentKind.TOP_BODY)) {
                 return TopFollowReadiness.RETRYABLE_REBIND;
             }
 
@@ -463,6 +504,33 @@ public final class ServoPropellerSlotManager {
                     && slotConstraintChildRuntimeIds[slot] != expectedChildRuntimeId)
                     || (slotConstraintChildObjectIdentities[slot] != DIAGNOSTIC_UNKNOWN_RUNTIME_ID
                     && slotConstraintChildObjectIdentities[slot] != expectedChildObjectIdentity)) {
+                return TopFollowReadiness.INVALID;
+            }
+        }
+
+        for (int edge = 0; edge < SLOT_TRIANGLE_EDGES.length; edge++) {
+            FixedConstraintHandle handle = triangleConstraintHandles[edge];
+            if (!isConstraintHandleValid(handle)) {
+                return TopFollowReadiness.RETRYABLE_REBIND;
+            }
+
+            int firstSlot = SLOT_TRIANGLE_EDGES[edge][0];
+            int secondSlot = SLOT_TRIANGLE_EDGES[edge][1];
+            ServerSubLevel firstSubLevel = resolvedSlots[firstSlot];
+            ServerSubLevel secondSubLevel = resolvedSlots[secondSlot];
+            UUID expectedFirstId = slotSubLevelIds[firstSlot];
+            UUID expectedSecondId = slotSubLevelIds[secondSlot];
+            if (triangleFirstSubLevelIds[edge] == null || triangleSecondSubLevelIds[edge] == null) {
+                return TopFollowReadiness.RETRYABLE_REBIND;
+            }
+            if (!expectedFirstId.equals(triangleFirstSubLevelIds[edge])
+                    || !expectedSecondId.equals(triangleSecondSubLevelIds[edge])) {
+                return TopFollowReadiness.INVALID;
+            }
+            if (triangleFirstRuntimeIds[edge] != getRuntimeIdForDiagnostics(firstSubLevel)
+                    || triangleSecondRuntimeIds[edge] != getRuntimeIdForDiagnostics(secondSubLevel)
+                    || triangleFirstObjectIdentities[edge] != getObjectIdentityForDiagnostics(firstSubLevel)
+                    || triangleSecondObjectIdentities[edge] != getObjectIdentityForDiagnostics(secondSubLevel)) {
                 return TopFollowReadiness.INVALID;
             }
         }
@@ -567,7 +635,123 @@ public final class ServoPropellerSlotManager {
         tag.put(TAG_PROPELLER_SLOTS, slotsTag);
     }
 
+    static boolean remapSchematicData(
+            CompoundTag tag,
+            SubLevelSchematicSerializationContext context,
+            @Nullable UUID sourceTopId,
+            @Nullable UUID mappedTopId
+    ) {
+        if (!tag.contains(TAG_PROPELLER_SLOTS)) {
+            return true;
+        }
+        if (!tag.contains(TAG_PROPELLER_SLOTS, Tag.TAG_COMPOUND)) {
+            return false;
+        }
+
+        CompoundTag slotsTag = tag.getCompound(TAG_PROPELLER_SLOTS);
+        for (int slot = 0; slot < SLOT_COUNT; slot++) {
+            String idKey = TAG_SLOT_ID_PREFIX + slot;
+            String anchorXKey = TAG_ANCHOR_X_PREFIX + slot;
+            String anchorYKey = TAG_ANCHOR_Y_PREFIX + slot;
+            String anchorZKey = TAG_ANCHOR_Z_PREFIX + slot;
+            boolean hasIdKey = slotsTag.contains(idKey);
+            boolean hasAnyAnchor = slotsTag.contains(anchorXKey)
+                    || slotsTag.contains(anchorYKey)
+                    || slotsTag.contains(anchorZKey);
+
+            if (!hasIdKey) {
+                if (hasAnyAnchor) {
+                    return false;
+                }
+                continue;
+            }
+            if (!slotsTag.hasUUID(idKey)
+                    || !slotsTag.contains(anchorXKey)
+                    || !slotsTag.contains(anchorYKey)
+                    || !slotsTag.contains(anchorZKey)) {
+                return false;
+            }
+
+            UUID sourceSlotId = slotsTag.getUUID(idKey);
+            SchematicMapping mapping = TwisterMillSableSchematicRemapper.getValidMapping(context, sourceSlotId);
+            if (mapping == null || !remapAnchor(slotsTag, anchorXKey, anchorYKey, anchorZKey, mapping)) {
+                return false;
+            }
+            slotsTag.putUUID(idKey, mapping.newUUID());
+        }
+
+        boolean topFollowActive = slotsTag.getBoolean(TAG_TOP_FOLLOW_ACTIVE);
+        boolean hasTopIdKey = slotsTag.contains(TAG_ACTIVE_TOP_ID);
+        boolean hasAnyTopAnchor = slotsTag.contains(TAG_ACTIVE_TOP_ANCHOR_X)
+                || slotsTag.contains(TAG_ACTIVE_TOP_ANCHOR_Y)
+                || slotsTag.contains(TAG_ACTIVE_TOP_ANCHOR_Z);
+        if (!topFollowActive) {
+            return !hasTopIdKey && !hasAnyTopAnchor;
+        }
+        if (!hasTopIdKey
+                || !slotsTag.hasUUID(TAG_ACTIVE_TOP_ID)
+                || !slotsTag.contains(TAG_ACTIVE_TOP_ANCHOR_X)
+                || !slotsTag.contains(TAG_ACTIVE_TOP_ANCHOR_Y)
+                || !slotsTag.contains(TAG_ACTIVE_TOP_ANCHOR_Z)) {
+            return false;
+        }
+
+        UUID activeTopId = slotsTag.getUUID(TAG_ACTIVE_TOP_ID);
+        if (sourceTopId == null || mappedTopId == null || !sourceTopId.equals(activeTopId)) {
+            return false;
+        }
+        SchematicMapping topMapping = TwisterMillSableSchematicRemapper.getValidMapping(context, activeTopId);
+        if (topMapping == null
+                || !mappedTopId.equals(topMapping.newUUID())
+                || !remapAnchor(
+                slotsTag,
+                TAG_ACTIVE_TOP_ANCHOR_X,
+                TAG_ACTIVE_TOP_ANCHOR_Y,
+                TAG_ACTIVE_TOP_ANCHOR_Z,
+                topMapping
+        )) {
+            return false;
+        }
+        slotsTag.putUUID(TAG_ACTIVE_TOP_ID, topMapping.newUUID());
+        return true;
+    }
+
+    static void clearSchematicData(CompoundTag tag) {
+        tag.remove(TAG_PROPELLER_SLOTS);
+    }
+
+    private static boolean remapAnchor(
+            CompoundTag slotsTag,
+            String xKey,
+            String yKey,
+            String zKey,
+            SchematicMapping mapping
+    ) {
+        if (mapping.transform() == null) {
+            return false;
+        }
+
+        double anchorX = slotsTag.getDouble(xKey);
+        double anchorY = slotsTag.getDouble(yKey);
+        double anchorZ = slotsTag.getDouble(zKey);
+        if (!Double.isFinite(anchorX) || !Double.isFinite(anchorY) || !Double.isFinite(anchorZ)) {
+            return false;
+        }
+
+        BlockPos sourceBlock = BlockPos.containing(anchorX, anchorY, anchorZ);
+        BlockPos mappedBlock = mapping.transform().get(sourceBlock);
+        if (mappedBlock == null) {
+            return false;
+        }
+
+        slotsTag.putDouble(xKey, anchorX + mappedBlock.getX() - sourceBlock.getX());
+        slotsTag.putDouble(yKey, anchorY + mappedBlock.getY() - sourceBlock.getY());
+        slotsTag.putDouble(zKey, anchorZ + mappedBlock.getZ() - sourceBlock.getZ());
+        return true;
+    }
+
     void read(CompoundTag tag) {
+        resetCanonicalRebindDiagnostics();
         for (int i = 0; i < SLOT_COUNT; i++) {
             clearSlot(i, "nbt-read-reset");
         }
@@ -610,6 +794,9 @@ public final class ServoPropellerSlotManager {
                     slotsTag.getDouble(TAG_ACTIVE_TOP_ANCHOR_Z)
             );
         }
+        canonicalRebindDiagnosticsArmed = TwisterMillDiagnostics.isServoLoggingEnabled()
+                && topFollowActive
+                && hasCompleteDistinctSlotSet();
     }
 
     private static Direction readSlotFacing(CompoundTag slotsTag) {
@@ -871,10 +1058,13 @@ public final class ServoPropellerSlotManager {
                     formatVector(activeTopAnchorLocalCenter));
         }
         boolean changed = false;
+        boolean topConstraintsReady = hasCompleteDistinctSlotSet();
+        ServerSubLevel[] resolvedSlots = new ServerSubLevel[SLOT_COUNT];
 
         for (int i = 0; i < SLOT_COUNT; i++) {
             UUID subLevelId = slotSubLevelIds[i];
             if (subLevelId == null) {
+                topConstraintsReady = false;
                 continue;
             }
 
@@ -882,8 +1072,10 @@ public final class ServoPropellerSlotManager {
             if (slotSubLevel == null) {
                 clearSlot(i, "top-follow-slot-sublevel-missing");
                 changed = true;
+                topConstraintsReady = false;
                 continue;
             }
+            resolvedSlots[i] = slotSubLevel;
 
             Vector3d anchorLocalCenter = getOrCreateAnchorLocalCenter(slotSubLevel, i);
             ConstraintEnsureResult result = ensureTopSlotConstraint(
@@ -892,13 +1084,22 @@ public final class ServoPropellerSlotManager {
                     slotSubLevel,
                     i,
                     anchorLocalCenter,
-                    topAnchorLocal,
                     "update-slot-motion-top"
             );
             if (result == ConstraintEnsureResult.UNSECURED) {
                 secureSupportSlotAtCurrentPose(rootLevel, pipeline, slotSubLevel, i, anchorLocalCenter,
                         "update-slot-motion-top-fallback");
             }
+            if (result != ConstraintEnsureResult.TARGET_ACTIVE
+                    || !isCurrentTopSlotConstraint(topSubLevel, slotSubLevel, i)) {
+                topConstraintsReady = false;
+            }
+        }
+
+        if (topConstraintsReady) {
+            ensureSlotTriangle(pipeline, topSubLevel, resolvedSlots, "update-slot-motion-triangle");
+        } else {
+            removeTriangleConstraints("update-slot-motion-triangle-not-ready");
         }
 
         return changed;
@@ -926,6 +1127,8 @@ public final class ServoPropellerSlotManager {
     }
 
     void clearRuntimeConstraints() {
+        resetCanonicalRebindDiagnostics();
+        removeTriangleConstraints("runtime-cleanup");
         for (int i = 0; i < SLOT_COUNT; i++) {
             removeSlotConstraint(i, "runtime-cleanup");
         }
@@ -937,31 +1140,9 @@ public final class ServoPropellerSlotManager {
             ServerSubLevel slotSubLevel,
             int slot,
             Vector3d anchorLocalCenter,
-            Vector3d topAnchorLocalCenter,
             String reason
     ) {
-        SlotFrame slotFrame = computeSlotFrame(slot, slotFacing);
-        Vector3d topFramePosition = new Vector3d(topAnchorLocalCenter).add(slotFrame.offset());
-        Quaterniond topFrameOrientation = new Quaterniond(slotFrame.rotation());
-        ConstraintTarget target = new ConstraintTarget(
-                ConstraintParentKind.TOP_BODY,
-                topSubLevel,
-                topFramePosition,
-                topFrameOrientation
-        );
-
-        if (!slotConstraintMatchesParent(slot, target, slotSubLevel)
-                && shouldSnapToTop(slot, topSubLevel)) {
-            applyTopPoseToSlot(
-                    pipeline,
-                    topSubLevel,
-                    slotSubLevel,
-                    slot,
-                    anchorLocalCenter,
-                    topAnchorLocalCenter
-            );
-            rememberTopSnap(slot, topSubLevel);
-        }
+        ConstraintTarget target = createCanonicalTopTarget(topSubLevel, slot);
 
         return ensureSlotConstraint(
                 pipeline,
@@ -1004,27 +1185,50 @@ public final class ServoPropellerSlotManager {
                 new Quaterniond(),
                 "targetKind=" + target.kind() + ", previous handle state is included in handle fields"
         );
-        GenericConstraintConfiguration configuration = new GenericConstraintConfiguration(
-                target.framePosition(),
-                anchorLocalCenter,
-                target.frameOrientation(),
-                new Quaterniond(),
-                LOCKED_AXES
-        );
-        if (!validateConstraintConfiguration(
-                configuration,
-                target.body(),
-                slotSubLevel,
-                slot,
-                reason
-        )) {
-            return constraintFailureResult(slot);
-        }
-
-        GenericConstraintHandle previousHandle = slotConstraintHandles[slot];
-        GenericConstraintHandle candidate;
+        PhysicsConstraintHandle previousHandle = slotConstraintHandles[slot];
+        PhysicsConstraintHandle candidate;
         try {
-            candidate = pipeline.addConstraint(target.body(), slotSubLevel, configuration);
+            if (target.kind() == ConstraintParentKind.TOP_BODY) {
+                FixedConstraintConfiguration configuration = new FixedConstraintConfiguration(
+                        target.framePosition(),
+                        anchorLocalCenter,
+                        target.frameOrientation()
+                );
+                if (!validateFixedConstraintConfiguration(
+                        configuration,
+                        target.body(),
+                        slotSubLevel,
+                        slot,
+                        reason
+                )) {
+                    return constraintFailureResult(slot);
+                }
+                captureCanonicalTopPreAddDiagnostics(
+                        slot,
+                        target.body(),
+                        slotSubLevel,
+                        configuration
+                );
+                candidate = pipeline.addConstraint(target.body(), slotSubLevel, configuration);
+            } else {
+                GenericConstraintConfiguration configuration = new GenericConstraintConfiguration(
+                        target.framePosition(),
+                        anchorLocalCenter,
+                        target.frameOrientation(),
+                        new Quaterniond(),
+                        LOCKED_AXES
+                );
+                if (!validateConstraintConfiguration(
+                        configuration,
+                        target.body(),
+                        slotSubLevel,
+                        slot,
+                        reason
+                )) {
+                    return constraintFailureResult(slot);
+                }
+                candidate = pipeline.addConstraint(target.body(), slotSubLevel, configuration);
+            }
             logConstraintState(
                     "candidate-add-result",
                     reason,
@@ -1042,21 +1246,33 @@ public final class ServoPropellerSlotManager {
             return constraintFailureResult(slot);
         }
 
-        if (!isConstraintHandleValid(candidate)) {
+        if (!isConstraintHandleValid(candidate) || !constraintHandleMatchesKind(candidate, target.kind())) {
             removeConstraintHandle(candidate, slot, reason + ":candidate-add-invalid");
             return constraintFailureResult(slot);
         }
 
-        MotorTuning tuning = configureConstraintHandle(
-                pipeline,
-                candidate,
-                target,
-                slotSubLevel,
-                slot,
-                anchorLocalCenter,
-                reason + ":candidate"
-        );
-        if (tuning == null || !isConstraintHandleValid(candidate)) {
+        boolean configured;
+        if (target.kind() == ConstraintParentKind.TOP_BODY) {
+            configured = configureFixedConstraintHandle(
+                    pipeline,
+                    candidate,
+                    target,
+                    slotSubLevel,
+                    slot,
+                    reason + ":candidate"
+            );
+        } else {
+            configured = configureGenericConstraintHandle(
+                    pipeline,
+                    (GenericConstraintHandle) candidate,
+                    target,
+                    slotSubLevel,
+                    slot,
+                    anchorLocalCenter,
+                    reason + ":candidate"
+            ) != null;
+        }
+        if (!configured || !isConstraintHandleValid(candidate)) {
             removeConstraintHandle(candidate, slot, reason + ":candidate-configuration-failed");
             return constraintFailureResult(slot);
         }
@@ -1093,8 +1309,8 @@ public final class ServoPropellerSlotManager {
             Vector3d anchorLocalCenter,
             String reason
     ) {
-        GenericConstraintHandle handle = slotConstraintHandles[slot];
-        if (!isConstraintHandleValid(handle)) {
+        PhysicsConstraintHandle handle = slotConstraintHandles[slot];
+        if (!isConstraintHandleValid(handle) || !constraintHandleMatchesKind(handle, target.kind())) {
             logConstraintState(
                     "update-skipped-invalid-handle",
                     reason,
@@ -1110,9 +1326,13 @@ public final class ServoPropellerSlotManager {
             return false;
         }
 
-        MotorTuning tuning = configureConstraintHandle(
+        if (target.kind() == ConstraintParentKind.TOP_BODY) {
+            return true;
+        }
+
+        MotorTuning tuning = configureGenericConstraintHandle(
                 pipeline,
-                handle,
+                (GenericConstraintHandle) handle,
                 target,
                 slotSubLevel,
                 slot,
@@ -1133,6 +1353,7 @@ public final class ServoPropellerSlotManager {
     private boolean storedConstraintParentMatches(int slot, ConstraintTarget target, ServerSubLevel slotSubLevel) {
         UUID expectedParentId = target.body() == null ? null : target.body().getUniqueId();
         return slotConstraintParentKinds[slot] == target.kind()
+                && constraintHandleMatchesKind(slotConstraintHandles[slot], target.kind())
                 && java.util.Objects.equals(slotConstraintParentSubLevelIds[slot], expectedParentId)
                 && slotConstraintParentRuntimeIds[slot] == getRuntimeIdForDiagnostics(target.body())
                 && slotConstraintParentObjectIdentities[slot] == getObjectIdentityForDiagnostics(target.body())
@@ -1170,7 +1391,7 @@ public final class ServoPropellerSlotManager {
     }
 
     @Nullable
-    private MotorTuning configureConstraintHandle(
+    private MotorTuning configureGenericConstraintHandle(
             PhysicsPipeline pipeline,
             GenericConstraintHandle handle,
             ConstraintTarget target,
@@ -1237,7 +1458,7 @@ public final class ServoPropellerSlotManager {
             int slot,
             ConstraintTarget target,
             ServerSubLevel slotSubLevel,
-            GenericConstraintHandle handle
+            PhysicsConstraintHandle handle
     ) {
         slotConstraintHandles[slot] = handle;
         slotConstraintParentKinds[slot] = target.kind();
@@ -1249,27 +1470,6 @@ public final class ServoPropellerSlotManager {
                 ? target.body().getUniqueId()
                 : null;
         recordConstraintRuntimeIdentities(slot, target.body(), slotSubLevel);
-        if (!slotConstraintAttachedToTop[slot]) {
-            clearTopSnap(slot);
-        }
-    }
-
-    private boolean shouldSnapToTop(int slot, ServerSubLevel topSubLevel) {
-        return !topSubLevel.getUniqueId().equals(slotLastSnapTopSubLevelIds[slot])
-                || getRuntimeIdForDiagnostics(topSubLevel) != slotLastSnapTopRuntimeIds[slot]
-                || getObjectIdentityForDiagnostics(topSubLevel) != slotLastSnapTopObjectIdentities[slot];
-    }
-
-    private void rememberTopSnap(int slot, ServerSubLevel topSubLevel) {
-        slotLastSnapTopSubLevelIds[slot] = topSubLevel.getUniqueId();
-        slotLastSnapTopRuntimeIds[slot] = getRuntimeIdForDiagnostics(topSubLevel);
-        slotLastSnapTopObjectIdentities[slot] = getObjectIdentityForDiagnostics(topSubLevel);
-    }
-
-    private void clearTopSnap(int slot) {
-        slotLastSnapTopSubLevelIds[slot] = null;
-        slotLastSnapTopRuntimeIds[slot] = DIAGNOSTIC_UNKNOWN_RUNTIME_ID;
-        slotLastSnapTopObjectIdentities[slot] = DIAGNOSTIC_UNKNOWN_RUNTIME_ID;
     }
 
     private boolean refreshSupportBinding(ServerLevel rootLevel, BlockPos assemblyAnchorPos, String reason) {
@@ -1393,6 +1593,623 @@ public final class ServoPropellerSlotManager {
         return new ConstraintTarget(kind, supportBinding.body(), localPosition, localOrientation);
     }
 
+    private ConstraintTarget createCanonicalTopTarget(ServerSubLevel topSubLevel, int slot) {
+        SlotFrame slotFrame = computeSlotFrame(slot, slotFacing);
+        Vector3d topAnchorLocal = new Vector3d(activeTopAnchorLocalCenter).add(slotFrame.offset());
+        return new ConstraintTarget(
+                ConstraintParentKind.TOP_BODY,
+                topSubLevel,
+                topAnchorLocal,
+                new Quaterniond(slotFrame.rotation())
+        );
+    }
+
+    private boolean isCurrentTopSlotConstraint(
+            ServerSubLevel topSubLevel,
+            ServerSubLevel slotSubLevel,
+            int slot
+    ) {
+        return hasValidConstraint(slot)
+                && slotConstraintHandles[slot] instanceof FixedConstraintHandle
+                && slotConstraintParentKinds[slot] == ConstraintParentKind.TOP_BODY
+                && slotConstraintAttachedToTop[slot]
+                && topSubLevel.getUniqueId().equals(slotConstraintParentSubLevelIds[slot])
+                && topSubLevel.getUniqueId().equals(slotConstraintTopSubLevelIds[slot])
+                && slotSubLevel.getUniqueId().equals(slotSubLevelIds[slot])
+                && slotConstraintParentRuntimeIds[slot] == getRuntimeIdForDiagnostics(topSubLevel)
+                && slotConstraintChildRuntimeIds[slot] == getRuntimeIdForDiagnostics(slotSubLevel)
+                && slotConstraintParentObjectIdentities[slot] == getObjectIdentityForDiagnostics(topSubLevel)
+                && slotConstraintChildObjectIdentities[slot] == getObjectIdentityForDiagnostics(slotSubLevel);
+    }
+
+    private boolean ensureSlotTriangle(
+            PhysicsPipeline pipeline,
+            ServerSubLevel topSubLevel,
+            ServerSubLevel[] resolvedSlots,
+            String reason
+    ) {
+        if (!hasCompleteDistinctSlotSet() || resolvedSlots.length != SLOT_COUNT) {
+            removeTriangleConstraints(reason + ":invalid-slot-set");
+            return false;
+        }
+
+        Set<UUID> resolvedIds = new HashSet<>();
+        for (int slot = 0; slot < SLOT_COUNT; slot++) {
+            ServerSubLevel resolved = resolvedSlots[slot];
+            if (resolved == null
+                    || resolved.isRemoved()
+                    || !slotSubLevelIds[slot].equals(resolved.getUniqueId())
+                    || !resolvedIds.add(resolved.getUniqueId())) {
+                removeTriangleConstraints(reason + ":invalid-resolved-slot");
+                return false;
+            }
+        }
+
+        FixedConstraintHandle[] candidates = new FixedConstraintHandle[SLOT_TRIANGLE_EDGES.length];
+        for (int edge = 0; edge < SLOT_TRIANGLE_EDGES.length; edge++) {
+            int firstSlot = SLOT_TRIANGLE_EDGES[edge][0];
+            int secondSlot = SLOT_TRIANGLE_EDGES[edge][1];
+            ServerSubLevel firstSubLevel = resolvedSlots[firstSlot];
+            ServerSubLevel secondSubLevel = resolvedSlots[secondSlot];
+            if (triangleConstraintMatches(edge, firstSubLevel, secondSubLevel)) {
+                continue;
+            }
+
+            FixedConstraintConfiguration configuration = createTriangleConfiguration(
+                    firstSlot,
+                    secondSlot,
+                    getOrCreateAnchorLocalCenter(firstSubLevel, firstSlot),
+                    getOrCreateAnchorLocalCenter(secondSubLevel, secondSlot)
+            );
+            if (configuration == null
+                    || !validateFixedConstraintConfiguration(
+                    configuration,
+                    firstSubLevel,
+                    secondSubLevel,
+                    firstSlot,
+                    reason + ":edge-" + edge
+            )) {
+                removeTriangleCandidates(candidates, reason + ":configuration-failed");
+                return false;
+            }
+
+            PhysicsConstraintHandle added;
+            try {
+                captureCanonicalTrianglePreAddDiagnostics(
+                        edge,
+                        firstSubLevel,
+                        secondSubLevel,
+                        configuration
+                );
+                added = pipeline.addConstraint(firstSubLevel, secondSubLevel, configuration);
+            } catch (Exception exception) {
+                logTriangleException("addConstraint", reason, edge, firstSubLevel, secondSubLevel, exception);
+                removeTriangleCandidates(candidates, reason + ":candidate-add-failed");
+                return false;
+            }
+            if (!(added instanceof FixedConstraintHandle candidate)
+                    || !isConstraintHandleValid(candidate)) {
+                removeConstraintHandle(added, firstSlot, reason + ":candidate-invalid-edge-" + edge);
+                removeTriangleCandidates(candidates, reason + ":candidate-invalid");
+                return false;
+            }
+            if (!configureTriangleConstraintHandle(
+                    pipeline,
+                    candidate,
+                    firstSubLevel,
+                    secondSubLevel,
+                    edge,
+                    reason
+            )) {
+                removeConstraintHandle(candidate, firstSlot, reason + ":candidate-config-failed-edge-" + edge);
+                removeTriangleCandidates(candidates, reason + ":candidate-config-failed");
+                return false;
+            }
+            candidates[edge] = candidate;
+            logTriangleState("candidate-ready", reason, edge, firstSubLevel, secondSubLevel, configuration, candidate);
+        }
+
+        boolean allCommitted = true;
+        for (int edge = 0; edge < SLOT_TRIANGLE_EDGES.length; edge++) {
+            FixedConstraintHandle candidate = candidates[edge];
+            if (candidate == null) {
+                continue;
+            }
+            int firstSlot = SLOT_TRIANGLE_EDGES[edge][0];
+            ServerSubLevel firstSubLevel = resolvedSlots[firstSlot];
+            ServerSubLevel secondSubLevel = resolvedSlots[SLOT_TRIANGLE_EDGES[edge][1]];
+            FixedConstraintHandle previous = triangleConstraintHandles[edge];
+            if (isConstraintHandleValid(previous)
+                    && !removeConstraintHandle(previous, firstSlot, reason + ":previous-edge-" + edge)) {
+                removeConstraintHandle(candidate, firstSlot, reason + ":candidate-rollback-edge-" + edge);
+                allCommitted = false;
+                continue;
+            }
+            commitTriangleConstraint(edge, firstSubLevel, secondSubLevel, candidate);
+            logTriangleState("candidate-committed", reason, edge, firstSubLevel, secondSubLevel, null, candidate);
+        }
+        boolean complete = allCommitted && hasCompleteCurrentTriangle(resolvedSlots);
+        if (complete) {
+            completeCanonicalRebindPreAddDiagnostics(topSubLevel, resolvedSlots);
+        }
+        return complete;
+    }
+
+    @Nullable
+    private FixedConstraintConfiguration createTriangleConfiguration(
+            int firstSlot,
+            int secondSlot,
+            Vector3d firstAnchorLocalCenter,
+            Vector3d secondAnchorLocalCenter
+    ) {
+        if (activeTopAnchorLocalCenter == null
+                || firstSlot < 0
+                || firstSlot >= SLOT_COUNT
+                || secondSlot < 0
+                || secondSlot >= SLOT_COUNT
+                || firstSlot == secondSlot) {
+            return null;
+        }
+
+        SlotFrame firstFrame = computeSlotFrame(firstSlot, slotFacing);
+        SlotFrame secondFrame = computeSlotFrame(secondSlot, slotFacing);
+        Vector3d firstCenterTopLocal = new Vector3d(activeTopAnchorLocalCenter).add(firstFrame.offset());
+        Vector3d secondCenterTopLocal = new Vector3d(activeTopAnchorLocalCenter).add(secondFrame.offset());
+        Vector3d jointTopLocal = new Vector3d(firstCenterTopLocal).add(secondCenterTopLocal).mul(0.5D);
+        Vector3d firstJointLocal = new Vector3d(jointTopLocal).sub(firstCenterTopLocal);
+        new Quaterniond(firstFrame.rotation()).conjugate().transform(firstJointLocal);
+        firstJointLocal.add(firstAnchorLocalCenter);
+        Vector3d secondJointLocal = new Vector3d(jointTopLocal).sub(secondCenterTopLocal);
+        new Quaterniond(secondFrame.rotation()).conjugate().transform(secondJointLocal);
+        secondJointLocal.add(secondAnchorLocalCenter);
+        Quaterniond relativeOrientation = new Quaterniond(firstFrame.rotation())
+                .conjugate()
+                .mul(secondFrame.rotation())
+                .normalize();
+        if (!isFinite(firstCenterTopLocal)
+                || !isFinite(secondCenterTopLocal)
+                || !isFinite(jointTopLocal)
+                || !isFinite(firstJointLocal)
+                || !isFinite(secondJointLocal)
+                || !isFinite(relativeOrientation)) {
+            return null;
+        }
+        return new FixedConstraintConfiguration(firstJointLocal, secondJointLocal, relativeOrientation);
+    }
+
+    private boolean configureTriangleConstraintHandle(
+            PhysicsPipeline pipeline,
+            FixedConstraintHandle handle,
+            ServerSubLevel firstSubLevel,
+            ServerSubLevel secondSubLevel,
+            int edge,
+            String reason
+    ) {
+        try {
+            handle.setContactsEnabled(false);
+            pipeline.wakeUp(firstSubLevel);
+            pipeline.wakeUp(secondSubLevel);
+            return handle.isValid();
+        } catch (Exception exception) {
+            logTriangleException("configure", reason, edge, firstSubLevel, secondSubLevel, exception);
+            return false;
+        }
+    }
+
+    private boolean triangleConstraintMatches(
+            int edge,
+            ServerSubLevel firstSubLevel,
+            ServerSubLevel secondSubLevel
+    ) {
+        return isConstraintHandleValid(triangleConstraintHandles[edge])
+                && firstSubLevel.getUniqueId().equals(triangleFirstSubLevelIds[edge])
+                && secondSubLevel.getUniqueId().equals(triangleSecondSubLevelIds[edge])
+                && triangleFirstRuntimeIds[edge] == getRuntimeIdForDiagnostics(firstSubLevel)
+                && triangleSecondRuntimeIds[edge] == getRuntimeIdForDiagnostics(secondSubLevel)
+                && triangleFirstObjectIdentities[edge] == getObjectIdentityForDiagnostics(firstSubLevel)
+                && triangleSecondObjectIdentities[edge] == getObjectIdentityForDiagnostics(secondSubLevel);
+    }
+
+    private boolean hasCompleteCurrentTriangle(ServerSubLevel[] resolvedSlots) {
+        for (int edge = 0; edge < SLOT_TRIANGLE_EDGES.length; edge++) {
+            if (!triangleConstraintMatches(
+                    edge,
+                    resolvedSlots[SLOT_TRIANGLE_EDGES[edge][0]],
+                    resolvedSlots[SLOT_TRIANGLE_EDGES[edge][1]]
+            )) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private void commitTriangleConstraint(
+            int edge,
+            ServerSubLevel firstSubLevel,
+            ServerSubLevel secondSubLevel,
+            FixedConstraintHandle handle
+    ) {
+        triangleConstraintHandles[edge] = handle;
+        triangleFirstSubLevelIds[edge] = firstSubLevel.getUniqueId();
+        triangleSecondSubLevelIds[edge] = secondSubLevel.getUniqueId();
+        triangleFirstRuntimeIds[edge] = getRuntimeIdForDiagnostics(firstSubLevel);
+        triangleSecondRuntimeIds[edge] = getRuntimeIdForDiagnostics(secondSubLevel);
+        triangleFirstObjectIdentities[edge] = getObjectIdentityForDiagnostics(firstSubLevel);
+        triangleSecondObjectIdentities[edge] = getObjectIdentityForDiagnostics(secondSubLevel);
+    }
+
+    private void removeTriangleCandidates(FixedConstraintHandle[] candidates, String reason) {
+        for (int edge = 0; edge < candidates.length; edge++) {
+            FixedConstraintHandle candidate = candidates[edge];
+            if (candidate != null) {
+                removeConstraintHandle(
+                        candidate,
+                        SLOT_TRIANGLE_EDGES[edge][0],
+                        reason + ":edge-" + edge
+                );
+            }
+        }
+    }
+
+    private void removeTriangleConstraints(String reason) {
+        for (int edge = 0; edge < SLOT_TRIANGLE_EDGES.length; edge++) {
+            FixedConstraintHandle handle = triangleConstraintHandles[edge];
+            if (handle != null) {
+                removeConstraintHandle(handle, SLOT_TRIANGLE_EDGES[edge][0], reason + ":edge-" + edge);
+            }
+            clearTriangleConstraintMetadata(edge);
+        }
+    }
+
+    private void clearTriangleConstraintMetadata(int edge) {
+        triangleConstraintHandles[edge] = null;
+        triangleFirstSubLevelIds[edge] = null;
+        triangleSecondSubLevelIds[edge] = null;
+        triangleFirstRuntimeIds[edge] = DIAGNOSTIC_UNKNOWN_RUNTIME_ID;
+        triangleSecondRuntimeIds[edge] = DIAGNOSTIC_UNKNOWN_RUNTIME_ID;
+        triangleFirstObjectIdentities[edge] = DIAGNOSTIC_UNKNOWN_RUNTIME_ID;
+        triangleSecondObjectIdentities[edge] = DIAGNOSTIC_UNKNOWN_RUNTIME_ID;
+    }
+
+    private void logTriangleState(
+            String event,
+            String reason,
+            int edge,
+            ServerSubLevel firstSubLevel,
+            ServerSubLevel secondSubLevel,
+            @Nullable FixedConstraintConfiguration configuration,
+            @Nullable PhysicsConstraintHandle handle
+    ) {
+        if (!TwisterMillDiagnostics.isServoLoggingEnabled()) {
+            return;
+        }
+        Vector3d firstJointWorld = configuration == null
+                ? null
+                : firstSubLevel.logicalPose().transformPosition(configuration.pos1(), new Vector3d());
+        Vector3d secondJointWorld = configuration == null
+                ? null
+                : secondSubLevel.logicalPose().transformPosition(configuration.pos2(), new Vector3d());
+        Vector3d firstBlockCenterWorld = slotAnchorLocalCenters[SLOT_TRIANGLE_EDGES[edge][0]] == null
+                ? null
+                : firstSubLevel.logicalPose().transformPosition(
+                slotAnchorLocalCenters[SLOT_TRIANGLE_EDGES[edge][0]],
+                new Vector3d()
+        );
+        Vector3d secondBlockCenterWorld = slotAnchorLocalCenters[SLOT_TRIANGLE_EDGES[edge][1]] == null
+                ? null
+                : secondSubLevel.logicalPose().transformPosition(
+                slotAnchorLocalCenters[SLOT_TRIANGLE_EDGES[edge][1]],
+                new Vector3d()
+        );
+        Vector3d selectedCentersMidpointWorld = firstBlockCenterWorld == null || secondBlockCenterWorld == null
+                ? null
+                : new Vector3d(firstBlockCenterWorld).add(secondBlockCenterWorld).mul(0.5D);
+        double anchorError = firstJointWorld == null || secondJointWorld == null
+                ? Double.NaN
+                : firstJointWorld.distance(secondJointWorld);
+        LOGGER.info(
+                "[PropellerSlotTriangleDiag] event={} reason={} edge={} firstSlot={} secondSlot={} firstBody={} secondBody={} firstBlockCenterWorld={} secondBlockCenterWorld={} selectedCentersMidpointWorld={} pos1={} pos2={} orientation={} firstJointWorld={} secondJointWorld={} anchorErrorBlocks={} handle={}",
+                event,
+                reason,
+                edge,
+                SLOT_TRIANGLE_EDGES[edge][0],
+                SLOT_TRIANGLE_EDGES[edge][1],
+                describeBody(firstSubLevel),
+                describeBody(secondSubLevel),
+                formatVector(firstBlockCenterWorld),
+                formatVector(secondBlockCenterWorld),
+                formatVector(selectedCentersMidpointWorld),
+                configuration == null ? "<retained>" : formatVector(configuration.pos1()),
+                configuration == null ? "<retained>" : formatVector(configuration.pos2()),
+                configuration == null ? "<retained>" : formatQuaternion(configuration.orientation()),
+                formatVector(firstJointWorld),
+                formatVector(secondJointWorld),
+                formatDouble(anchorError),
+                describeConstraintHandle(handle)
+        );
+    }
+
+    private void logTriangleException(
+            String operation,
+            String reason,
+            int edge,
+            ServerSubLevel firstSubLevel,
+            ServerSubLevel secondSubLevel,
+            Exception exception
+    ) {
+        LOGGER.warn(
+                "[PropellerSlotTriangleDiag] event=exception operation={} reason={} edge={} firstSlot={} secondSlot={} firstBody={} secondBody={}",
+                operation,
+                reason,
+                edge,
+                SLOT_TRIANGLE_EDGES[edge][0],
+                SLOT_TRIANGLE_EDGES[edge][1],
+                describeBody(firstSubLevel),
+                describeBody(secondSubLevel),
+                exception
+        );
+    }
+
+    private void captureCanonicalTopPreAddDiagnostics(
+            int slot,
+            @Nullable ServerSubLevel topSubLevel,
+            ServerSubLevel slotSubLevel,
+            FixedConstraintConfiguration configuration
+    ) {
+        if (!canonicalRebindDiagnosticsArmed) {
+            return;
+        }
+        if (!TwisterMillDiagnostics.isServoLoggingEnabled()) {
+            resetCanonicalRebindDiagnostics();
+            return;
+        }
+
+        try {
+            canonicalTopPreAddDiagnostics[slot] = computeConstraintFrameDiagnostics(
+                    topSubLevel,
+                    slotSubLevel,
+                    configuration.pos1(),
+                    configuration.orientation(),
+                    configuration.pos2(),
+                    new Quaterniond()
+            );
+        } catch (RuntimeException exception) {
+            abortCanonicalRebindDiagnostics("top-pre-add", slot, exception);
+        }
+    }
+
+    private void captureCanonicalTrianglePreAddDiagnostics(
+            int edge,
+            ServerSubLevel firstSubLevel,
+            ServerSubLevel secondSubLevel,
+            FixedConstraintConfiguration configuration
+    ) {
+        if (!canonicalRebindDiagnosticsArmed) {
+            return;
+        }
+        if (!TwisterMillDiagnostics.isServoLoggingEnabled()) {
+            resetCanonicalRebindDiagnostics();
+            return;
+        }
+
+        try {
+            canonicalTrianglePreAddDiagnostics[edge] = computeConstraintFrameDiagnostics(
+                    firstSubLevel,
+                    secondSubLevel,
+                    configuration.pos1(),
+                    configuration.orientation(),
+                    configuration.pos2(),
+                    new Quaterniond()
+            );
+        } catch (RuntimeException exception) {
+            abortCanonicalRebindDiagnostics("triangle-pre-add", edge, exception);
+        }
+    }
+
+    private void completeCanonicalRebindPreAddDiagnostics(
+            ServerSubLevel topSubLevel,
+            ServerSubLevel[] resolvedSlots
+    ) {
+        if (!canonicalRebindDiagnosticsArmed) {
+            return;
+        }
+        if (!TwisterMillDiagnostics.isServoLoggingEnabled()) {
+            resetCanonicalRebindDiagnostics();
+            return;
+        }
+        if (Arrays.stream(canonicalTopPreAddDiagnostics).anyMatch(java.util.Objects::isNull)
+                || Arrays.stream(canonicalTrianglePreAddDiagnostics).anyMatch(java.util.Objects::isNull)) {
+            return;
+        }
+
+        int validTopHandles = countCurrentTopConstraintHandles(topSubLevel, resolvedSlots);
+        int validTriangleHandles = countCurrentTriangleConstraintHandles(resolvedSlots);
+        if (validTopHandles != SLOT_COUNT || validTriangleHandles != SLOT_TRIANGLE_EDGES.length) {
+            return;
+        }
+
+        logCanonicalRebindSnapshot(
+                "canonical-rebind-pre-add",
+                canonicalTopPreAddDiagnostics,
+                canonicalTrianglePreAddDiagnostics,
+                validTopHandles,
+                validTriangleHandles
+        );
+        canonicalRebindDiagnosticsArmed = false;
+        canonicalRebindPostSnapshotPending = true;
+    }
+
+    private void captureCanonicalRebindPostSnapshot(ServerLevel rootLevel) {
+        if (!canonicalRebindPostSnapshotPending) {
+            return;
+        }
+        if (!TwisterMillDiagnostics.isServoLoggingEnabled()) {
+            resetCanonicalRebindDiagnostics();
+            return;
+        }
+        if (!topFollowActive
+                || activeTopSubLevelId == null
+                || activeTopAnchorLocalCenter == null
+                || !hasCompleteDistinctSlotSet()) {
+            resetCanonicalRebindDiagnostics();
+            return;
+        }
+
+        ServerSubLevel topSubLevel = resolveSubLevel(rootLevel, activeTopSubLevelId);
+        if (topSubLevel == null) {
+            return;
+        }
+        ServerSubLevel[] resolvedSlots = new ServerSubLevel[SLOT_COUNT];
+        for (int slot = 0; slot < SLOT_COUNT; slot++) {
+            resolvedSlots[slot] = resolveSubLevel(rootLevel, slotSubLevelIds[slot]);
+            if (resolvedSlots[slot] == null || slotAnchorLocalCenters[slot] == null) {
+                return;
+            }
+        }
+
+        ConstraintFrameDiagnostics[] topDiagnostics = new ConstraintFrameDiagnostics[SLOT_COUNT];
+        ConstraintFrameDiagnostics[] triangleDiagnostics =
+                new ConstraintFrameDiagnostics[SLOT_TRIANGLE_EDGES.length];
+        try {
+            for (int slot = 0; slot < SLOT_COUNT; slot++) {
+                ConstraintTarget target = createCanonicalTopTarget(topSubLevel, slot);
+                FixedConstraintConfiguration configuration = new FixedConstraintConfiguration(
+                        target.framePosition(),
+                        slotAnchorLocalCenters[slot],
+                        target.frameOrientation()
+                );
+                topDiagnostics[slot] = computeConstraintFrameDiagnostics(
+                        topSubLevel,
+                        resolvedSlots[slot],
+                        configuration.pos1(),
+                        configuration.orientation(),
+                        configuration.pos2(),
+                        new Quaterniond()
+                );
+            }
+            for (int edge = 0; edge < SLOT_TRIANGLE_EDGES.length; edge++) {
+                int firstSlot = SLOT_TRIANGLE_EDGES[edge][0];
+                int secondSlot = SLOT_TRIANGLE_EDGES[edge][1];
+                FixedConstraintConfiguration configuration = createTriangleConfiguration(
+                        firstSlot,
+                        secondSlot,
+                        slotAnchorLocalCenters[firstSlot],
+                        slotAnchorLocalCenters[secondSlot]
+                );
+                if (configuration == null) {
+                    throw new IllegalStateException("Canonical triangle configuration unavailable for edge " + edge);
+                }
+                triangleDiagnostics[edge] = computeConstraintFrameDiagnostics(
+                        resolvedSlots[firstSlot],
+                        resolvedSlots[secondSlot],
+                        configuration.pos1(),
+                        configuration.orientation(),
+                        configuration.pos2(),
+                        new Quaterniond()
+                );
+            }
+        } catch (RuntimeException exception) {
+            abortCanonicalRebindDiagnostics("first-postphysics", -1, exception);
+            return;
+        }
+
+        logCanonicalRebindSnapshot(
+                "canonical-rebind-first-postphysics",
+                topDiagnostics,
+                triangleDiagnostics,
+                countCurrentTopConstraintHandles(topSubLevel, resolvedSlots),
+                countCurrentTriangleConstraintHandles(resolvedSlots)
+        );
+        resetCanonicalRebindDiagnostics();
+    }
+
+    private int countCurrentTopConstraintHandles(
+            ServerSubLevel topSubLevel,
+            ServerSubLevel[] resolvedSlots
+    ) {
+        int count = 0;
+        for (int slot = 0; slot < SLOT_COUNT; slot++) {
+            if (isCurrentTopSlotConstraint(topSubLevel, resolvedSlots[slot], slot)) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    private int countCurrentTriangleConstraintHandles(ServerSubLevel[] resolvedSlots) {
+        int count = 0;
+        for (int edge = 0; edge < SLOT_TRIANGLE_EDGES.length; edge++) {
+            if (triangleConstraintMatches(
+                    edge,
+                    resolvedSlots[SLOT_TRIANGLE_EDGES[edge][0]],
+                    resolvedSlots[SLOT_TRIANGLE_EDGES[edge][1]]
+            )) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    private void logCanonicalRebindSnapshot(
+            String event,
+            ConstraintFrameDiagnostics[] topDiagnostics,
+            ConstraintFrameDiagnostics[] triangleDiagnostics,
+            int validTopHandles,
+            int validTriangleHandles
+    ) {
+        LOGGER.info(
+                "[PropellerSlotCanonicalRebindDiag] event={} topSubLevelId={} slotFacing={} topTranslationErrorsBlocks={} topQuaternionErrorsDeg={} triangleAnchorErrorsBlocks={} triangleRelativeQuaternionErrorsDeg={} validTopFixedHandles={} validTriangleFixedHandles={}",
+                event,
+                activeTopSubLevelId,
+                slotFacing,
+                formatDiagnosticErrors(topDiagnostics, false),
+                formatDiagnosticErrors(topDiagnostics, true),
+                formatDiagnosticErrors(triangleDiagnostics, false),
+                formatDiagnosticErrors(triangleDiagnostics, true),
+                validTopHandles,
+                validTriangleHandles
+        );
+    }
+
+    private String formatDiagnosticErrors(
+            ConstraintFrameDiagnostics[] diagnostics,
+            boolean orientation
+    ) {
+        StringBuilder formatted = new StringBuilder("[");
+        for (int index = 0; index < diagnostics.length; index++) {
+            if (index > 0) {
+                formatted.append(',');
+            }
+            ConstraintFrameDiagnostics diagnostic = diagnostics[index];
+            formatted.append(index).append('=');
+            formatted.append(diagnostic == null
+                    ? "unavailable"
+                    : formatDouble(orientation
+                    ? diagnostic.orientationErrorDegrees()
+                    : diagnostic.positionError()));
+        }
+        return formatted.append(']').toString();
+    }
+
+    private void abortCanonicalRebindDiagnostics(String phase, int index, RuntimeException exception) {
+        LOGGER.warn(
+                "[PropellerSlotCanonicalRebindDiag] event=diagnostic-capture-failed phase={} index={} topSubLevelId={} slotFacing={}",
+                phase,
+                index,
+                activeTopSubLevelId,
+                slotFacing,
+                exception
+        );
+        resetCanonicalRebindDiagnostics();
+    }
+
+    private void resetCanonicalRebindDiagnostics() {
+        canonicalRebindDiagnosticsArmed = false;
+        canonicalRebindPostSnapshotPending = false;
+        Arrays.fill(canonicalTopPreAddDiagnostics, null);
+        Arrays.fill(canonicalTrianglePreAddDiagnostics, null);
+    }
+
     private Vector3d targetWorldPosition(ConstraintTarget target) {
         return target.body() == null
                 ? new Vector3d(target.framePosition())
@@ -1405,7 +2222,7 @@ public final class ServoPropellerSlotManager {
                 : new Quaterniond(target.body().logicalPose().orientation()).mul(target.frameOrientation()).normalize();
     }
 
-    private boolean removeConstraintHandle(@Nullable GenericConstraintHandle handle, int slot, String reason) {
+    private boolean removeConstraintHandle(@Nullable PhysicsConstraintHandle handle, int slot, String reason) {
         logConstraintRemoval("transaction-remove-attempt", reason, slot, handle, null);
         if (handle == null) {
             return true;
@@ -1433,8 +2250,8 @@ public final class ServoPropellerSlotManager {
             int slot,
             ConstraintTarget target,
             ServerSubLevel child,
-            @Nullable GenericConstraintHandle previous,
-            @Nullable GenericConstraintHandle candidate
+            @Nullable PhysicsConstraintHandle previous,
+            @Nullable PhysicsConstraintHandle candidate
     ) {
         if (!TwisterMillDiagnostics.isServoLoggingEnabled()) {
             return;
@@ -1568,9 +2385,12 @@ public final class ServoPropellerSlotManager {
             return;
         }
 
+        boolean topConstraintsReady = hasCompleteDistinctSlotSet();
+        ServerSubLevel[] resolvedSlots = new ServerSubLevel[SLOT_COUNT];
         for (int i = 0; i < SLOT_COUNT; i++) {
             UUID subLevelId = slotSubLevelIds[i];
             if (subLevelId == null) {
+                topConstraintsReady = false;
                 continue;
             }
 
@@ -1580,8 +2400,10 @@ public final class ServoPropellerSlotManager {
                     return;
                 }
                 clearSlot(i, "stabilize-slot-sublevel-missing");
+                topConstraintsReady = false;
                 continue;
             }
+            resolvedSlots[i] = slotSubLevel;
 
             Vector3d anchorLocalCenter = getOrCreateAnchorLocalCenter(slotSubLevel, i);
             ConstraintEnsureResult result = ensureTopSlotConstraint(
@@ -1590,7 +2412,6 @@ public final class ServoPropellerSlotManager {
                     slotSubLevel,
                     i,
                     anchorLocalCenter,
-                    activeTopAnchorLocalCenter,
                     recomputeFromTopPose ? "post-physics-top-ensure" : "pre-physics-top-ensure"
             );
             if (result == ConstraintEnsureResult.UNSECURED) {
@@ -1603,34 +2424,36 @@ public final class ServoPropellerSlotManager {
                         recomputeFromTopPose ? "post-physics-top-fallback" : "pre-physics-top-fallback"
                 );
             }
+            if (result != ConstraintEnsureResult.TARGET_ACTIVE
+                    || !isCurrentTopSlotConstraint(topSubLevel, slotSubLevel, i)) {
+                topConstraintsReady = false;
+            }
+        }
+
+        if (topConstraintsReady) {
+            ensureSlotTriangle(
+                    pipeline,
+                    topSubLevel,
+                    resolvedSlots,
+                    recomputeFromTopPose ? "post-physics-triangle-ensure" : "pre-physics-triangle-ensure"
+            );
+        } else if (!freeBearingFailClosedTopFollow) {
+            removeTriangleConstraints(
+                    recomputeFromTopPose ? "post-physics-triangle-not-ready" : "pre-physics-triangle-not-ready"
+            );
         }
     }
 
-    private void applyTopPoseToSlot(
-            PhysicsPipeline pipeline,
-            ServerSubLevel topSubLevel,
-            ServerSubLevel slotSubLevel,
-            int slot,
-            Vector3d anchorLocalCenter,
-            Vector3d topAnchorLocalCenter
-    ) {
-        Pose3dc topPose = topSubLevel.logicalPose();
-        SlotFrame slotFrame = computeSlotFrame(slot, slotFacing);
-        Vector3d localCenter = new Vector3d(topAnchorLocalCenter)
-                .add(slotFrame.offset());
-        Vector3d worldCenter = topPose.transformPosition(localCenter, new Vector3d());
-        Quaterniond orientation = new Quaterniond(topPose.orientation()).mul(slotFrame.rotation());
-
-        snapSlotPose(slotSubLevel, anchorLocalCenter, worldCenter, orientation, pipeline);
-    }
-
     private void clearTopFollowState() {
+        resetCanonicalRebindDiagnostics();
+        removeTriangleConstraints("top-follow-cleared");
         topFollowActive = false;
         activeTopSubLevelId = null;
         activeTopAnchorLocalCenter = null;
     }
 
     private void clearSlot(int slot, String reason) {
+        removeTriangleConstraints(reason + ":triangle-cleanup");
         removeSlotConstraint(slot, reason + ":constraint-cleanup");
         slotSubLevelIds[slot] = null;
         slotAnchorLocalCenters[slot] = null;
@@ -1648,7 +2471,7 @@ public final class ServoPropellerSlotManager {
     }
 
     private void removeSlotConstraint(int slot, String reason) {
-        GenericConstraintHandle handle = slotConstraintHandles[slot];
+        PhysicsConstraintHandle handle = slotConstraintHandles[slot];
         logConstraintRemoval("remove-attempt", reason, slot, handle, null);
         if (handle != null) {
             try {
@@ -1666,7 +2489,6 @@ public final class ServoPropellerSlotManager {
         slotConstraintParentSubLevelIds[slot] = null;
         slotConstraintFrame1Positions[slot] = null;
         slotConstraintFrame1Orientations[slot] = null;
-        clearTopSnap(slot);
         slotConstraintAttachedToTop[slot] = false;
         slotConstraintTopSubLevelIds[slot] = null;
         slotConstraintParentRuntimeIds[slot] = DIAGNOSTIC_UNKNOWN_RUNTIME_ID;
@@ -1799,7 +2621,7 @@ public final class ServoPropellerSlotManager {
                     frame2Orientation
             );
             LOGGER.info(
-                    "[PropellerSlotConstraintDiag] event={} reason={} slot={} target={} servoWorldPos={} actualSupport={} parent={} child={} handle={} storedParentUuid={} storedParentRuntimeId={} storedChildRuntimeId={} lockedAxes={} frame1LocalPos={} frame1LocalRot={} frame2LocalPos={} frame2LocalRot={} frame1WorldPos={} frame1WorldRot={} frame2WorldPos={} frame2WorldRot={} framePositionError={} frameOrientationErrorDeg={} detail={}",
+                    "[PropellerSlotConstraintDiag] event={} reason={} slot={} target={} servoWorldPos={} actualSupport={} parent={} child={} handle={} storedParentUuid={} storedParentRuntimeId={} storedChildRuntimeId={} constraintContract={} frame1LocalPos={} frame1LocalRot={} frame2LocalPos={} frame2LocalRot={} frame1WorldPos={} frame1WorldRot={} frame2WorldPos={} frame2WorldRot={} framePositionError={} frameOrientationErrorDeg={} detail={}",
                     event,
                     reason,
                     slot,
@@ -1812,7 +2634,7 @@ public final class ServoPropellerSlotManager {
                     slotConstraintParentSubLevelIds[slot],
                     slotConstraintParentRuntimeIds[slot],
                     slotConstraintChildRuntimeIds[slot],
-                    LOCKED_AXES,
+                    constraintContractForDiagnostics(parentSubLevel),
                     formatVector(frame1Position),
                     formatQuaternion(frame1Orientation),
                     formatVector(frame2Position),
@@ -1859,7 +2681,7 @@ public final class ServoPropellerSlotManager {
             int slot,
             @Nullable ServerSubLevel parentSubLevel,
             @Nullable ServerSubLevel slotSubLevel,
-            @Nullable GenericConstraintHandle handle,
+            @Nullable PhysicsConstraintHandle handle,
             Exception exception
     ) {
         LOGGER.warn(
@@ -1883,7 +2705,7 @@ public final class ServoPropellerSlotManager {
             String event,
             String reason,
             int slot,
-            @Nullable GenericConstraintHandle handle,
+            @Nullable PhysicsConstraintHandle handle,
             @Nullable Exception exception
     ) {
         if (!TwisterMillDiagnostics.isServoLoggingEnabled()) {
@@ -2003,6 +2825,14 @@ public final class ServoPropellerSlotManager {
         return ConstraintParentKind.SUPPORT_BODY.name().toLowerCase(Locale.ROOT);
     }
 
+    private String constraintContractForDiagnostics(@Nullable ServerSubLevel parentSubLevel) {
+        return parentSubLevel != null
+                && activeTopSubLevelId != null
+                && activeTopSubLevelId.equals(parentSubLevel.getUniqueId())
+                ? "fixed-all-six-dofs"
+                : "generic-locked-axes=" + LOCKED_AXES;
+    }
+
     private String describeBody(@Nullable PhysicsPipelineBody body) {
         if (body == null) {
             return "{kind=root-world,runtimeId=" + PhysicsPipelineBody.NULL_RUNTIME_ID + ",removed=false}";
@@ -2019,7 +2849,7 @@ public final class ServoPropellerSlotManager {
         return describeConstraintHandle(slotConstraintHandles[slot]);
     }
 
-    private String describeConstraintHandle(@Nullable GenericConstraintHandle handle) {
+    private String describeConstraintHandle(@Nullable PhysicsConstraintHandle handle) {
         if (handle == null) {
             return "{valid=false}";
         }
@@ -2030,7 +2860,10 @@ public final class ServoPropellerSlotManager {
         } catch (Exception exception) {
             valid = "error:" + exception.getClass().getName() + ":" + exception.getMessage();
         }
-        return "{valid=" + valid + "}";
+        String type = handle instanceof FixedConstraintHandle
+                ? "fixed"
+                : handle instanceof GenericConstraintHandle ? "generic" : handle.getClass().getName();
+        return "{type=" + type + ",valid=" + valid + "}";
     }
 
     private int getRuntimeIdForDiagnostics(@Nullable PhysicsPipelineBody body) {
@@ -2093,6 +2926,110 @@ public final class ServoPropellerSlotManager {
         }
     }
 
+    private boolean configureFixedConstraintHandle(
+            PhysicsPipeline pipeline,
+            PhysicsConstraintHandle handle,
+            ConstraintTarget target,
+            ServerSubLevel slotSubLevel,
+            int slot,
+            String reason
+    ) {
+        if (!(handle instanceof FixedConstraintHandle)) {
+            return false;
+        }
+
+        String operation = "setContactsEnabled(false)";
+        try {
+            handle.setContactsEnabled(false);
+            if (target.body() != null) {
+                operation = "wakeUp(parent)";
+                pipeline.wakeUp(target.body());
+            }
+            operation = "wakeUp(child)";
+            pipeline.wakeUp(slotSubLevel);
+            return true;
+        } catch (Exception exception) {
+            logConstraintHandleException(operation, reason, slot, target.body(), slotSubLevel, handle, exception);
+            return false;
+        }
+    }
+
+    private boolean validateFixedConstraintConfiguration(
+            FixedConstraintConfiguration configuration,
+            @Nullable ServerSubLevel parentSubLevel,
+            ServerSubLevel slotSubLevel,
+            int slot,
+            String reason
+    ) {
+        boolean invalidBodies = parentSubLevel == null
+                || parentSubLevel.isRemoved()
+                || slotSubLevel.isRemoved()
+                || parentSubLevel == slotSubLevel
+                || parentSubLevel.getUniqueId().equals(slotSubLevel.getUniqueId());
+        boolean invalidFrame = !isFinite(configuration.pos1())
+                || !isFinite(configuration.pos2())
+                || !isFinite(configuration.orientation());
+        if (invalidBodies || invalidFrame) {
+            logConstraintState(
+                    "fixed-configuration-validation-failed",
+                    reason,
+                    slot,
+                    parentSubLevel,
+                    slotSubLevel,
+                    configuration.pos1(),
+                    configuration.orientation(),
+                    configuration.pos2(),
+                    new Quaterniond(),
+                    "invalidBodies=" + invalidBodies + ", invalidFrame=" + invalidFrame
+            );
+            return false;
+        }
+
+        ServerSubLevelContainer container = SubLevelContainer.getContainer(slotSubLevel.getLevel());
+        if (container == null) {
+            logConstraintState(
+                    "fixed-configuration-validate-skipped",
+                    reason,
+                    slot,
+                    parentSubLevel,
+                    slotSubLevel,
+                    configuration.pos1(),
+                    configuration.orientation(),
+                    configuration.pos2(),
+                    new Quaterniond(),
+                    "result=container-null"
+            );
+            return false;
+        }
+
+        try {
+            configuration.validate(container, parentSubLevel, slotSubLevel);
+            logConstraintState(
+                    "fixed-configuration-validate-result",
+                    reason,
+                    slot,
+                    parentSubLevel,
+                    slotSubLevel,
+                    configuration.pos1(),
+                    configuration.orientation(),
+                    configuration.pos2(),
+                    new Quaterniond(),
+                    "result=success"
+            );
+            return true;
+        } catch (Exception exception) {
+            logConstraintException(
+                    "FixedConstraintConfiguration.validate",
+                    reason,
+                    slot,
+                    parentSubLevel,
+                    slotSubLevel,
+                    exception
+            );
+            return false;
+        }
+    }
+
     private boolean ensureSlotPlacementHelperMetadata(
             ServerLevel rootLevel,
             ServerSubLevel slotSubLevel,
@@ -2126,7 +3063,18 @@ public final class ServoPropellerSlotManager {
         return isConstraintHandleValid(slotConstraintHandles[slot]);
     }
 
-    private boolean isConstraintHandleValid(@Nullable GenericConstraintHandle handle) {
+    private boolean constraintHandleMatchesKind(
+            @Nullable PhysicsConstraintHandle handle,
+            ConstraintParentKind kind
+    ) {
+        return switch (kind) {
+            case TOP_BODY -> handle instanceof FixedConstraintHandle;
+            case ROOT_WORLD, SUPPORT_BODY -> handle instanceof GenericConstraintHandle;
+            case NONE -> false;
+        };
+    }
+
+    private boolean isConstraintHandleValid(@Nullable PhysicsConstraintHandle handle) {
         if (handle == null) {
             return false;
         }
@@ -2143,6 +3091,14 @@ public final class ServoPropellerSlotManager {
                 && Double.isFinite(vector.x())
                 && Double.isFinite(vector.y())
                 && Double.isFinite(vector.z());
+    }
+
+    private boolean isFinite(@Nullable Quaterniondc quaternion) {
+        return quaternion != null
+                && Double.isFinite(quaternion.x())
+                && Double.isFinite(quaternion.y())
+                && Double.isFinite(quaternion.z())
+                && Double.isFinite(quaternion.w());
     }
 
     private String formatVector(@Nullable Vector3dc vector) {

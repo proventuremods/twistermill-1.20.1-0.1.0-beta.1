@@ -2,6 +2,7 @@ package com.proventure.twistermill.blockentity;
 
 import com.mojang.logging.LogUtils;
 import dev.ryanhcode.sable.Sable;
+import dev.ryanhcode.sable.api.block.BlockEntitySubLevelActor;
 import dev.ryanhcode.sable.api.sublevel.SubLevelContainer;
 import dev.ryanhcode.sable.companion.ClientSubLevelAccess;
 import dev.ryanhcode.sable.companion.math.Pose3d;
@@ -46,7 +47,7 @@ import org.joml.Quaterniond;
 import org.joml.Vector3d;
 import org.slf4j.Logger;
 
-public class WindRotoVerticalBlockEntity extends MechanicalBearingBlockEntity {
+public class WindRotoVerticalBlockEntity extends MechanicalBearingBlockEntity implements BlockEntitySubLevelActor {
 
     private static final Logger LOGGER = LogUtils.getLogger();
     private static final String TAG_SABLE_ACTIVE = "SableActive";
@@ -334,6 +335,19 @@ public class WindRotoVerticalBlockEntity extends MechanicalBearingBlockEntity {
         if (activeSubLevelId != null) {
             target.add(activeSubLevelId);
         }
+    }
+
+    @Override
+    public Iterable<SubLevel> sable$getConnectionDependencies() {
+        return TwisterMillSableSchematicRemapper.resolveConnectionDependencies(
+                level,
+                this::collectChildSubLevelIdsForWindRotoSailCount
+        );
+    }
+
+    @Override
+    public Iterable<SubLevel> sable$getLoadingDependencies() {
+        return List.of();
     }
 
     @Nullable
@@ -1780,10 +1794,20 @@ public class WindRotoVerticalBlockEntity extends MechanicalBearingBlockEntity {
             rememberedShipMemory.write(tag);
         }
         logSableWriteNbtDiagnostics("write-after-backend", tag, clientPacket);
+        TwisterMillSableSchematicRemapper.remapForWrite(
+                tag,
+                clientPacket,
+                TwisterMillSableSchematicRemapper.OwnerType.WIND_ROTO_VERTICAL
+        );
     }
 
     @Override
     public void read(CompoundTag tag, HolderLookup.Provider registries, boolean clientPacket) {
+        tag = TwisterMillSableSchematicRemapper.prepareForRead(
+                tag,
+                clientPacket,
+                TwisterMillSableSchematicRemapper.OwnerType.WIND_ROTO_VERTICAL
+        );
         super.read(tag, registries, clientPacket);
 
         forceRotationModeNeverPlace();

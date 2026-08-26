@@ -87,6 +87,30 @@ final class SableInteractiveContraptionBackend {
         }
     }
 
+    enum HardHingeEnsureStatus {
+        READY,
+        RETRYABLE,
+        INVALID
+    }
+
+    record HardHingeEnsureResult(HardHingeEnsureStatus status, String reason) {
+        private static HardHingeEnsureResult ready() {
+            return new HardHingeEnsureResult(HardHingeEnsureStatus.READY, "ready");
+        }
+
+        private static HardHingeEnsureResult retryable(String reason) {
+            return new HardHingeEnsureResult(HardHingeEnsureStatus.RETRYABLE, reason);
+        }
+
+        private static HardHingeEnsureResult invalid(String reason) {
+            return new HardHingeEnsureResult(HardHingeEnsureStatus.INVALID, reason);
+        }
+
+        boolean readyForMotor() {
+            return status == HardHingeEnsureStatus.READY;
+        }
+    }
+
     private static final Logger LOGGER = LogUtils.getLogger();
     private static final TagKey<Block> TWISTERMILL_SAIL_LIKE =
             TagKey.create(Registries.BLOCK, ResourceLocation.fromNamespaceAndPath("twistermill", "sail_like"));
@@ -109,6 +133,15 @@ final class SableInteractiveContraptionBackend {
             Blocks.BLACK_WOOL
     );
     private static final double CONSTRAINT_ANCHOR_NUDGE = 1.0E-3;
+    private static final double FACING_AXIS_GUIDE_OFFSET_BLOCKS = 1.0D;
+    private static final double FACING_AXIS_GUIDE_FRAME_EPSILON = 1.0E-9D;
+    private static final int FACING_AXIS_GUIDE_DIAGNOSTIC_INTERVAL_TICKS = 20;
+    private static final Set<ConstraintJointAxis> FACING_AXIS_GUIDE_LOCKED_AXES =
+            Collections.unmodifiableSet(EnumSet.of(
+                    ConstraintJointAxis.LINEAR_X,
+                    ConstraintJointAxis.LINEAR_Y,
+                    ConstraintJointAxis.LINEAR_Z
+            ));
     private static final float ANGLE_STEP_DEGREES = 0.05F; //settings for contraption
     private static final float MODE3_DISASSEMBLY_PHYSICAL_ZERO_LIMIT_DEGREES = 2.0F;
     private static final double WORLD_LOCK_PROJECTION_EPSILON = 1.0E-8;
@@ -128,6 +161,24 @@ final class SableInteractiveContraptionBackend {
     private transient PhysicsConstraintHandle constraintHandle;
     @Nullable
     private transient RotationProfile constraintRotationProfile;
+    @Nullable
+    private transient GenericConstraintHandle facingAxisGuideHandle;
+    @Nullable
+    private transient PhysicsConstraintHandle facingAxisGuidePrimaryHandle;
+    @Nullable
+    private transient UUID facingAxisGuideParentSubLevelId;
+    @Nullable
+    private transient UUID facingAxisGuideChildSubLevelId;
+    private transient boolean facingAxisGuideParentWasRoot;
+    private transient int facingAxisGuideParentRuntimeId = Integer.MIN_VALUE;
+    private transient int facingAxisGuideChildRuntimeId = Integer.MIN_VALUE;
+    private transient int facingAxisGuideParentObjectIdentity = Integer.MIN_VALUE;
+    private transient int facingAxisGuideChildObjectIdentity = Integer.MIN_VALUE;
+    @Nullable
+    private transient Vector3d facingAxisGuidePos1;
+    @Nullable
+    private transient Vector3d facingAxisGuidePos2;
+    private transient long facingAxisGuideLastDiagnosticTick = Long.MIN_VALUE;
     private transient boolean constraintReattachPending;
     private transient RotationProfile pendingReattachProfile = RotationProfile.FACING_AXIS;
     @Nullable
@@ -1467,6 +1518,7 @@ final class SableInteractiveContraptionBackend {
 
     private boolean attachPreparedConstraint(PhysicsPipeline pipeline, ServerSubLevel attachedSubLevel,
             PreparedRotationConstraint prepared) {
+        disableFacingAxisHardHinge("prepared-primary-replaced");
         try {
             PhysicsConstraintHandle handle = prepared.attach(pipeline, attachedSubLevel);
             if (handle == null || !handle.isValid()) {
@@ -2053,6 +2105,7 @@ final class SableInteractiveContraptionBackend {
 
     private boolean activate(ServerSubLevel serverSubLevel, ServerLevel level, BlockPos bearingPos, Direction facing,
             RotationProfile rotationProfile) {
+        disableFacingAxisHardHinge("activate-reset");
         active = true;
         subLevelId = serverSubLevel.getUniqueId();
         subLevel = serverSubLevel;
@@ -2135,6 +2188,354 @@ final class SableInteractiveContraptionBackend {
         BlockPos pivotBlock = constraintPivotBlock(bearingPos, facing, RotationProfile.FACING_AXIS);
         ServerSubLevel baseSubLevel = resolveBaseSubLevel(serverLevel, pivotBlock);
         return isConstraintBaseCurrent(baseSubLevel);
+    }
+
+    HardHingeEnsureResult ensureFacingAxisHardHinge(
+            ServerLevel serverLevel,
+            BlockPos bearingPos,
+            Direction facing
+    ) {
+        if (diagnosticsTarget != TwisterMillDiagnostics.Target.SERVO) {
+            disableFacingAxisHardHinge("non-servo-backend");
+            return HardHingeEnsureResult.invalid("non-servo-backend");
+        }
+        if (!active || subLevelId == null) {
+            disableFacingAxisHardHinge("backend-inactive");
+            return HardHingeEnsureResult.invalid("backend-inactive");
+        }
+
+        ServerSubLevelContainer container = SubLevelContainer.getContainer(serverLevel);
+        if (container == null || container.physicsSystem() == null) {
+            return HardHingeEnsureResult.retryable("physics-container-unavailable");
+        }
+
+        ResolveSubLevelResult resolved = resolveSubLevelDetailed(serverLevel);
+        ServerSubLevel attachedSubLevel = resolved.subLevel();
+        if (attachedSubLevel == null) {
+            return isRetryableHardHingeResolveFailure(resolved.failureReason())
+                    ? HardHingeEnsureResult.retryable("child-" + resolved.failureReason().name().toLowerCase(Locale.ROOT))
+                    : HardHingeEnsureResult.invalid("child-" + resolved.failureReason().name().toLowerCase(Locale.ROOT));
+        }
+        if (!(constraintHandle instanceof RotaryConstraintHandle)
+                || !hasCurrentFacingAxisConstraint(serverLevel, bearingPos, facing)) {
+            return HardHingeEnsureResult.retryable("primary-rotary-not-current");
+        }
+
+        PreparedConstraint prepared = prepareConstraint(
+                serverLevel,
+                attachedSubLevel,
+                bearingPos,
+                facing,
+                RotationProfile.FACING_AXIS
+        );
+        if (prepared == null || prepared.baseSubLevel() == attachedSubLevel) {
+            disableFacingAxisHardHinge("primary-frame-invalid");
+            return HardHingeEnsureResult.invalid("primary-frame-invalid");
+        }
+        if (!isConstraintBaseCurrent(prepared.baseSubLevel())) {
+            return HardHingeEnsureResult.retryable("primary-base-not-current");
+        }
+
+        RotaryConstraintConfiguration primaryConfiguration = prepared.configuration();
+        Vector3d normal1 = new Vector3d(primaryConfiguration.normal1());
+        Vector3d normal2 = new Vector3d(primaryConfiguration.normal2());
+        if (!isFiniteVector(primaryConfiguration.pos1())
+                || !isFiniteVector(primaryConfiguration.pos2())
+                || !isFiniteVector(normal1)
+                || !isFiniteVector(normal2)
+                || normal1.lengthSquared() <= 1.0E-12D
+                || normal2.lengthSquared() <= 1.0E-12D) {
+            disableFacingAxisHardHinge("primary-frame-nonfinite");
+            return HardHingeEnsureResult.invalid("primary-frame-nonfinite");
+        }
+        normal1.normalize();
+        normal2.normalize();
+        Vector3d guidePos1 = new Vector3d(primaryConfiguration.pos1())
+                .fma(FACING_AXIS_GUIDE_OFFSET_BLOCKS, normal1);
+        Vector3d guidePos2 = new Vector3d(primaryConfiguration.pos2())
+                .fma(FACING_AXIS_GUIDE_OFFSET_BLOCKS, normal2);
+        if (!isFiniteVector(guidePos1) || !isFiniteVector(guidePos2)) {
+            disableFacingAxisHardHinge("guide-frame-nonfinite");
+            return HardHingeEnsureResult.invalid("guide-frame-nonfinite");
+        }
+
+        PhysicsPipeline pipeline = container.physicsSystem().getPipeline();
+        ServerSubLevel baseSubLevel = prepared.baseSubLevel();
+        if (facingAxisGuideMatches(baseSubLevel, attachedSubLevel, guidePos1, guidePos2)) {
+            logFacingAxisHardHingeDiagnostics(
+                    serverLevel,
+                    pipeline,
+                    baseSubLevel,
+                    attachedSubLevel,
+                    primaryConfiguration,
+                    guidePos1,
+                    guidePos2,
+                    "retained",
+                    false
+            );
+            return HardHingeEnsureResult.ready();
+        }
+
+        GenericConstraintConfiguration guideConfiguration = new GenericConstraintConfiguration(
+                guidePos1,
+                guidePos2,
+                new Quaterniond(),
+                new Quaterniond(),
+                FACING_AXIS_GUIDE_LOCKED_AXES
+        );
+        try {
+            guideConfiguration.validate(container, baseSubLevel, attachedSubLevel);
+        } catch (Exception exception) {
+            logFacingAxisGuideException("validate", bearingPos, exception);
+            return HardHingeEnsureResult.invalid("guide-configuration-invalid");
+        }
+
+        GenericConstraintHandle candidate = null;
+        try {
+            candidate = pipeline.addConstraint(baseSubLevel, attachedSubLevel, guideConfiguration);
+            if (candidate == null || !candidate.isValid()) {
+                removeFacingAxisGuideCandidate(candidate);
+                return HardHingeEnsureResult.retryable("guide-candidate-invalid");
+            }
+            candidate.lockAxes(
+                    ConstraintJointAxis.LINEAR_X,
+                    ConstraintJointAxis.LINEAR_Y,
+                    ConstraintJointAxis.LINEAR_Z
+            );
+            candidate.setContactsEnabled(false);
+            if (baseSubLevel != null) {
+                pipeline.wakeUp(baseSubLevel);
+            }
+            pipeline.wakeUp(attachedSubLevel);
+            if (!candidate.isValid()) {
+                removeFacingAxisGuideCandidate(candidate);
+                return HardHingeEnsureResult.retryable("guide-candidate-lost-after-configuration");
+            }
+        } catch (Exception exception) {
+            removeFacingAxisGuideCandidate(candidate);
+            logFacingAxisGuideException("add-or-configure", bearingPos, exception);
+            return HardHingeEnsureResult.retryable("guide-candidate-exception");
+        }
+
+        GenericConstraintHandle previous = facingAxisGuideHandle;
+        if (isConstraintHandleValid(previous) && !removeFacingAxisGuideHandle(previous, "replace-previous")) {
+            removeFacingAxisGuideCandidate(candidate);
+            return HardHingeEnsureResult.retryable("previous-guide-remove-failed");
+        }
+
+        commitFacingAxisGuide(baseSubLevel, attachedSubLevel, guidePos1, guidePos2, candidate);
+        logFacingAxisHardHingeDiagnostics(
+                serverLevel,
+                pipeline,
+                baseSubLevel,
+                attachedSubLevel,
+                primaryConfiguration,
+                guidePos1,
+                guidePos2,
+                "candidate-committed",
+                true
+        );
+        return HardHingeEnsureResult.ready();
+    }
+
+    void disableFacingAxisHardHinge(String reason) {
+        GenericConstraintHandle handle = facingAxisGuideHandle;
+        if (handle != null) {
+            removeFacingAxisGuideHandle(handle, reason);
+        }
+        clearFacingAxisGuideMetadata();
+    }
+
+    private boolean facingAxisGuideMatches(
+            @Nullable ServerSubLevel baseSubLevel,
+            ServerSubLevel attachedSubLevel,
+            Vector3d guidePos1,
+            Vector3d guidePos2
+    ) {
+        return isConstraintHandleValid(facingAxisGuideHandle)
+                && facingAxisGuidePrimaryHandle == constraintHandle
+                && facingAxisGuideParentWasRoot == (baseSubLevel == null)
+                && Objects.equals(
+                facingAxisGuideParentSubLevelId,
+                baseSubLevel == null ? null : baseSubLevel.getUniqueId()
+        )
+                && attachedSubLevel.getUniqueId().equals(facingAxisGuideChildSubLevelId)
+                && facingAxisGuideParentRuntimeId == getSubLevelRuntimeId(baseSubLevel)
+                && facingAxisGuideChildRuntimeId == getSubLevelRuntimeId(attachedSubLevel)
+                && facingAxisGuideParentObjectIdentity == getObjectIdentity(baseSubLevel)
+                && facingAxisGuideChildObjectIdentity == getObjectIdentity(attachedSubLevel)
+                && vectorsMatch(facingAxisGuidePos1, guidePos1)
+                && vectorsMatch(facingAxisGuidePos2, guidePos2);
+    }
+
+    private void commitFacingAxisGuide(
+            @Nullable ServerSubLevel baseSubLevel,
+            ServerSubLevel attachedSubLevel,
+            Vector3d guidePos1,
+            Vector3d guidePos2,
+            GenericConstraintHandle handle
+    ) {
+        facingAxisGuideHandle = handle;
+        facingAxisGuidePrimaryHandle = constraintHandle;
+        facingAxisGuideParentWasRoot = baseSubLevel == null;
+        facingAxisGuideParentSubLevelId = baseSubLevel == null ? null : baseSubLevel.getUniqueId();
+        facingAxisGuideChildSubLevelId = attachedSubLevel.getUniqueId();
+        facingAxisGuideParentRuntimeId = getSubLevelRuntimeId(baseSubLevel);
+        facingAxisGuideChildRuntimeId = getSubLevelRuntimeId(attachedSubLevel);
+        facingAxisGuideParentObjectIdentity = getObjectIdentity(baseSubLevel);
+        facingAxisGuideChildObjectIdentity = getObjectIdentity(attachedSubLevel);
+        facingAxisGuidePos1 = new Vector3d(guidePos1);
+        facingAxisGuidePos2 = new Vector3d(guidePos2);
+    }
+
+    private boolean removeFacingAxisGuideHandle(@Nullable GenericConstraintHandle handle, String reason) {
+        if (handle == null) {
+            return true;
+        }
+        try {
+            if (handle.isValid()) {
+                handle.remove();
+            }
+            boolean removed = !handle.isValid();
+            if (TwisterMillDiagnostics.isLoggingEnabled(diagnosticsTarget)) {
+                LOGGER.info("[ServoHardHingeDiag] event=guide-remove reason={} removed={}", reason, removed);
+            }
+            return removed;
+        } catch (Exception exception) {
+            LOGGER.warn("[ServoHardHingeDiag] event=guide-remove-failed reason={}", reason, exception);
+            return false;
+        }
+    }
+
+    private void removeFacingAxisGuideCandidate(@Nullable GenericConstraintHandle candidate) {
+        removeFacingAxisGuideHandle(candidate, "candidate-rollback");
+    }
+
+    private void clearFacingAxisGuideMetadata() {
+        facingAxisGuideHandle = null;
+        facingAxisGuidePrimaryHandle = null;
+        facingAxisGuideParentSubLevelId = null;
+        facingAxisGuideChildSubLevelId = null;
+        facingAxisGuideParentWasRoot = false;
+        facingAxisGuideParentRuntimeId = Integer.MIN_VALUE;
+        facingAxisGuideChildRuntimeId = Integer.MIN_VALUE;
+        facingAxisGuideParentObjectIdentity = Integer.MIN_VALUE;
+        facingAxisGuideChildObjectIdentity = Integer.MIN_VALUE;
+        facingAxisGuidePos1 = null;
+        facingAxisGuidePos2 = null;
+        facingAxisGuideLastDiagnosticTick = Long.MIN_VALUE;
+    }
+
+    private static boolean isRetryableHardHingeResolveFailure(RefreshFailureReason failureReason) {
+        return failureReason == RefreshFailureReason.CONTAINER_UNAVAILABLE
+                || failureReason == RefreshFailureReason.SUBLEVEL_NOT_FOUND
+                || failureReason == RefreshFailureReason.BASE_CONTEXT_UNAVAILABLE
+                || failureReason == RefreshFailureReason.PARENT_SUBLEVEL_NOT_READY
+                || failureReason == RefreshFailureReason.CONSTRAINT_ATTACH_FAILED
+                || failureReason == RefreshFailureReason.CONSTRAINT_REATTACH_PENDING;
+    }
+
+    private static int getSubLevelRuntimeId(@Nullable ServerSubLevel subLevel) {
+        if (subLevel == null) {
+            return Integer.MIN_VALUE;
+        }
+        try {
+            return subLevel.getRuntimeId();
+        } catch (Exception ignored) {
+            return Integer.MIN_VALUE;
+        }
+    }
+
+    private static int getObjectIdentity(@Nullable Object object) {
+        return object == null ? 0 : System.identityHashCode(object);
+    }
+
+    private static boolean vectorsMatch(@Nullable Vector3dc first, Vector3dc second) {
+        return first != null
+                && new Vector3d(first).sub(second).lengthSquared()
+                <= FACING_AXIS_GUIDE_FRAME_EPSILON * FACING_AXIS_GUIDE_FRAME_EPSILON;
+    }
+
+    private static boolean isConstraintHandleValid(@Nullable PhysicsConstraintHandle handle) {
+        if (handle == null) {
+            return false;
+        }
+        try {
+            return handle.isValid();
+        } catch (Exception ignored) {
+            return false;
+        }
+    }
+
+    private void logFacingAxisGuideException(String operation, BlockPos bearingPos, Exception exception) {
+        LOGGER.warn(
+                "[ServoHardHingeDiag] event=guide-exception operation={} bearingPos={} childId={}",
+                operation,
+                bearingPos,
+                subLevelId,
+                exception
+        );
+    }
+
+    private void logFacingAxisHardHingeDiagnostics(
+            ServerLevel serverLevel,
+            PhysicsPipeline pipeline,
+            @Nullable ServerSubLevel baseSubLevel,
+            ServerSubLevel attachedSubLevel,
+            RotaryConstraintConfiguration primaryConfiguration,
+            Vector3d guidePos1,
+            Vector3d guidePos2,
+            String event,
+            boolean force
+    ) {
+        if (!TwisterMillDiagnostics.isLoggingEnabled(diagnosticsTarget)) {
+            return;
+        }
+        long gameTime = serverLevel.getGameTime();
+        if (!force
+                && facingAxisGuideLastDiagnosticTick != Long.MIN_VALUE
+                && gameTime >= facingAxisGuideLastDiagnosticTick
+                && gameTime - facingAxisGuideLastDiagnosticTick < FACING_AXIS_GUIDE_DIAGNOSTIC_INTERVAL_TICKS) {
+            return;
+        }
+        facingAxisGuideLastDiagnosticTick = gameTime;
+
+        try {
+            Pose3dc parentPose = baseSubLevel == null ? new Pose3d() : baseSubLevel.logicalPose();
+            Pose3dc childPose = attachedSubLevel.logicalPose();
+            Vector3d primaryParentWorld = parentPose.transformPosition(primaryConfiguration.pos1(), new Vector3d());
+            Vector3d primaryChildWorld = childPose.transformPosition(primaryConfiguration.pos2(), new Vector3d());
+            Vector3d guideParentWorld = parentPose.transformPosition(guidePos1, new Vector3d());
+            Vector3d guideChildWorld = childPose.transformPosition(guidePos2, new Vector3d());
+            Vector3d axisParentWorld = parentPose.transformNormal(primaryConfiguration.normal1(), new Vector3d());
+            Vector3d axisChildWorld = childPose.transformNormal(primaryConfiguration.normal2(), new Vector3d());
+            if (axisParentWorld.lengthSquared() > 1.0E-12D) {
+                axisParentWorld.normalize();
+            }
+            if (axisChildWorld.lengthSquared() > 1.0E-12D) {
+                axisChildWorld.normalize();
+            }
+            Vector3d relativeAngularVelocity = pipeline.getAngularVelocity(attachedSubLevel, new Vector3d());
+            if (baseSubLevel != null) {
+                relativeAngularVelocity.sub(pipeline.getAngularVelocity(baseSubLevel, new Vector3d()));
+            }
+            Vector3d orthogonalAngularVelocity = new Vector3d(relativeAngularVelocity)
+                    .fma(-relativeAngularVelocity.dot(axisParentWorld), axisParentWorld);
+            LOGGER.info(
+                    "[ServoHardHingeDiag] event={} gameTime={} parentId={} childId={} primaryPivotErrorBlocks={} guidePointErrorBlocks={} axisDot={} orthogonalRelativeAngularVelocityRadiansPerSecond={} guideValid={}",
+                    event,
+                    gameTime,
+                    baseSubLevel == null ? "<root>" : baseSubLevel.getUniqueId(),
+                    attachedSubLevel.getUniqueId(),
+                    formatDouble(distance(primaryParentWorld, primaryChildWorld)),
+                    formatDouble(distance(guideParentWorld, guideChildWorld)),
+                    formatDouble(axisParentWorld.dot(axisChildWorld)),
+                    formatDouble(orthogonalAngularVelocity.length()),
+                    isConstraintHandleValid(facingAxisGuideHandle)
+            );
+        } catch (Exception exception) {
+            logFacingAxisGuideException("diagnostics", BlockPos.ZERO, exception);
+        }
     }
 
     private boolean attachConstraint(ServerLevel serverLevel, ServerSubLevel attachedSubLevel, BlockPos bearingPos,
@@ -3335,6 +3736,7 @@ final class SableInteractiveContraptionBackend {
     }
 
     private void removeConstraintHandle() {
+        disableFacingAxisHardHinge("primary-remove");
         if (constraintHandle != null) {
             try {
                 if (constraintHandle.isValid()) {
@@ -3350,6 +3752,7 @@ final class SableInteractiveContraptionBackend {
     }
 
     private void clearRuntimeCache() {
+        disableFacingAxisHardHinge("runtime-cache-clear");
         subLevel = null;
         constraintHandle = null;
         constraintRotationProfile = null;

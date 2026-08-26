@@ -25,6 +25,7 @@ import com.simibubi.create.foundation.blockEntity.behaviour.ValueBoxTransform;
 import com.simibubi.create.foundation.blockEntity.behaviour.scrollValue.ScrollOptionBehaviour;
 import com.simibubi.create.foundation.utility.CreateLang;
 import dev.ryanhcode.sable.Sable;
+import dev.ryanhcode.sable.api.block.BlockEntitySubLevelActor;
 import dev.ryanhcode.sable.api.sublevel.SubLevelContainer;
 import dev.ryanhcode.sable.companion.ClientSubLevelAccess;
 import dev.ryanhcode.sable.companion.math.Pose3d;
@@ -62,7 +63,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
-public class WindRotoBlockEntity extends MechanicalBearingBlockEntity {
+public class WindRotoBlockEntity extends MechanicalBearingBlockEntity implements BlockEntitySubLevelActor {
 
     private static final Logger LOGGER = LogUtils.getLogger();
     private static final int OUTSIDE_CHECK_TICKS = 100;
@@ -365,6 +366,19 @@ public class WindRotoBlockEntity extends MechanicalBearingBlockEntity {
         if (activeSubLevelId != null) {
             target.add(activeSubLevelId);
         }
+    }
+
+    @Override
+    public Iterable<SubLevel> sable$getConnectionDependencies() {
+        return TwisterMillSableSchematicRemapper.resolveConnectionDependencies(
+                level,
+                this::collectChildSubLevelIdsForWindRotoSailCount
+        );
+    }
+
+    @Override
+    public Iterable<SubLevel> sable$getLoadingDependencies() {
+        return List.of();
     }
 
     public boolean addBoundServo(BlockPos servoPos, boolean inverted) {
@@ -1659,10 +1673,20 @@ public class WindRotoBlockEntity extends MechanicalBearingBlockEntity {
         if (!clientPacket) {
             rememberedShipMemory.write(tag);
         }
+        TwisterMillSableSchematicRemapper.remapForWrite(
+                tag,
+                clientPacket,
+                TwisterMillSableSchematicRemapper.OwnerType.WIND_ROTO
+        );
     }
 
     @Override
     public void read(CompoundTag tag, HolderLookup.Provider registries, boolean clientPacket) {
+        tag = TwisterMillSableSchematicRemapper.prepareForRead(
+                tag,
+                clientPacket,
+                TwisterMillSableSchematicRemapper.OwnerType.WIND_ROTO
+        );
         super.read(tag, registries, clientPacket);
 
         forceRotationModePlace();
